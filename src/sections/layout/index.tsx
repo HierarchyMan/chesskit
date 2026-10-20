@@ -55,7 +55,7 @@ export default function Layout({ children }: PropsWithChildren) {
 
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
+      <CssBaseline enableColorScheme />
       <Box sx={{ display: "flex", minHeight: "100vh" }}>
         <NavMenu
           mobileOpen={mobileMenuOpen}
