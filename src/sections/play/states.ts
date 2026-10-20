@@ -5,6 +5,7 @@ import {
   clampDepth,
   clampElo,
 } from "@/lib/engine/strength";
+import { ChallengeStatus } from "@/lib/endgames";
 import { GameEnd } from "@/lib/gameResult";
 import { Odds } from "@/lib/odds";
 import { storedAtom } from "@/lib/storedAtom";
@@ -36,6 +37,8 @@ export const startingPositionAtom = atom("");
 export const boardFlippedAtom = atom(false);
 export const hintArrowsAtom = atom<Arrow[]>([]);
 export const botThinkingAtom = atom(false);
+export const challengeIdAtom = atom<string | null>(null);
+export const challengeStatusAtom = atom<ChallengeStatus>("active");
 
 const isEngineName = (value: unknown): value is EngineName =>
   Object.values(EngineName).includes(value as EngineName);

@@ -1,6 +1,7 @@
 import { ENGINE_LABELS } from "@/constants";
 import { useChessActions } from "@/hooks/useChessActions";
-import { BotStrength } from "@/lib/engine/strength";
+import { getEndgame } from "@/lib/endgames";
+import { BotStrength, CHALLENGE_STRENGTH } from "@/lib/engine/strength";
 import { Odds, getOddsFen } from "@/lib/odds";
 import { loadGameFromText, normalizeFen } from "@/lib/pgn";
 import { Color, EngineName } from "@/types/enums";
@@ -13,6 +14,8 @@ import {
   coachAtom,
   boardFlippedAtom,
   botStrengthAtom,
+  challengeIdAtom,
+  challengeStatusAtom,
   colorChoiceAtom,
   enginePlayNameAtom,
   gameAtom,
@@ -58,8 +61,24 @@ export const useStartGame = () => {
   const { reset: resetGame } = useChessActions(gameAtom);
 
   const startGame = useCallback(
-    (overrides?: { playerColor?: Color }): string | undefined => {
-      const choice = overrides?.playerColor ?? store.get(colorChoiceAtom);
+    (overrides?: {
+      playerColor?: Color;
+      challengeId?: string;
+    }): string | undefined => {
+      const challenge = overrides?.challengeId
+        ? getEndgame(overrides.challengeId)
+        : undefined;
+      if (overrides?.challengeId && !challenge) {
+        return "That endgame does not exist.";
+      }
+
+      const choice =
+        overrides?.playerColor ??
+        (challenge
+          ? challenge.player === "w"
+            ? Color.White
+            : Color.Black
+          : store.get(colorChoiceAtom));
       const playerColor =
         choice === "random"
           ? Math.random() < 0.5
@@ -69,15 +88,19 @@ export const useStartGame = () => {
       const botColor = playerColor === Color.White ? Color.Black : Color.White;
 
       const engineName = store.get(enginePlayNameAtom);
-      const strength = store.get(botStrengthAtom);
+      const strength = challenge
+        ? CHALLENGE_STRENGTH
+        : store.get(botStrengthAtom);
 
       let startFen: string | undefined;
       try {
-        startFen = resolveStartFen(
-          store.get(startingPositionAtom),
-          store.get(oddsAtom),
-          botColor
-        );
+        startFen = challenge
+          ? challenge.fen
+          : resolveStartFen(
+              store.get(startingPositionAtom),
+              store.get(oddsAtom),
+              botColor
+            );
         if (startFen && new Chess(startFen).isGameOver()) {
           return "That position is already finished.";
         }
@@ -100,11 +123,18 @@ export const useStartGame = () => {
       });
 
       store.set(playerColorAtom, playerColor);
-      store.set(activeGameModeAtom, store.get(gameModeAtom));
+      store.set(
+        activeGameModeAtom,
+        challenge ? "casual" : store.get(gameModeAtom)
+      );
       store.set(
         activeCoachAtom,
-        store.get(gameModeAtom) === "casual" && store.get(coachAtom)
+        !challenge &&
+          store.get(gameModeAtom) === "casual" &&
+          store.get(coachAtom)
       );
+      store.set(challengeIdAtom, challenge?.id ?? null);
+      store.set(challengeStatusAtom, "active");
       store.set(gameEndAtom, null);
       store.set(savedGameIdAtom, null);
       store.set(boardFlippedAtom, false);
@@ -124,9 +154,16 @@ export const useStartGame = () => {
     store.set(savedGameIdAtom, null);
     store.set(hintArrowsAtom, []);
     store.set(boardFlippedAtom, false);
+    store.set(challengeIdAtom, null);
+    store.set(challengeStatusAtom, "active");
   }, [store, resetGame]);
 
-  return { startGame, backToSetup };
+  const startChallenge = useCallback(
+    (id: string) => startGame({ challengeId: id }),
+    [startGame]
+  );
+
+  return { startGame, startChallenge, backToSetup };
 };
 
 export type StartGame = ReturnType<typeof useStartGame>;

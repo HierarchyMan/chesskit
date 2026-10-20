@@ -37,6 +37,12 @@ export const DEFAULT_STRENGTH: BotStrength = {
   depth: 8,
 };
 
+export const CHALLENGE_STRENGTH: BotStrength = {
+  mode: "max",
+  elo: MAX_BOT_ELO,
+  depth: FULL_STRENGTH_DEPTH,
+};
+
 export const STRENGTH_PRESETS: { label: string; elo: number }[] = [
   { label: "Beginner", elo: 600 },
   { label: "Casual", elo: 1000 },

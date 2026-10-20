@@ -4,7 +4,7 @@ import { useGameData } from "@/hooks/useGameData";
 import { usePlayersData } from "@/hooks/usePlayersData";
 import { uciMoveParams } from "@/lib/chess";
 import { getBotMove } from "@/lib/engine/botMove";
-import { maxDepthForTime } from "@/lib/engine/strength";
+import { CHALLENGE_STRENGTH, maxDepthForTime } from "@/lib/engine/strength";
 import { UciEngine } from "@/lib/engine/uciEngine";
 import { sleep } from "@/lib/helpers";
 import { Color } from "@/types/enums";
@@ -14,6 +14,7 @@ import {
   boardFlippedAtom,
   botStrengthAtom,
   botThinkingAtom,
+  challengeIdAtom,
   clocksAtom,
   gameAtom,
   gameDataAtom,
@@ -58,7 +59,9 @@ export default function BoardContainer({ engine, boardSize }: Props) {
         const move = await getBotMove(
           engine,
           gameFen,
-          store.get(botStrengthAtom),
+          store.get(challengeIdAtom)
+            ? CHALLENGE_STRENGTH
+            : store.get(botStrengthAtom),
           { maxDepth: maxDepthForTime(botClock) }
         );
         await minimumThinkTime;

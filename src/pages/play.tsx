@@ -13,6 +13,7 @@ import {
   startingPositionAtom,
 } from "@/sections/play/states";
 import { useGameLifecycle } from "@/sections/play/useGameLifecycle";
+import { useStartGame } from "@/sections/play/useStartGame";
 import { Box } from "@mui/material";
 import { useAtomValue, useSetAtom } from "jotai";
 
@@ -25,13 +26,17 @@ export default function Play() {
   const game = useAtomValue(gameAtom);
   const end = useAtomValue(gameEndAtom);
   const setStartingPosition = useSetAtom(startingPositionAtom);
+  const { startChallenge } = useStartGame();
   const { boardSize, sideBySide } = useBoardLayout({
     sidePanelWidth: SIDE_PANEL_WIDTH,
   });
 
   useGameLifecycle();
 
-  useHandoff(["fen"], ({ fen }) => setStartingPosition(fen));
+  useHandoff(["fen", "challenge"], (handoff) => {
+    if (handoff.kind === "challenge") startChallenge(handoff.id);
+    else setStartingPosition(handoff.fen);
+  });
 
   const hasGame = isInProgress || game.history().length > 0 || !!end;
 

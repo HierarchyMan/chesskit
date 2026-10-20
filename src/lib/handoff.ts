@@ -1,7 +1,8 @@
 export type Handoff =
   | { kind: "pgn"; pgn: string; orientation?: "white" | "black" }
   | { kind: "fen"; fen: string }
-  | { kind: "image"; dataUrl: string };
+  | { kind: "image"; dataUrl: string }
+  | { kind: "challenge"; id: string };
 
 export const HANDOFF_EVENT = "chesskit:handoff";
 

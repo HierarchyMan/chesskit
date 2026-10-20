@@ -4,7 +4,8 @@ import TopMovesPanel from "@/components/topMovesPanel";
 import { ENGINE_LABELS } from "@/constants";
 import { EngineState, useEngineState } from "@/hooks/useEngine";
 import { useChessActions } from "@/hooks/useChessActions";
-import { scoreFromLine } from "@/lib/engine/strength";
+import { getEndgame } from "@/lib/endgames";
+import { CHALLENGE_STRENGTH, scoreFromLine } from "@/lib/engine/strength";
 import { MoveSide } from "@/lib/engine/topMoves";
 import { getGameResult, getOutcomeFor } from "@/lib/gameResult";
 import { engineNameAtom } from "@/sections/analysis/states";
@@ -28,6 +29,7 @@ import {
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
+import ChallengeCard from "./challengeCard";
 import CoachCard from "./coachCard";
 import {
   activeCoachAtom,
@@ -35,6 +37,7 @@ import {
   boardFlippedAtom,
   botStrengthAtom,
   botThinkingAtom,
+  challengeIdAtom,
   enginePlayNameAtom,
   gameAtom,
   gameEndAtom,
@@ -58,7 +61,10 @@ export default function GamePanel({ botEngine }: Props) {
   const [end, setEnd] = useAtom(gameEndAtom);
   const botThinking = useAtomValue(botThinkingAtom);
   const botEngineName = useAtomValue(enginePlayNameAtom);
-  const strength = useAtomValue(botStrengthAtom);
+  const savedStrength = useAtomValue(botStrengthAtom);
+  const challengeId = useAtomValue(challengeIdAtom);
+  const challenge = challengeId ? getEndgame(challengeId) : undefined;
+  const strength = challenge ? CHALLENGE_STRENGTH : savedStrength;
   const setFlipped = useSetAtom(boardFlippedAtom);
   const setHintArrows = useSetAtom(hintArrowsAtom);
   const analysisEngineName = useAtomValue(engineNameAtom);
@@ -143,6 +149,8 @@ export default function GamePanel({ botEngine }: Props) {
 
   return (
     <Stack spacing={2}>
+      {challenge && <ChallengeCard endgame={challenge} />}
+
       <Panel
         title={
           <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
@@ -155,6 +163,7 @@ export default function GamePanel({ botEngine }: Props) {
             {strength.mode === "depth" && (
               <Chip size="small" label={`depth ${strength.depth}`} />
             )}
+            {strength.mode === "max" && <Chip size="small" label="max" />}
             <Chip
               size="small"
               variant="outlined"
@@ -365,7 +374,8 @@ function ResultCard({
   const game = useAtomValue(gameAtom);
   const playerColor = useAtomValue(playerColorAtom);
   const savedGameId = useAtomValue(savedGameIdAtom);
-  const { startGame, backToSetup } = useStartGame();
+  const challengeId = useAtomValue(challengeIdAtom);
+  const { startGame, startChallenge, backToSetup } = useStartGame();
   const [copied, setCopied] = useState("");
 
   const headline =
@@ -417,9 +427,13 @@ function ResultCard({
           <Button
             variant="outlined"
             startIcon={<Icon icon="mdi:sync" height={18} />}
-            onClick={() => startGame({ playerColor: opposite(playerColor) })}
+            onClick={() =>
+              challengeId
+                ? startChallenge(challengeId)
+                : startGame({ playerColor: opposite(playerColor) })
+            }
           >
-            Rematch
+            {challengeId ? "Try again" : "Rematch"}
           </Button>
           <Button
             variant="outlined"
