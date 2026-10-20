@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatLine, getFenForSide, linesToTopMoves } from "@/lib/engine/topMoves";
+import {
+  formatLine,
+  getFenForSide,
+  linesToTopMoves,
+} from "@/lib/engine/topMoves";
 
 const IN_CHECK =
   "rnbqkbnr/ppp2ppp/8/1B1pp3/4P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 3";
@@ -82,10 +86,9 @@ describe("linesToTopMoves", () => {
   });
 
   it("labels mates", () => {
-    const [move] = linesToTopMoves(
-      "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1",
-      [{ pv: ["a1a8"], mate: 1, depth: 3, multiPv: 1 }]
-    );
+    const [move] = linesToTopMoves("6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1", [
+      { pv: ["a1a8"], mate: 1, depth: 3, multiPv: 1 },
+    ]);
     assert.equal(move.san, "Ra8#");
     assert.equal(move.evalLabel, "+M1");
   });
@@ -102,7 +105,8 @@ describe("formatLine", () => {
   });
 
   it("continues the move numbers of a later position", () => {
-    const fen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
+    const fen =
+      "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
     assert.equal(formatLine(fen, ["Bb5", "a6"]), "3. Bb5 a6");
   });
 });

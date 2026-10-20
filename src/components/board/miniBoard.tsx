@@ -11,6 +11,7 @@ interface Props {
   orientation?: Color;
   arrows?: Arrow[];
   lastMove?: { from: string; to: string };
+  squareStyles?: Record<string, CSSProperties>;
   animationDuration?: number;
   showCoordinates?: boolean;
 }
@@ -25,6 +26,7 @@ export default function MiniBoard({
   orientation = Color.White,
   arrows,
   lastMove,
+  squareStyles: extraSquareStyles,
   animationDuration = 250,
   showCoordinates,
 }: Props) {
@@ -32,11 +34,13 @@ export default function MiniBoard({
   const id = useId();
 
   const squareStyles = useMemo(
-    () =>
-      lastMove
+    () => ({
+      ...(lastMove
         ? { [lastMove.from]: LAST_MOVE_STYLE, [lastMove.to]: LAST_MOVE_STYLE }
-        : {},
-    [lastMove]
+        : {}),
+      ...(extraSquareStyles ?? {}),
+    }),
+    [lastMove, extraSquareStyles]
   );
 
   return (

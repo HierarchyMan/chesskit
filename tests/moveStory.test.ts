@@ -74,7 +74,18 @@ describe("buildMoveStory", () => {
 
   it("never shows more than ten moves after the played one", () => {
     const quiet = [
-      "e7e5", "g1f3", "b8c6", "f1b5", "g8f6", "e1g1", "f6e4", "d2d4", "e5d4", "f1e1", "d7d5", "c3e4",
+      "e7e5",
+      "g1f3",
+      "b8c6",
+      "f1b5",
+      "g8f6",
+      "e1g1",
+      "f6e4",
+      "d2d4",
+      "e5d4",
+      "f1e1",
+      "d7d5",
+      "c3e4",
     ];
     const story = buildMoveStory({
       fenBefore: START,

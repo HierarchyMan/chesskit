@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { describeMove, joinClauses, pieceAttacks } from "@/lib/visualize/explain";
+import {
+  describeMove,
+  joinClauses,
+  pieceAttacks,
+} from "@/lib/visualize/explain";
 import { Chess } from "chess.js";
 
 describe("joinClauses", () => {
@@ -22,14 +26,26 @@ describe("pieceAttacks", () => {
 
   it("knows knight and pawn geometry", () => {
     const game = new Chess("4k3/8/8/3N4/4P3/8/8/4K3 w - - 0 1");
-    assert.deepEqual([...pieceAttacks(game, "d5")].sort(), ["b4", "b6", "c3", "c7", "e3", "e7", "f4", "f6"]);
+    assert.deepEqual([...pieceAttacks(game, "d5")].sort(), [
+      "b4",
+      "b6",
+      "c3",
+      "c7",
+      "e3",
+      "e7",
+      "f4",
+      "f6",
+    ]);
     assert.deepEqual([...pieceAttacks(game, "e4")].sort(), ["d5", "f5"]);
   });
 });
 
 describe("describeMove", () => {
   it("describes a quiet development move", () => {
-    const result = describeMove("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "g1f3");
+    const result = describeMove(
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "g1f3"
+    );
     assert.match(result.text, /^White moves the knight to f3/);
     assert.ok(result.tags.includes("develop"));
   });
@@ -82,7 +98,10 @@ describe("describeMove", () => {
   });
 
   it("flags a new threat", () => {
-    const result = describeMove("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", "g1f3");
+    const result = describeMove(
+      "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+      "g1f3"
+    );
     assert.ok(result.tags.includes("threat"));
     assert.match(result.text, /attacking the pawn on e5/);
   });
@@ -115,7 +134,10 @@ describe("describeMove", () => {
   });
 
   it("describes en passant", () => {
-    const result = describeMove("rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3", "e5d6");
+    const result = describeMove(
+      "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3",
+      "e5d6"
+    );
     assert.match(result.text, /en passant/);
   });
 });

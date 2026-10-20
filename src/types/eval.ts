@@ -47,6 +47,7 @@ export interface EvaluatePositionWithUpdateParams {
   setPartialEval?: (positionEval: PositionEval) => void;
   useCloudEval?: boolean;
   movetimeMs?: number;
+  elo?: number;
 }
 
 export interface CurrentPosition {

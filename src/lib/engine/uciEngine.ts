@@ -387,6 +387,7 @@ export class UciEngine {
     setPartialEval,
     useCloudEval = true,
     movetimeMs,
+    elo,
   }: EvaluatePositionWithUpdateParams): Promise<PositionEval> {
     this.throwErrorIfNotReady();
 
@@ -396,7 +397,7 @@ export class UciEngine {
 
     await this.stopAllCurrentJobs();
     await this.setMultiPv(multiPv);
-    await this.setElo(undefined);
+    await this.setElo(elo);
 
     let lastUpdate = 0;
     const THROTTLE_MS = 60; // Limit UI updates to ~16 updates per second to avoid performance issues

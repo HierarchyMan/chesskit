@@ -41,6 +41,15 @@ export async function resolve(specifier, context, nextResolve) {
 }
 
 export async function load(url, context, nextLoad) {
+  if (url.startsWith("file:") && url.endsWith(".json")) {
+    const text = readFileSync(fileURLToPath(url), "utf8");
+    return {
+      format: "module",
+      source: `export default ${text};`,
+      shortCircuit: true,
+    };
+  }
+
   if (!url.startsWith("file:") || !/\.tsx?$/.test(url)) {
     return nextLoad(url, context);
   }

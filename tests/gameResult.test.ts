@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Chess } from "chess.js";
 import { Color } from "@/types/enums";
-import { getGameResult, getOutcomeFor, hasMatingMaterial } from "@/lib/gameResult";
+import {
+  getGameResult,
+  getOutcomeFor,
+  hasMatingMaterial,
+} from "@/lib/gameResult";
 
 const play = (...moves: string[]) => {
   const game = new Chess();
@@ -30,7 +34,10 @@ describe("getGameResult", () => {
   });
 
   it("scores resignation for the other side", () => {
-    const info = getGameResult(new Chess(), { type: "resign", loser: Color.White });
+    const info = getGameResult(new Chess(), {
+      type: "resign",
+      loser: Color.White,
+    });
     assert.equal(info.winner, Color.Black);
     assert.equal(info.result, "0-1");
   });
@@ -42,7 +49,10 @@ describe("getGameResult", () => {
   });
 
   it("gives the win on time when the opponent can mate", () => {
-    const info = getGameResult(new Chess(), { type: "timeout", loser: Color.Black });
+    const info = getGameResult(new Chess(), {
+      type: "timeout",
+      loser: Color.Black,
+    });
     assert.equal(info.winner, Color.White);
   });
 
@@ -55,19 +65,34 @@ describe("getGameResult", () => {
 
 describe("hasMatingMaterial", () => {
   it("counts pawns, rooks and queens", () => {
-    assert.equal(hasMatingMaterial(new Chess("8/8/8/4k3/8/8/4K2P/8 w - - 0 1"), "w"), true);
-    assert.equal(hasMatingMaterial(new Chess("8/8/8/4k3/8/8/4K3/8 w - - 0 1"), "w"), false);
+    assert.equal(
+      hasMatingMaterial(new Chess("8/8/8/4k3/8/8/4K2P/8 w - - 0 1"), "w"),
+      true
+    );
+    assert.equal(
+      hasMatingMaterial(new Chess("8/8/8/4k3/8/8/4K3/8 w - - 0 1"), "w"),
+      false
+    );
   });
 
   it("needs more than one lone minor piece", () => {
-    assert.equal(hasMatingMaterial(new Chess("8/8/8/4k3/8/8/4K1N1/8 w - - 0 1"), "w"), false);
-    assert.equal(hasMatingMaterial(new Chess("8/8/8/4k3/8/8/4K1NN/8 w - - 0 1"), "w"), true);
+    assert.equal(
+      hasMatingMaterial(new Chess("8/8/8/4k3/8/8/4K1N1/8 w - - 0 1"), "w"),
+      false
+    );
+    assert.equal(
+      hasMatingMaterial(new Chess("8/8/8/4k3/8/8/4K1NN/8 w - - 0 1"), "w"),
+      true
+    );
   });
 });
 
 describe("getOutcomeFor", () => {
   it("maps results to the player's point of view", () => {
-    const whiteWins = getGameResult(new Chess(), { type: "resign", loser: Color.Black });
+    const whiteWins = getGameResult(new Chess(), {
+      type: "resign",
+      loser: Color.Black,
+    });
     assert.equal(getOutcomeFor(whiteWins, Color.White), "won");
     assert.equal(getOutcomeFor(whiteWins, Color.Black), "lost");
     const draw = getGameResult(new Chess(), { type: "draw-agreed" });

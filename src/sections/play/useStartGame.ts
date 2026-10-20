@@ -8,7 +8,9 @@ import { Chess } from "chess.js";
 import { useStore } from "jotai";
 import { useCallback } from "react";
 import {
+  activeCoachAtom,
   activeGameModeAtom,
+  coachAtom,
   boardFlippedAtom,
   botStrengthAtom,
   colorChoiceAtom,
@@ -99,6 +101,10 @@ export const useStartGame = () => {
 
       store.set(playerColorAtom, playerColor);
       store.set(activeGameModeAtom, store.get(gameModeAtom));
+      store.set(
+        activeCoachAtom,
+        store.get(gameModeAtom) === "casual" && store.get(coachAtom)
+      );
       store.set(gameEndAtom, null);
       store.set(savedGameIdAtom, null);
       store.set(boardFlippedAtom, false);

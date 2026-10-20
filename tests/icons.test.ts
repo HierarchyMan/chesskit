@@ -23,20 +23,31 @@ describe("icon bundle", () => {
 
     const available = new Set(
       bundle.flatMap((collection) => [
-        ...Object.keys(collection.icons).map((name) => `${collection.prefix}:${name}`),
-        ...Object.keys(collection.aliases ?? {}).map((name) => `${collection.prefix}:${name}`),
+        ...Object.keys(collection.icons).map(
+          (name) => `${collection.prefix}:${name}`
+        ),
+        ...Object.keys(collection.aliases ?? {}).map(
+          (name) => `${collection.prefix}:${name}`
+        ),
       ])
     );
 
     const missing = new Set<string>();
     for (const file of walk("src").filter((path) => /\.(ts|tsx)$/.test(path))) {
       const text = readFileSync(file, "utf8");
-      for (const match of text.matchAll(/["'`]([a-z0-9-]+):([a-z0-9-]+)["'`]/g)) {
+      for (const match of text.matchAll(
+        /["'`]([a-z0-9-]+):([a-z0-9-]+)["'`]/g
+      )) {
         const name = `${match[1]}:${match[2]}`;
-        if (PREFIXES.includes(match[1]) && !available.has(name)) missing.add(name);
+        if (PREFIXES.includes(match[1]) && !available.has(name))
+          missing.add(name);
       }
     }
 
-    assert.deepEqual([...missing], [], "run `npm run icons` to add the missing icons");
+    assert.deepEqual(
+      [...missing],
+      [],
+      "run `npm run icons` to add the missing icons"
+    );
   });
 });

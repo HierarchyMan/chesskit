@@ -18,6 +18,8 @@ import {
   OutlinedInput,
   Select,
   Stack,
+  Switch,
+  FormControlLabel,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -30,6 +32,7 @@ import {
   ColorChoice,
   GameMode,
   botStrengthAtom,
+  coachAtom,
   colorChoiceAtom,
   enginePlayNameAtom,
   gameModeAtom,
@@ -60,6 +63,7 @@ export default function NewGamePanel({ botEngine }: Props) {
   const [engineName, setEngineName] = useAtom(enginePlayNameAtom);
   const [strength, setStrength] = useAtom(botStrengthAtom);
   const [mode, setMode] = useAtom(gameModeAtom);
+  const [coach, setCoach] = useAtom(coachAtom);
   const [colorChoice, setColorChoice] = useAtom(colorChoiceAtom);
   const [timeControl, setTimeControl] = useAtom(timeControlAtom);
   const [odds, setOdds] = useAtom(oddsAtom);
@@ -154,6 +158,23 @@ export default function NewGamePanel({ botEngine }: Props) {
               ? "Hints, top moves for either side and takebacks are available. Great for learning."
               : "No hints and no takebacks, like a real game. Every move counts."}
           </Typography>
+          {mode === "casual" && (
+            <FormControlLabel
+              sx={{ mt: 0.5 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={coach}
+                  onChange={(_, checked) => setCoach(checked)}
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  Coach: rate each of my moves and show what weak ones lead to
+                </Typography>
+              }
+            />
+          )}
         </Section>
 
         <Section title="Time">

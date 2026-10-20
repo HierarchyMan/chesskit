@@ -28,6 +28,7 @@ export const playerColorAtom = atom<Color>(Color.White);
 export const isGameInProgressAtom = atom(false);
 export const gameIdAtom = atom(0);
 export const activeGameModeAtom = atom<GameMode>("casual");
+export const activeCoachAtom = atom(false);
 export const gameEndAtom = atom<GameEnd | null>(null);
 export const clocksAtom = atom<{ w: number; b: number } | null>(null);
 export const savedGameIdAtom = atom<number | null>(null);
@@ -91,6 +92,12 @@ export const gameModeAtom = storedAtom<GameMode>(
   "play-game-mode",
   "casual",
   (value): value is GameMode => value === "casual" || value === "formal"
+);
+
+export const coachAtom = storedAtom<boolean>(
+  "play-coach",
+  true,
+  (value): value is boolean => typeof value === "boolean"
 );
 
 export const colorChoiceAtom = storedAtom<ColorChoice>(

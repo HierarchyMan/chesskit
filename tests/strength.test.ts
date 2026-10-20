@@ -41,7 +41,10 @@ describe("planMove", () => {
   });
 
   it("plays plain best moves above the emulated range", () => {
-    assert.equal(planMove({ mode: "elo", elo: 3000, depth: 8 }, false).kind, "best");
+    assert.equal(
+      planMove({ mode: "elo", elo: 3000, depth: 8 }, false).kind,
+      "best"
+    );
   });
 
   it("gets weaker as Elo drops", () => {
@@ -77,8 +80,12 @@ describe("scoreFromLine", () => {
   });
 
   it("prefers faster mates", () => {
-    assert.ok(scoreFromLine({ mate: 1 }, "w") > scoreFromLine({ mate: 3 }, "w"));
-    assert.ok(scoreFromLine({ mate: -1 }, "w") < scoreFromLine({ mate: -3 }, "w"));
+    assert.ok(
+      scoreFromLine({ mate: 1 }, "w") > scoreFromLine({ mate: 3 }, "w")
+    );
+    assert.ok(
+      scoreFromLine({ mate: -1 }, "w") < scoreFromLine({ mate: -3 }, "w")
+    );
   });
 });
 
@@ -91,29 +98,62 @@ describe("pickSampledMove", () => {
   const legal = ["e2e4", "d2d4", "a2a3", "h2h3"];
 
   it("takes the best move when nothing pushes it away", () => {
-    const move = pickSampledMove(candidates, legal, sampledPlan({ temperatureCp: 1 }), 1500, seeded([0.99]));
+    const move = pickSampledMove(
+      candidates,
+      legal,
+      sampledPlan({ temperatureCp: 1 }),
+      1500,
+      seeded([0.99])
+    );
     assert.equal(move, "e2e4");
   });
 
   it("can pick a weaker candidate when the roll lands on it", () => {
-    const move = pickSampledMove(candidates, legal, sampledPlan({ temperatureCp: 100 }), 1500, seeded([0.99, 0.6]));
+    const move = pickSampledMove(
+      candidates,
+      legal,
+      sampledPlan({ temperatureCp: 100 }),
+      1500,
+      seeded([0.99, 0.6])
+    );
     assert.equal(move, "d2d4");
   });
 
   it("plays a random legal move when the blunder roll hits", () => {
-    const move = pickSampledMove(candidates, legal, sampledPlan({ randomMoveChance: 0.5 }), 600, seeded([0.1, 0.99]));
+    const move = pickSampledMove(
+      candidates,
+      legal,
+      sampledPlan({ randomMoveChance: 0.5 }),
+      600,
+      seeded([0.1, 0.99])
+    );
     assert.equal(move, "h2h3");
   });
 
   it("always plays a found mate above beginner level", () => {
-    const withMate = [{ uci: "d1h5", cp: 99_999 }, { uci: "a2a3", cp: 0 }];
-    const move = pickSampledMove(withMate, ["d1h5", "a2a3"], sampledPlan({ randomMoveChance: 1 }), 1200, seeded([0]));
+    const withMate = [
+      { uci: "d1h5", cp: 99_999 },
+      { uci: "a2a3", cp: 0 },
+    ];
+    const move = pickSampledMove(
+      withMate,
+      ["d1h5", "a2a3"],
+      sampledPlan({ randomMoveChance: 1 }),
+      1200,
+      seeded([0])
+    );
     assert.equal(move, "d1h5");
   });
 
   it("falls back to a legal move when the engine gave nothing", () => {
-    assert.equal(pickSampledMove([], legal, sampledPlan(), 1000, seeded([0])), "e2e4");
-    assert.equal(pickSampledMove(candidates, [], sampledPlan(), 1000), undefined);
+    assert.equal(
+      pickSampledMove([], legal, sampledPlan(), 1000, seeded([0])),
+      "e2e4"
+    );
+    assert.equal(
+      pickSampledMove(candidates, [], sampledPlan(), 1000),
+      undefined
+    );
   });
 
   it("rarely chooses clearly losing moves at club level", () => {

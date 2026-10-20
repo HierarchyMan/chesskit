@@ -28,7 +28,9 @@ import {
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
+import CoachCard from "./coachCard";
 import {
+  activeCoachAtom,
   activeGameModeAtom,
   boardFlippedAtom,
   botStrengthAtom,
@@ -52,6 +54,7 @@ export default function GamePanel({ botEngine }: Props) {
   const playerColor = useAtomValue(playerColorAtom);
   const [isInProgress, setIsInProgress] = useAtom(isGameInProgressAtom);
   const activeMode = useAtomValue(activeGameModeAtom);
+  const coachActive = useAtomValue(activeCoachAtom);
   const [end, setEnd] = useAtom(gameEndAtom);
   const botThinking = useAtomValue(botThinkingAtom);
   const botEngineName = useAtomValue(enginePlayNameAtom);
@@ -227,6 +230,8 @@ export default function GamePanel({ botEngine }: Props) {
           )}
         </Stack>
       </Panel>
+
+      {coachActive && <CoachCard />}
 
       {isInProgress && isCasual && hintsOpen && (
         <Panel title="Hints">

@@ -33,7 +33,10 @@ describe("recordPuzzle", () => {
   });
 
   it("never drops below the floor", () => {
-    let stats = { ...DEFAULT_STATS, puzzles: { ...DEFAULT_STATS.puzzles, rating: 105 } };
+    let stats = {
+      ...DEFAULT_STATS,
+      puzzles: { ...DEFAULT_STATS.puzzles, rating: 105 },
+    };
     for (let i = 0; i < 20; i++) stats = recordPuzzle(stats, 2500, false);
     assert.ok(stats.puzzles.rating >= 100);
   });

@@ -9,6 +9,10 @@ import Image from "next/image";
 import PrettyMoveSan from "@/components/prettyMoveSan";
 import { moveStoryAtom } from "@/components/moveStoryDialog";
 import { buildMoveStory } from "@/lib/visualize/moveStory";
+import {
+  CLASSIFICATION_PHRASES,
+  WORTH_VISUALIZING,
+} from "@/lib/classificationLabels";
 
 export default function MoveInfo() {
   const position = useAtomValue(currentPositionAtom);
@@ -52,7 +56,7 @@ export default function MoveInfo() {
     !!position.lastEval?.lines.length &&
     !!position.eval?.lines.length &&
     !!moveClassification &&
-    VISUALIZE_CLASSIFICATIONS.includes(moveClassification);
+    WORTH_VISUALIZING.includes(moveClassification);
 
   const handleVisualize = () => {
     const move = position.lastMove;
@@ -105,9 +109,7 @@ export default function MoveInfo() {
             }}
             san={position.lastMove?.san ?? ""}
             color={position.lastMove?.color ?? "w"}
-            additionalText={
-              " is " + moveClassificationLabels[moveClassification]
-            }
+            additionalText={" is " + CLASSIFICATION_PHRASES[moveClassification]}
           />
         </Stack>
       )}
@@ -148,23 +150,3 @@ export default function MoveInfo() {
     </Stack>
   );
 }
-
-const moveClassificationLabels: Record<MoveClassification, string> = {
-  [MoveClassification.Opening]: "an opening move",
-  [MoveClassification.Forced]: "forced",
-  [MoveClassification.Splendid]: "splendid !!",
-  [MoveClassification.Perfect]: "the only good move !",
-  [MoveClassification.Best]: "the best move",
-  [MoveClassification.Excellent]: "excellent",
-  [MoveClassification.Okay]: "an okay move",
-  [MoveClassification.Inaccuracy]: "an inaccuracy",
-  [MoveClassification.Mistake]: "a mistake",
-  [MoveClassification.Blunder]: "a blunder",
-};
-
-const VISUALIZE_CLASSIFICATIONS: MoveClassification[] = [
-  MoveClassification.Okay,
-  MoveClassification.Inaccuracy,
-  MoveClassification.Mistake,
-  MoveClassification.Blunder,
-];

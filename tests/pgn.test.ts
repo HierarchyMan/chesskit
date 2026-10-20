@@ -91,7 +91,7 @@ describe("loadGameFromText", () => {
       3,
     ],
     "bare moves": ["e4 e5 Nf3 Nc6", 4],
-    "variations": ["1. e4 e5 (1... c5 2. Nf3) 2. Nf3 Nc6 1-0", 4],
+    variations: ["1. e4 e5 (1... c5 2. Nf3) 2. Nf3 Nc6 1-0", 4],
   };
 
   for (const [name, [pgn, plies]] of Object.entries(cases)) {
@@ -109,10 +109,7 @@ describe("loadGameFromText", () => {
     const fen = "r3k3/8/8/8/4P3/8/8/3QK3 w - - 0 1";
 
     assert.equal(loadGameFromText(new Chess(fen).pgn()).fen(), fen);
-    assert.equal(
-      loadGameFromText(new Chess().pgn()).fen(),
-      new Chess().fen()
-    );
+    assert.equal(loadGameFromText(new Chess().pgn()).fen(), new Chess().fen());
   });
 
   it("reads a header-only game", () => {
@@ -121,15 +118,20 @@ describe("loadGameFromText", () => {
   });
 
   it("does not turn results into castling", () => {
-    const game = loadGameFromText("1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0");
+    const game = loadGameFromText(
+      "1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0"
+    );
     assert.equal(game.history().length, 7);
     assert.ok(game.isCheckmate());
   });
 
   it("throws a single-line message for illegal moves", () => {
-    assert.throws(() => loadGameFromText("1. e4 e5 2. Ke7"), (error: Error) => {
-      return !error.message.includes("\n");
-    });
+    assert.throws(
+      () => loadGameFromText("1. e4 e5 2. Ke7"),
+      (error: Error) => {
+        return !error.message.includes("\n");
+      }
+    );
   });
 });
 
@@ -162,7 +164,10 @@ describe("parseLichessUrl", () => {
       id: "AbCdEfGh",
       orientation: "black",
     });
-    assert.equal(parseLichessUrl("https://lichess.org/AbCdEfGhIjKl")?.id, "AbCdEfGh");
+    assert.equal(
+      parseLichessUrl("https://lichess.org/AbCdEfGhIjKl")?.id,
+      "AbCdEfGh"
+    );
   });
 
   it("ignores site pages that have eight letters", () => {
