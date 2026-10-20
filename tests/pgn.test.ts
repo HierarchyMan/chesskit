@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { Chess } from "chess.js";
 import {
   detectInput,
   loadGameFromText,
@@ -102,6 +103,21 @@ describe("loadGameFromText", () => {
   it("keeps castling zeros inside comments untouched", () => {
     const game = loadGameFromText("1. e4 {play 0-0 later} e5 *");
     assert.equal(game.history().length, 2);
+  });
+
+  it("reads back the pgn chess.js writes for a game without moves", () => {
+    const fen = "r3k3/8/8/8/4P3/8/8/3QK3 w - - 0 1";
+
+    assert.equal(loadGameFromText(new Chess(fen).pgn()).fen(), fen);
+    assert.equal(
+      loadGameFromText(new Chess().pgn()).fen(),
+      new Chess().fen()
+    );
+  });
+
+  it("reads a header-only game", () => {
+    const game = loadGameFromText('[Event "x"]\n[White "a"]');
+    assert.equal(game.history().length, 0);
   });
 
   it("does not turn results into castling", () => {

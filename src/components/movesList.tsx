@@ -36,7 +36,10 @@ export default function MovesList({
 
     const top = active.offsetTop - container.offsetTop;
     if (top < container.scrollTop) container.scrollTop = top;
-    else if (top + active.offsetHeight > container.scrollTop + container.clientHeight) {
+    else if (
+      top + active.offsetHeight >
+      container.scrollTop + container.clientHeight
+    ) {
       container.scrollTop = top + active.offsetHeight - container.clientHeight;
     }
   }, [currentPly, moves.length]);
@@ -71,16 +74,24 @@ export default function MovesList({
           fontSize: "0.95rem",
           backgroundColor: active ? "primary.main" : undefined,
           color: active ? "primary.contrastText" : undefined,
-          "&:hover": { backgroundColor: active ? "primary.main" : "action.hover" },
+          "&:hover": {
+            backgroundColor: active ? "primary.main" : "action.hover",
+          },
         }}
       >
-        <PrettyMoveSan san={san} color={active ? (color === "w" ? "b" : "w") : color} />
+        <PrettyMoveSan
+          san={san}
+          color={active ? (color === "w" ? "b" : "w") : color}
+        />
       </ButtonBase>
     );
   };
 
   return (
-    <Box ref={containerRef} sx={{ maxHeight, overflowY: "auto", position: "relative" }}>
+    <Box
+      ref={containerRef}
+      sx={{ maxHeight, overflowY: "auto", position: "relative" }}
+    >
       {Array.from({ length: rowCount }).map((_, row) => {
         const whitePly = row * 2 - offset;
         const blackPly = whitePly + 1;

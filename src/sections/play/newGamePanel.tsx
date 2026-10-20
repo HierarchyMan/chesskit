@@ -96,10 +96,16 @@ export default function NewGamePanel({ botEngine }: Props) {
                 labelId="play-engine-label"
                 input={<OutlinedInput label="Engine" />}
                 value={engineName}
-                onChange={(event) => setEngineName(event.target.value as EngineName)}
+                onChange={(event) =>
+                  setEngineName(event.target.value as EngineName)
+                }
               >
                 {Object.values(EngineName).map((name) => (
-                  <MenuItem key={name} value={name} disabled={!isEngineSupported(name)}>
+                  <MenuItem
+                    key={name}
+                    value={name}
+                    disabled={!isEngineSupported(name)}
+                  >
                     {ENGINE_LABELS[name].full}
                   </MenuItem>
                 ))}
@@ -108,7 +114,11 @@ export default function NewGamePanel({ botEngine }: Props) {
 
             <EngineStatusLine engine={botEngine} engineName={engineName} />
 
-            <StrengthControl value={strength} onChange={setStrength} engineName={engineName} />
+            <StrengthControl
+              value={strength}
+              onChange={setStrength}
+              engineName={engineName}
+            />
           </Stack>
         </Section>
 
@@ -118,7 +128,9 @@ export default function NewGamePanel({ botEngine }: Props) {
             fullWidth
             size="small"
             value={colorChoice}
-            onChange={(_, value: ColorChoice | null) => value && setColorChoice(value)}
+            onChange={(_, value: ColorChoice | null) =>
+              value && setColorChoice(value)
+            }
           >
             <ToggleButton value={Color.White}>White</ToggleButton>
             <ToggleButton value="random">Random</ToggleButton>
@@ -159,7 +171,10 @@ export default function NewGamePanel({ botEngine }: Props) {
                   color={selected ? "primary" : "default"}
                   variant={selected ? "filled" : "outlined"}
                   onClick={() =>
-                    setTimeControl({ minutes: preset.minutes, increment: preset.increment })
+                    setTimeControl({
+                      minutes: preset.minutes,
+                      increment: preset.increment,
+                    })
                   }
                 />
               );
@@ -178,7 +193,11 @@ export default function NewGamePanel({ botEngine }: Props) {
                 <MenuItem key={option.value} value={option.value}>
                   {option.label}
                   {option.value !== "none" && (
-                    <Typography component="span" variant="caption" sx={{ ml: 1, opacity: 0.65 }}>
+                    <Typography
+                      component="span"
+                      variant="caption"
+                      sx={{ ml: 1, opacity: 0.65 }}
+                    >
                       {option.hint}
                     </Typography>
                   )}
@@ -193,7 +212,11 @@ export default function NewGamePanel({ botEngine }: Props) {
             size="small"
             color="inherit"
             onClick={() => setShowPosition((value) => !value)}
-            startIcon={<Icon icon={showPosition ? "mdi:chevron-up" : "mdi:chevron-down"} />}
+            startIcon={
+              <Icon
+                icon={showPosition ? "mdi:chevron-up" : "mdi:chevron-down"}
+              />
+            }
             disabled={odds !== "none"}
           >
             Start from a position
@@ -230,17 +253,30 @@ export default function NewGamePanel({ botEngine }: Props) {
           onClick={handleStart}
           startIcon={<Icon icon="mdi:play" height={22} />}
         >
-          {ready ? "Start game" : botEngine.status === "error" ? "Engine unavailable" : "Loading engine…"}
+          {ready
+            ? "Start game"
+            : botEngine.status === "error"
+              ? "Engine unavailable"
+              : "Loading engine…"}
         </Button>
       </Stack>
     </Panel>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <Box>
-      <Typography variant="overline" sx={{ opacity: 0.7, letterSpacing: "0.08em" }}>
+      <Typography
+        variant="overline"
+        sx={{ opacity: 0.7, letterSpacing: "0.08em" }}
+      >
         {title}
       </Typography>
       <Box mt={0.5}>{children}</Box>
@@ -281,7 +317,10 @@ function EngineStatusLine({
   return (
     <Typography variant="body2" sx={{ opacity: 0.75 }}>
       Loading {ENGINE_LABELS[engineName].small}
-      {ENGINE_LABELS[engineName].sizeMb > 20 ? ` (${ENGINE_LABELS[engineName].sizeMb}MB, first time only)` : ""}…
+      {ENGINE_LABELS[engineName].sizeMb > 20
+        ? ` (${ENGINE_LABELS[engineName].sizeMb}MB, first time only)`
+        : ""}
+      …
     </Typography>
   );
 }

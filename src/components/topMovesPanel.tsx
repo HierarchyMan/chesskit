@@ -18,7 +18,14 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Arrow, Square } from "react-chessboard/dist/chessboard/types";
 
-export const TOP_MOVE_COLORS = ["#22ac38", "#3894eb", "#e69f00", "#a06bd6", "#df5353", "#74b038"];
+export const TOP_MOVE_COLORS = [
+  "#22ac38",
+  "#3894eb",
+  "#e69f00",
+  "#a06bd6",
+  "#df5353",
+  "#74b038",
+];
 
 interface Props {
   fen: string;
@@ -97,14 +104,22 @@ export default function TopMovesPanel({
 
   return (
     <Stack spacing={1.25}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap">
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={1}
+        flexWrap="wrap"
+      >
         <Typography variant="subtitle2">{description}</Typography>
         {onSideChange && (
           <ToggleButtonGroup
             exclusive
             size="small"
             value={side}
-            onChange={(_, value: MoveSide | null) => value && onSideChange(value)}
+            onChange={(_, value: MoveSide | null) =>
+              value && onSideChange(value)
+            }
             aria-label="Which side to show"
           >
             <ToggleButton value="mover" sx={{ py: 0.25, px: 1.25 }}>
@@ -116,6 +131,13 @@ export default function TopMovesPanel({
           </ToggleButtonGroup>
         )}
       </Stack>
+
+      {side === "opponent" && (
+        <Typography variant="caption" sx={{ opacity: 0.7 }}>
+          A what-if, not a real move: it shows what that side would do if it
+          could move right now, which reveals its threats.
+        </Typography>
+      )}
 
       {isLoading && <LinearProgress sx={{ borderRadius: 1 }} />}
 
@@ -160,7 +182,8 @@ export default function TopMovesPanel({
             border: 1,
             borderColor: "divider",
             borderLeft: "4px solid",
-            borderLeftColor: TOP_MOVE_COLORS[(move.rank - 1) % TOP_MOVE_COLORS.length],
+            borderLeftColor:
+              TOP_MOVE_COLORS[(move.rank - 1) % TOP_MOVE_COLORS.length],
           }}
         >
           <Box sx={{ minWidth: 0, flexGrow: 1 }}>
@@ -184,9 +207,25 @@ export default function TopMovesPanel({
               </Box>
             </Stack>
             {move.pvSan.length > 1 && (
-              <Typography variant="caption" noWrap display="block" sx={{ opacity: 0.7 }}>
-                {formatLine(queryFen ?? fen, move.pvSan.slice(0, 7))}
-              </Typography>
+              <>
+                <Typography variant="caption" display="block">
+                  Then {turnColor === "w" ? "Black" : "White"} answers{" "}
+                  <b>
+                    <PrettyMoveSan
+                      san={move.pvSan[1]}
+                      color={turnColor === "w" ? "b" : "w"}
+                    />
+                  </b>
+                </Typography>
+                <Typography
+                  variant="caption"
+                  noWrap
+                  display="block"
+                  sx={{ opacity: 0.6 }}
+                >
+                  {formatLine(queryFen ?? fen, move.pvSan.slice(0, 7))}
+                </Typography>
+              </>
             )}
           </Box>
           {onPlay && (

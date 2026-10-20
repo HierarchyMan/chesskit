@@ -37,7 +37,11 @@ const isStats = (value: unknown): value is Stats =>
   isObject(value.endgames) &&
   Array.isArray(value.endgames.completed);
 
-export const statsAtom = storedAtom<Stats>("chesskit-stats", DEFAULT_STATS, isStats);
+export const statsAtom = storedAtom<Stats>(
+  "chesskit-stats",
+  DEFAULT_STATS,
+  isStats
+);
 
 const PUZZLE_K_FACTOR = 32;
 

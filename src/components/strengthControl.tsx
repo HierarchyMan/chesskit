@@ -28,7 +28,11 @@ interface Props {
 
 const MARKS = STRENGTH_PRESETS.map(({ elo }) => ({ value: elo }));
 
-export default function StrengthControl({ value, onChange, engineName }: Props) {
+export default function StrengthControl({
+  value,
+  onChange,
+  engineName,
+}: Props) {
   const nativeSupported = hasNativeEloLimit(engineName);
 
   return (
@@ -87,7 +91,9 @@ export default function StrengthControl({ value, onChange, engineName }: Props) 
             max={MAX_BOT_DEPTH}
             step={1}
             valueLabelDisplay="on"
-            onChange={(_, depth) => onChange({ ...value, depth: depth as number })}
+            onChange={(_, depth) =>
+              onChange({ ...value, depth: depth as number })
+            }
             aria-label="Search depth"
             sx={{ mt: 3 }}
           />

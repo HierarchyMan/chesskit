@@ -43,15 +43,16 @@ import {
   Tab,
   Tabs,
   Typography,
+  useTheme,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
 import { useAtom, useAtomValue } from "jotai";
 import Image from "next/image";
 import { useState } from "react";
 import { settingsOpenAtom } from "../layout/states";
-import { useTheme } from "@mui/material";
 
-const PREVIEW_FEN = "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
+const PREVIEW_FEN =
+  "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
 
 export default function SettingsDialog() {
   const [open, setOpen] = useAtom(settingsOpenAtom);
@@ -72,9 +73,21 @@ export default function SettingsDialog() {
         variant="fullWidth"
         sx={{ px: 1, borderBottom: 1, borderColor: "divider" }}
       >
-        <Tab label="Engine" icon={<Icon icon="mdi:chip" height={20} />} iconPosition="start" />
-        <Tab label="Board" icon={<Icon icon="mdi:chess-pawn" height={20} />} iconPosition="start" />
-        <Tab label="Reckless" icon={<Icon icon="mdi:lightning-bolt" height={20} />} iconPosition="start" />
+        <Tab
+          label="Engine"
+          icon={<Icon icon="mdi:chip" height={20} />}
+          iconPosition="start"
+        />
+        <Tab
+          label="Board"
+          icon={<Icon icon="mdi:chess-pawn" height={20} />}
+          iconPosition="start"
+        />
+        <Tab
+          label="Reckless"
+          icon={<Icon icon="mdi:lightning-bolt" height={20} />}
+          iconPosition="start"
+        />
       </Tabs>
       <DialogContent sx={{ pt: 3, minHeight: 420 }}>
         {tab === 0 && <EngineTab />}
@@ -108,10 +121,16 @@ function EngineTab() {
             labelId="settings-engine-label"
             input={<OutlinedInput label="Analysis engine" />}
             value={engineName}
-            onChange={(event) => setEngineName(event.target.value as EngineName)}
+            onChange={(event) =>
+              setEngineName(event.target.value as EngineName)
+            }
           >
             {Object.values(EngineName).map((name) => (
-              <MenuItem key={name} value={name} disabled={!isEngineSupported(name)}>
+              <MenuItem
+                key={name}
+                value={name}
+                disabled={!isEngineSupported(name)}
+              >
                 {ENGINE_LABELS[name].full}
               </MenuItem>
             ))}
@@ -123,8 +142,23 @@ function EngineTab() {
         </Typography>
       </Grid>
 
-      <Slider label="Search depth" value={depth} setValue={setDepth} min={10} max={30} marksFilter={2} />
-      <Slider label="Number of lines" value={multiPv} setValue={setMultiPv} min={2} max={6} marksFilter={1} size={6} />
+      <Slider
+        label="Search depth"
+        value={depth}
+        setValue={setDepth}
+        min={10}
+        max={30}
+        marksFilter={2}
+      />
+      <Slider
+        label="Number of lines"
+        value={multiPv}
+        setValue={setMultiPv}
+        min={2}
+        max={6}
+        marksFilter={1}
+        size={6}
+      />
       <Slider
         label="Analysis threads"
         value={workers}
@@ -134,8 +168,8 @@ function EngineTab() {
         marksFilter={1}
         infoContent={
           <>
-            More threads means faster full-game analysis, as long as your
-            device can handle them. The estimated best value for this device is{" "}
+            More threads means faster full-game analysis, as long as your device
+            can handle them. The estimated best value for this device is{" "}
             {getRecommendedWorkersNb()}.
           </>
         }
@@ -144,15 +178,30 @@ function EngineTab() {
       <Grid size={12}>
         <Stack>
           <FormControlLabel
-            control={<Switch checked={cloud} onChange={(_, value) => setCloud(value)} />}
+            control={
+              <Switch
+                checked={cloud}
+                onChange={(_, value) => setCloud(value)}
+              />
+            }
             label="Use Lichess cloud evaluations when available"
           />
           <FormControlLabel
-            control={<Switch checked={showArrow} onChange={(_, value) => setShowArrow(value)} />}
+            control={
+              <Switch
+                checked={showArrow}
+                onChange={(_, value) => setShowArrow(value)}
+              />
+            }
             label="Show the engine's best move arrow in analysis"
           />
           <FormControlLabel
-            control={<Switch checked={showIcon} onChange={(_, value) => setShowIcon(value)} />}
+            control={
+              <Switch
+                checked={showIcon}
+                onChange={(_, value) => setShowIcon(value)}
+              />
+            }
             label="Show the quality icon on played moves"
           />
         </Stack>
@@ -194,7 +243,8 @@ function BoardTab() {
                   borderRadius: 1.5,
                   overflow: "hidden",
                   outline: boardTheme === name ? "3px solid" : "1px solid",
-                  outlineColor: boardTheme === name ? "primary.main" : "divider",
+                  outlineColor:
+                    boardTheme === name ? "primary.main" : "divider",
                   background: `conic-gradient(${theme.dark} 25%, ${theme.light} 0 50%, ${theme.dark} 0 75%, ${theme.light} 0)`,
                 }}
               />
@@ -229,15 +279,32 @@ function BoardTab() {
           </Select>
         </FormControl>
 
-        <Slider label="Board hue" value={hue} setValue={setHue} min={0} max={360} size={12} />
+        <Slider
+          label="Board hue"
+          value={hue}
+          setValue={setHue}
+          min={0}
+          max={360}
+          size={12}
+        />
 
         <Stack mt={1}>
           <FormControlLabel
-            control={<Switch checked={coordinates} onChange={(_, value) => setCoordinates(value)} />}
+            control={
+              <Switch
+                checked={coordinates}
+                onChange={(_, value) => setCoordinates(value)}
+              />
+            }
             label="Show coordinates"
           />
           <FormControlLabel
-            control={<Switch checked={sound} onChange={(_, value) => setSound(value)} />}
+            control={
+              <Switch
+                checked={sound}
+                onChange={(_, value) => setSound(value)}
+              />
+            }
             label="Move sounds"
           />
         </Stack>
@@ -247,7 +314,9 @@ function BoardTab() {
 }
 
 function RecklessTab() {
-  const [status, setStatus] = useState<"unknown" | "checking" | "up" | "down">("unknown");
+  const [status, setStatus] = useState<"unknown" | "checking" | "up" | "down">(
+    "unknown"
+  );
   const engineName = useAtomValue(engineNameAtom);
 
   const check = async () => {
@@ -267,12 +336,20 @@ function RecklessTab() {
         <b> start-chess.bat</b> to start the bridge and the app together.
       </Typography>
       <Stack direction="row" alignItems="center" gap={2}>
-        <Button variant="outlined" onClick={check} disabled={status === "checking"}>
+        <Button
+          variant="outlined"
+          onClick={check}
+          disabled={status === "checking"}
+        >
           Check bridge
         </Button>
         <Typography
           color={
-            status === "up" ? "success.main" : status === "down" ? "error.main" : undefined
+            status === "up"
+              ? "success.main"
+              : status === "down"
+                ? "error.main"
+                : undefined
           }
         >
           {status === "up" && "Reckless bridge is running."}

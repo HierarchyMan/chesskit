@@ -1,4 +1,5 @@
 import { getGameFromPgn, setGameHeaders } from "@/lib/chess";
+import { loadGameFromText } from "@/lib/pgn";
 import { playIllegalMoveSound, playSoundFromMove } from "@/lib/sounds";
 import { Player } from "@/types/game";
 import { Chess, Move, DEFAULT_POSITION } from "chess.js";
@@ -17,9 +18,7 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
 
   const setPgn = useCallback(
     (pgn: string) => {
-      const newGame = new Chess();
-      newGame.loadPgn(pgn);
-      setGame(newGame);
+      setGame(loadGameFromText(pgn));
     },
     [setGame]
   );
@@ -48,8 +47,7 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
       }
     }
 
-    newGame.loadPgn(game.pgn());
-    return newGame;
+    return loadGameFromText(game.pgn());
   }, [game]);
 
   const resetToStartingPosition = useCallback(
@@ -113,8 +111,7 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
     (moveIdx: number, fullGame: Chess) => {
       if (moveIdx < 0) return;
 
-      const newGame = new Chess();
-      newGame.loadPgn(fullGame.pgn());
+      const newGame = loadGameFromText(fullGame.pgn());
 
       const movesNb = fullGame.history().length;
       if (moveIdx > movesNb) return;

@@ -48,7 +48,7 @@ const LICHESS_RESERVED_PATHS = new Set([
 ]);
 
 const cleanNewlines = (text: string): string =>
-  text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
 
 export const splitPgnGames = (text: string): string[] => {
   const lines = cleanNewlines(text).split("\n");
@@ -100,17 +100,26 @@ export const normalizePgn = (pgn: string): string => {
     (line) => line.trim() && !TAG_LINE.test(line)
   );
 
-  if (firstMovetextLine === -1) return lines.join("\n");
+  const headerLines = (
+    firstMovetextLine === -1 ? lines : lines.slice(0, firstMovetextLine)
+  ).filter((line) => line.trim());
 
-  const headers = lines.slice(0, firstMovetextLine);
+  if (firstMovetextLine === -1) {
+    return headerLines.length ? [...headerLines, "", "*"].join("\n") : "";
+  }
+
   const movetext = lines
     .slice(firstMovetextLine)
     .join("\n")
     .split(COMMENT_SPLIT)
-    .map((part, index) => (index % 2 === 0 ? normalizeMovetextSegment(part) : part))
+    .map((part, index) =>
+      index % 2 === 0 ? normalizeMovetextSegment(part) : part
+    )
     .join("");
 
-  return [...headers, movetext].join("\n");
+  return headerLines.length
+    ? [...headerLines, "", movetext].join("\n")
+    : movetext;
 };
 
 const firstLine = (message: string): string => message.split("\n")[0].trim();
@@ -231,3 +240,5 @@ export const detectInput = (text: string): DetectedInput => {
 
   return { kind: "pgn", games };
 };
+
+export const fenToPgn = (fen: string): string => new Chess(fen).pgn();

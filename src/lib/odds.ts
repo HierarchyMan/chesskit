@@ -35,7 +35,8 @@ export const getOddsFen = (odds: Odds, botColor: "w" | "b"): string => {
   if (odds === "none") return DEFAULT_POSITION;
 
   const game = new Chess();
-  const rank = odds === "pawn" ? (botColor === "w" ? 2 : 7) : botColor === "w" ? 1 : 8;
+  const rank =
+    odds === "pawn" ? (botColor === "w" ? 2 : 7) : botColor === "w" ? 1 : 8;
   game.remove(`${ODDS_FILES[odds]}${rank}` as Square);
 
   const fields = game.fen().split(" ");

@@ -80,7 +80,9 @@ export const useStartGame = () => {
           return "That position is already finished.";
         }
       } catch (error) {
-        return error instanceof Error ? `${error.message}.` : "Unreadable start position.";
+        return error instanceof Error
+          ? `${error.message}.`
+          : "Unreadable start position.";
       }
 
       const bot = {

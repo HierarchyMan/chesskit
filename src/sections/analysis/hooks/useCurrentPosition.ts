@@ -6,6 +6,7 @@ import {
   gameAtom,
   gameEvalAtom,
   savedEvalsAtom,
+  useCloudEvalAtom,
 } from "@/sections/analysis/states";
 import { CurrentPosition, PositionEval } from "@/types/eval";
 import { useAtom, useAtomValue } from "jotai";
@@ -23,8 +24,10 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
   const depth = useAtomValue(engineDepthAtom);
   const multiPv = useAtomValue(engineMultiPvAtom);
   const [savedEvals, setSavedEvals] = useAtom(savedEvalsAtom);
+  const useCloudEval = useAtomValue(useCloudEvalAtom);
 
   useEffect(() => {
+    let isCurrent = true;
     const boardHistory = board.history({ verbose: true });
     const position: CurrentPosition = {
       lastMove: boardHistory.at(-1),
@@ -106,6 +109,7 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
           depth,
           multiPv,
           setPartialEval,
+          useCloudEval,
         });
 
         setSavedEvals((prev) => ({
@@ -118,6 +122,7 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
 
       const getPositionEval = async () => {
         const setPartialEval = (positionEval: PositionEval) => {
+          if (!isCurrent) return;
           setCurrentPosition({ ...position, eval: positionEval });
         };
         const rawPositionEval = await getFenEngineEval(
@@ -125,7 +130,11 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
           setPartialEval
         );
 
-        if (boardHistory.length === 0) return;
+        if (!isCurrent) return;
+        if (boardHistory.length === 0) {
+          setCurrentPosition({ ...position, eval: rawPositionEval });
+          return;
+        }
 
         const params = getEvaluateGameParams(board);
         const fens = params.fens.slice(board.turn() === "w" ? -3 : -4);
@@ -153,6 +162,7 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
           fens
         );
 
+        if (!isCurrent) return;
         setCurrentPosition({
           ...position,
           eval: positionsWithMoveClassification.slice(-1)[0],
@@ -164,12 +174,13 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
     }
 
     return () => {
+      isCurrent = false;
       if (engine?.getIsReady()) {
         engine?.stopAllCurrentJobs();
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameEval, board, game, engine, depth, multiPv]);
+  }, [gameEval, board, game, engine, depth, multiPv, useCloudEval]);
 
   return currentPosition;
 };

@@ -19,11 +19,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import NextLink from "next/link";
 import { useRouter } from "next/router";
 import { ReactNode, useEffect, useMemo, useState } from "react";
-import {
-  NAV_GROUPS,
-  NAV_ITEMS,
-  NavItem,
-} from "../layout/navItems";
+import { NAV_GROUPS, NAV_ITEMS, NavItem } from "../layout/navItems";
 import { importDialogAtom, settingsOpenAtom } from "../layout/states";
 
 const greeting = (): string => {
@@ -34,11 +30,36 @@ const greeting = (): string => {
   return "Good evening";
 };
 
-const QUICK_ACTIONS: { id: string; title: string; subtitle: string; href: string }[] = [
-  { id: "play", title: "Play a bot", subtitle: "Any strength, from beginner to Reckless", href: "/play" },
-  { id: "analysis", title: "Analyze a game", subtitle: "Paste a PGN or load from Lichess", href: "/analysis" },
-  { id: "puzzles", title: "Solve puzzles", subtitle: "Sharpen your tactics", href: "/puzzles" },
-  { id: "learn", title: "Learn with a coach", subtitle: "See why moves work", href: "/learn" },
+const QUICK_ACTIONS: {
+  id: string;
+  title: string;
+  subtitle: string;
+  href: string;
+}[] = [
+  {
+    id: "play",
+    title: "Play a bot",
+    subtitle: "Any strength, from beginner to Reckless",
+    href: "/play",
+  },
+  {
+    id: "analysis",
+    title: "Analyze a game",
+    subtitle: "Paste a PGN or load from Lichess",
+    href: "/analysis",
+  },
+  {
+    id: "puzzles",
+    title: "Solve puzzles",
+    subtitle: "Sharpen your tactics",
+    href: "/puzzles",
+  },
+  {
+    id: "learn",
+    title: "Learn with a coach",
+    subtitle: "See why moves work",
+    href: "/learn",
+  },
 ];
 
 export default function Hub() {
@@ -95,7 +116,11 @@ export default function Hub() {
             gap={2.5}
             textAlign={{ xs: "center", sm: "left" }}
           >
-            <Icon icon="mdi:clipboard-plus-outline" height={52} color="#3B9AC6" />
+            <Icon
+              icon="mdi:clipboard-plus-outline"
+              height={52}
+              color="#3B9AC6"
+            />
             <Box flexGrow={1}>
               <Typography variant="h6" fontWeight={600}>
                 Paste or drop anything chess
@@ -233,7 +258,12 @@ function Panel({
 }) {
   return (
     <Card variant="outlined" sx={{ height: "100%", p: 2 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        mb={1.5}
+      >
         <Stack direction="row" alignItems="center" gap={1}>
           <Icon icon={icon} height={22} />
           <Typography fontWeight={600}>{title}</Typography>
@@ -294,7 +324,10 @@ function RecentGames() {
                 size="small"
                 variant="outlined"
                 onClick={() =>
-                  router.push({ pathname: "/analysis", query: { gameId: game.id } })
+                  router.push({
+                    pathname: "/analysis",
+                    query: { gameId: game.id },
+                  })
                 }
               >
                 Open
@@ -311,32 +344,33 @@ function Progress() {
   const stats = useAtomValue(statsAtom);
   const { puzzles, games, openings, endgames, vision } = stats;
 
-  const tiles: { label: string; value: string; icon: string; hint: string }[] = [
-    {
-      label: "Puzzle rating",
-      value: String(puzzles.rating),
-      icon: "mdi:puzzle-outline",
-      hint: `${puzzles.solved} solved · best streak ${puzzles.bestStreak}`,
-    },
-    {
-      label: "Games vs bots",
-      value: `${games.won}-${games.drawn}-${games.lost}`,
-      icon: "mdi:chess-pawn",
-      hint: `${games.played} played (won-drawn-lost)`,
-    },
-    {
-      label: "Openings learned",
-      value: String(openings.learned.length),
-      icon: "mdi:book-open-page-variant-outline",
-      hint: "Finish a drill to add one",
-    },
-    {
-      label: "Endgames done",
-      value: String(endgames.completed.length),
-      icon: "mdi:chess-king",
-      hint: `Board vision best: ${vision.bestScore}`,
-    },
-  ];
+  const tiles: { label: string; value: string; icon: string; hint: string }[] =
+    [
+      {
+        label: "Puzzle rating",
+        value: String(puzzles.rating),
+        icon: "mdi:puzzle-outline",
+        hint: `${puzzles.solved} solved · best streak ${puzzles.bestStreak}`,
+      },
+      {
+        label: "Games vs bots",
+        value: `${games.won}-${games.drawn}-${games.lost}`,
+        icon: "mdi:chess-pawn",
+        hint: `${games.played} played (won-drawn-lost)`,
+      },
+      {
+        label: "Openings learned",
+        value: String(openings.learned.length),
+        icon: "mdi:book-open-page-variant-outline",
+        hint: "Finish a drill to add one",
+      },
+      {
+        label: "Endgames done",
+        value: String(endgames.completed.length),
+        icon: "mdi:chess-king",
+        hint: `Board vision best: ${vision.bestScore}`,
+      },
+    ];
 
   return (
     <Panel title="Your progress" icon="mdi:trending-up">
@@ -352,7 +386,12 @@ function Progress() {
                 height: "100%",
               }}
             >
-              <Stack direction="row" alignItems="center" gap={0.75} sx={{ opacity: 0.75 }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                gap={0.75}
+                sx={{ opacity: 0.75 }}
+              >
                 <Icon icon={tile.icon} height={16} />
                 <Typography variant="caption">{tile.label}</Typography>
               </Stack>

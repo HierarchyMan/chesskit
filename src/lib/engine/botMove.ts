@@ -20,7 +20,8 @@ export const getBotMove = async (
   { random = Math.random, maxDepth }: BotMoveOptions = {}
 ): Promise<string | undefined> => {
   const plan = planMove(strength, hasNativeEloLimit(engine.name));
-  const cap = (depth: number) => Math.max(1, Math.min(depth, maxDepth ?? depth));
+  const cap = (depth: number) =>
+    Math.max(1, Math.min(depth, maxDepth ?? depth));
 
   if (plan.kind === "native") {
     return engine.getEngineNextMove(fen, plan.elo, cap(plan.depth));

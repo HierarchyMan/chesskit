@@ -1,15 +1,19 @@
-import { Skeleton, Stack, Typography } from "@mui/material";
-import { useAtomValue } from "jotai";
+import { Button, Skeleton, Stack, Typography } from "@mui/material";
+import { Icon } from "@iconify/react";
+import { useAtomValue, useSetAtom } from "jotai";
 import { boardAtom, currentPositionAtom } from "../../states";
 import { useMemo } from "react";
 import { moveLineUciToSan } from "@/lib/chess";
 import { MoveClassification } from "@/types/enums";
 import Image from "next/image";
 import PrettyMoveSan from "@/components/prettyMoveSan";
+import { moveStoryAtom } from "@/components/moveStoryDialog";
+import { buildMoveStory } from "@/lib/visualize/moveStory";
 
 export default function MoveInfo() {
   const position = useAtomValue(currentPositionAtom);
   const board = useAtomValue(boardAtom);
+  const setMoveStory = useSetAtom(moveStoryAtom);
 
   const bestMove = position?.lastEval?.bestMove;
 
@@ -42,6 +46,29 @@ export default function MoveInfo() {
   }
 
   const moveClassification = position.eval?.moveClassification;
+
+  const canVisualize =
+    !!position.lastMove &&
+    !!position.lastEval?.lines.length &&
+    !!position.eval?.lines.length &&
+    !!moveClassification &&
+    VISUALIZE_CLASSIFICATIONS.includes(moveClassification);
+
+  const handleVisualize = () => {
+    const move = position.lastMove;
+    if (!move || !position.lastEval || !position.eval) return;
+
+    setMoveStory({
+      open: true,
+      classification: moveClassification,
+      story: buildMoveStory({
+        fenBefore: move.before,
+        playedUci: move.from + move.to + (move.promotion ?? ""),
+        beforeLines: position.lastEval.lines,
+        afterLines: position.eval.lines,
+      }),
+    });
+  };
 
   const showBestMoveLabel =
     moveClassification !== MoveClassification.Best &&
@@ -107,6 +134,17 @@ export default function MoveInfo() {
           />
         </Stack>
       )}
+
+      {canVisualize && (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<Icon icon="mdi:eye-outline" height={18} />}
+          onClick={handleVisualize}
+        >
+          Visualize
+        </Button>
+      )}
     </Stack>
   );
 }
@@ -123,3 +161,10 @@ const moveClassificationLabels: Record<MoveClassification, string> = {
   [MoveClassification.Mistake]: "a mistake",
   [MoveClassification.Blunder]: "a blunder",
 };
+
+const VISUALIZE_CLASSIFICATIONS: MoveClassification[] = [
+  MoveClassification.Okay,
+  MoveClassification.Inaccuracy,
+  MoveClassification.Mistake,
+  MoveClassification.Blunder,
+];

@@ -13,18 +13,18 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { getEvaluateGameParams } from "@/lib/chess";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { LoadingButton } from "@mui/lab";
-import { useEngine } from "@/hooks/useEngine";
+import EngineStatusChip from "@/components/engineStatusChip";
 import { logAnalyticsEvent } from "@/lib/firebase";
 import { SavedEvals } from "@/types/eval";
 import { useEffect, useCallback } from "react";
 import { usePlayersData } from "@/hooks/usePlayersData";
-import { Typography } from "@mui/material";
-import { useCurrentPosition } from "../hooks/useCurrentPosition";
+import { Stack, Typography } from "@mui/material";
+import { useAnalysisEngine } from "../engineContext";
 
 export default function AnalyzeButton() {
   const engineName = useAtomValue(engineNameAtom);
-  const engine = useEngine(engineName);
-  useCurrentPosition(engine);
+  const engineState = useAnalysisEngine();
+  const engine = engineState.engine;
   const engineWorkersNb = useAtomValue(engineWorkersNbAtom);
   const [evaluationProgress, setEvaluationProgress] = useAtom(
     evaluationProgressAtom
@@ -115,16 +115,21 @@ export default function AnalyzeButton() {
   if (evaluationProgress) return null;
 
   return (
-    <LoadingButton
-      variant="contained"
-      size="small"
-      startIcon={<Icon icon="streamline:magnifying-glass-solid" height={12} />}
-      onClick={handleAnalyze}
-      disabled={!readyToAnalyse}
-    >
-      <Typography fontSize="0.9em" fontWeight="500" lineHeight="1.4em">
-        {gameEval ? "Analyze again" : "Analyze"}
-      </Typography>
-    </LoadingButton>
+    <Stack direction="row" alignItems="center" gap={1.5}>
+      <EngineStatusChip state={engineState} engineName={engineName} />
+      <LoadingButton
+        variant="contained"
+        size="small"
+        startIcon={
+          <Icon icon="streamline:magnifying-glass-solid" height={12} />
+        }
+        onClick={handleAnalyze}
+        disabled={!readyToAnalyse}
+      >
+        <Typography fontSize="0.9em" fontWeight="500" lineHeight="1.4em">
+          {gameEval ? "Analyze again" : "Analyze"}
+        </Typography>
+      </LoadingButton>
+    </Stack>
   );
 }

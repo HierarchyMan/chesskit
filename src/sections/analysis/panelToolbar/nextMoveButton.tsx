@@ -2,10 +2,10 @@ import { useAtomValue } from "jotai";
 import { boardAtom, gameAtom } from "../states";
 import { useChessActions } from "@/hooks/useChessActions";
 import { useCallback } from "react";
-import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { ToolbarButton } from "@/components/ToolbarButton";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
-export default function NextMoveButton() {
+export const useNextMove = () => {
   const { playMove: playBoardMove } = useChessActions(boardAtom);
   const game = useAtomValue(gameAtom);
   const board = useAtomValue(boardAtom);
@@ -13,37 +13,43 @@ export default function NextMoveButton() {
   const gameHistory = game.history();
   const boardHistory = board.history();
 
-  const isButtonEnabled =
+  const canGoNext =
     boardHistory.length < gameHistory.length &&
     gameHistory.slice(0, boardHistory.length).join() === boardHistory.join();
 
-  const addNextGameMoveToBoard = useCallback(() => {
-    if (!isButtonEnabled) return;
+  const goNext = useCallback(() => {
+    if (!canGoNext) return;
 
     const nextMoveIndex = boardHistory.length;
     const nextMove = game.history({ verbose: true })[nextMoveIndex];
+    if (!nextMove) return;
+
     const comment = game
       .getComments()
       .find((c) => c.fen === nextMove.after)?.comment;
 
-    if (nextMove) {
-      playBoardMove({
-        from: nextMove.from,
-        to: nextMove.to,
-        promotion: nextMove.promotion,
-        comment,
-      });
-    }
-  }, [isButtonEnabled, boardHistory, game, playBoardMove]);
+    playBoardMove({
+      from: nextMove.from,
+      to: nextMove.to,
+      promotion: nextMove.promotion,
+      comment,
+    });
+  }, [canGoNext, boardHistory, game, playBoardMove]);
 
-  useKeyboardShortcut("ArrowRight", addNextGameMoveToBoard);
+  return { canGoNext, goNext, plies: boardHistory.length };
+};
+
+export default function NextMoveButton() {
+  const { canGoNext, goNext } = useNextMove();
+
+  useKeyboardShortcut("ArrowRight", goNext);
 
   return (
     <ToolbarButton
       tooltip="Next move (→)"
-      onClick={() => addNextGameMoveToBoard()}
+      onClick={goNext}
       icon="ri:arrow-right-s-line"
-      disabled={!isButtonEnabled}
+      disabled={!canGoNext}
       iconHeight={30}
     />
   );

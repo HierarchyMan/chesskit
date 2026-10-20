@@ -20,7 +20,8 @@ const readAsDataUrl = (file: File): Promise<string> =>
   });
 
 const hasFiles = (event: DragEvent): boolean =>
-  !!event.dataTransfer && Array.from(event.dataTransfer.types).includes("Files");
+  !!event.dataTransfer &&
+  Array.from(event.dataTransfer.types).includes("Files");
 
 export default function GlobalImportListeners() {
   const setDialog = useSetAtom(importDialogAtom);

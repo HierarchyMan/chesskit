@@ -56,7 +56,11 @@ export default function Play() {
           mt: sideBySide ? "3.2rem" : 0,
         }}
       >
-        {hasGame ? <GamePanel botEngine={botEngine} /> : <NewGamePanel botEngine={botEngine} />}
+        {hasGame ? (
+          <GamePanel botEngine={botEngine} />
+        ) : (
+          <NewGamePanel botEngine={botEngine} />
+        )}
       </Box>
     </Box>
   );

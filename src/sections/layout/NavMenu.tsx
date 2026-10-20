@@ -102,7 +102,12 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
         sx={{ px: expanded ? 2.5 : 0, height: 56, flexShrink: 0 }}
         justifyContent={expanded ? "flex-start" : "center"}
       >
-        <Image src="/favicon-32x32.png" alt="Chesskit logo" width={30} height={30} />
+        <Image
+          src="/favicon-32x32.png"
+          alt="Chesskit logo"
+          width={30}
+          height={30}
+        />
         {expanded && (
           <Typography variant="h6" fontWeight={700} noWrap>
             Chesskit
@@ -133,7 +138,9 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
                   {group}
                 </ListSubheader>
               ) : (
-                <Box sx={{ mx: 2, my: 1, borderTop: 1, borderColor: "divider" }} />
+                <Box
+                  sx={{ mx: 2, my: 1, borderTop: 1, borderColor: "divider" }}
+                />
               )
             }
           >
@@ -147,14 +154,21 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
           alignItems={expanded ? "flex-end" : "center"}
           sx={{ p: 1, flexShrink: 0 }}
         >
-          <Tooltip title={expanded ? "Collapse menu" : "Expand menu"} placement="right">
+          <Tooltip
+            title={expanded ? "Collapse menu" : "Expand menu"}
+            placement="right"
+          >
             <IconButton
               size="small"
               onClick={() => setNavExpanded((value) => !value)}
               aria-label={expanded ? "Collapse menu" : "Expand menu"}
             >
               <Icon
-                icon={expanded ? "mdi:chevron-double-left" : "mdi:chevron-double-right"}
+                icon={
+                  expanded
+                    ? "mdi:chevron-double-left"
+                    : "mdi:chevron-double-right"
+                }
                 height={20}
               />
             </IconButton>

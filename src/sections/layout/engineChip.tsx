@@ -3,10 +3,7 @@ import { Stockfish16_1 } from "@/lib/engine/stockfish16_1";
 import { isEngineSupported } from "@/lib/engine/shared";
 import { probeRecklessBridge } from "@/lib/engine/reckless";
 import { EngineName } from "@/types/enums";
-import {
-  engineNameAtom,
-  useCloudEvalAtom,
-} from "@/sections/analysis/states";
+import { engineNameAtom, useCloudEvalAtom } from "@/sections/analysis/states";
 import { Icon } from "@iconify/react";
 import {
   Box,

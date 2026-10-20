@@ -1,45 +1,19 @@
 import LoadGameButton from "../../loadGame/loadGameButton";
-import { useCallback, useEffect, useMemo } from "react";
-import { useChessActions } from "@/hooks/useChessActions";
-import {
-  boardAtom,
-  boardOrientationAtom,
-  evaluationProgressAtom,
-  gameAtom,
-  gameEvalAtom,
-} from "../states";
+import { useEffect } from "react";
+import { evaluationProgressAtom, gameAtom } from "../states";
+import { useLoadAnalysisGame } from "../hooks/useLoadAnalysisGame";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
-import { useAtomValue, useSetAtom } from "jotai";
-import { Chess } from "chess.js";
+import { useAtomValue } from "jotai";
 import { useRouter } from "next/router";
-import { GameEval } from "@/types/eval";
 import { fetchLichessGame } from "@/lib/lichess";
+import { useHandoff } from "@/hooks/useHandoff";
 
 export default function LoadGame() {
   const router = useRouter();
   const game = useAtomValue(gameAtom);
-  const { setPgn: setGamePgn } = useChessActions(gameAtom);
-  const { resetToStartingPosition: resetBoard } = useChessActions(boardAtom);
   const { gameFromUrl } = useGameDatabase();
-  const setEval = useSetAtom(gameEvalAtom);
-  const setBoardOrientation = useSetAtom(boardOrientationAtom);
   const evaluationProgress = useAtomValue(evaluationProgressAtom);
-
-  const joinedGameHistory = useMemo(() => game.history().join(), [game]);
-
-  const resetAndSetGamePgn = useCallback(
-    (pgn: string, orientation?: boolean, gameEval?: GameEval) => {
-      const gameFromPgn = new Chess();
-      gameFromPgn.loadPgn(pgn);
-      if (joinedGameHistory === gameFromPgn.history().join()) return;
-
-      resetBoard(pgn);
-      setEval(gameEval);
-      setGamePgn(pgn);
-      setBoardOrientation(orientation ?? true);
-    },
-    [joinedGameHistory, resetBoard, setGamePgn, setEval, setBoardOrientation]
-  );
+  const { loadPgn: resetAndSetGamePgn } = useLoadAnalysisGame();
 
   const { lichessGameId, orientation: orientationParam } = router.query;
 
@@ -60,6 +34,10 @@ export default function LoadGame() {
       handleLichess(lichessGameId);
     }
   }, [gameFromUrl, lichessGameId, orientationParam, resetAndSetGamePgn]);
+
+  useHandoff(["pgn"], ({ pgn, orientation }) => {
+    resetAndSetGamePgn(pgn, orientation !== "black");
+  });
 
   useEffect(() => {
     const eventHandler = (event: MessageEvent) => {

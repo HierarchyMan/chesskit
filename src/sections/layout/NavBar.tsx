@@ -27,7 +27,11 @@ interface Props {
   onMenuClick: () => void;
 }
 
-export default function NavBar({ darkMode, switchDarkMode, onMenuClick }: Props) {
+export default function NavBar({
+  darkMode,
+  switchDarkMode,
+  onMenuClick,
+}: Props) {
   const router = useRouter();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
@@ -120,7 +124,9 @@ export default function NavBar({ darkMode, switchDarkMode, onMenuClick }: Props)
           </IconButton>
         </Tooltip>
 
-        <Tooltip title={darkMode ? "Switch to light theme" : "Switch to dark theme"}>
+        <Tooltip
+          title={darkMode ? "Switch to light theme" : "Switch to dark theme"}
+        >
           <IconButton
             color="inherit"
             aria-label="Switch theme"

@@ -4,6 +4,7 @@ import { Chess, PieceSymbol, Square } from "chess.js";
 import { getPositionWinPercentage } from "./engine/helpers/winPercentage";
 import { Color } from "@/types/enums";
 import { Piece } from "react-chessboard/dist/chessboard/types";
+import { loadGameFromText } from "./pgn";
 
 export const getEvaluateGameParams = (game: Chess): EvaluateGameParams => {
   const history = game.history({ verbose: true });
@@ -18,12 +19,10 @@ export const getEvaluateGameParams = (game: Chess): EvaluateGameParams => {
   return { fens, uciMoves };
 };
 
-export const getGameFromPgn = (pgn: string): Chess => {
-  const game = new Chess();
-  game.loadPgn(pgn);
+export const getGameFromPgn = (pgn: string): Chess => loadGameFromText(pgn);
 
-  return game;
-};
+export const getGameSignature = (game: Chess): string =>
+  `${game.getHeaders().FEN ?? ""}|${game.history().join(",")}`;
 
 export const formatGameToDatabase = (game: Chess): Omit<Game, "id"> => {
   const headers: Record<string, string | undefined> = game.getHeaders();

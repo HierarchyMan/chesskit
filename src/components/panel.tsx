@@ -7,7 +7,13 @@ interface Props extends Omit<BoxProps, "title"> {
   children: ReactNode;
 }
 
-export default function Panel({ title, actions, children, sx, ...rest }: Props) {
+export default function Panel({
+  title,
+  actions,
+  children,
+  sx,
+  ...rest
+}: Props) {
   return (
     <Box
       sx={{

@@ -115,7 +115,9 @@ export default function GamePanel({ botEngine }: Props) {
       if (botScore <= 30 && history.length >= 16) {
         setEnd({ type: "draw-agreed" });
         setIsInProgress(false);
-        setNotice(`${ENGINE_LABELS[botEngineName].small} accepted your draw offer.`);
+        setNotice(
+          `${ENGINE_LABELS[botEngineName].small} accepted your draw offer.`
+        );
       } else {
         setNotice(
           history.length < 16
@@ -144,8 +146,12 @@ export default function GamePanel({ botEngine }: Props) {
             <Typography fontWeight={600}>
               vs {ENGINE_LABELS[botEngineName].small}
             </Typography>
-            {strength.mode === "elo" && <Chip size="small" label={`${strength.elo}`} />}
-            {strength.mode === "depth" && <Chip size="small" label={`depth ${strength.depth}`} />}
+            {strength.mode === "elo" && (
+              <Chip size="small" label={`${strength.elo}`} />
+            )}
+            {strength.mode === "depth" && (
+              <Chip size="small" label={`depth ${strength.depth}`} />
+            )}
             <Chip
               size="small"
               variant="outlined"
@@ -199,7 +205,9 @@ export default function GamePanel({ botEngine }: Props) {
               <ActionButton
                 icon="mdi:handshake-outline"
                 label="Offer draw"
-                tooltip={isPlayerTurn ? "Ask the bot for a draw" : "Wait for your turn"}
+                tooltip={
+                  isPlayerTurn ? "Ask the bot for a draw" : "Wait for your turn"
+                }
                 disabled={!isPlayerTurn || !botEngine.engine}
                 onClick={handleOfferDraw}
               />
@@ -356,9 +364,17 @@ function ResultCard({
   const [copied, setCopied] = useState("");
 
   const headline =
-    outcome === "won" ? "You won!" : outcome === "lost" ? `${opponent} won` : "Draw";
+    outcome === "won"
+      ? "You won!"
+      : outcome === "lost"
+        ? `${opponent} won`
+        : "Draw";
   const icon =
-    outcome === "won" ? "mdi:trophy-outline" : outcome === "lost" ? "mdi:emoticon-sad-outline" : "mdi:handshake-outline";
+    outcome === "won"
+      ? "mdi:trophy-outline"
+      : outcome === "lost"
+        ? "mdi:emoticon-sad-outline"
+        : "mdi:handshake-outline";
 
   const copy = (label: string, text: string) => {
     navigator.clipboard?.writeText?.(text);
@@ -385,7 +401,10 @@ function ResultCard({
             startIcon={<Icon icon="mdi:chart-line" height={18} />}
             disabled={savedGameId === null}
             onClick={() =>
-              router.push({ pathname: "/analysis", query: { gameId: savedGameId } })
+              router.push({
+                pathname: "/analysis",
+                query: { gameId: savedGameId },
+              })
             }
           >
             Analyze game
@@ -407,10 +426,18 @@ function ResultCard({
         </Stack>
 
         <Stack direction="row" gap={1}>
-          <Button size="small" color="inherit" onClick={() => copy("PGN", game.pgn())}>
+          <Button
+            size="small"
+            color="inherit"
+            onClick={() => copy("PGN", game.pgn())}
+          >
             {copied === "PGN" ? "Copied!" : "Copy PGN"}
           </Button>
-          <Button size="small" color="inherit" onClick={() => copy("FEN", game.fen())}>
+          <Button
+            size="small"
+            color="inherit"
+            onClick={() => copy("FEN", game.fen())}
+          >
             {copied === "FEN" ? "Copied!" : "Copy FEN"}
           </Button>
         </Stack>
@@ -418,4 +445,3 @@ function ResultCard({
     </Panel>
   );
 }
-

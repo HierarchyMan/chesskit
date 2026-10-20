@@ -26,7 +26,8 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/play",
     icon: "mdi:chess-pawn",
     group: "Play",
-    description: "Play a bot at any strength, with hints and undo in casual games",
+    description:
+      "Play a bot at any strength, with hints and undo in casual games",
     accent: "#3B9AC6",
   },
   {
@@ -98,7 +99,8 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/editor",
     icon: "mdi:pencil-ruler",
     group: "Tools",
-    description: "Arrange pieces, set up any position, evaluate it live",
+    description:
+      "Arrange any position, then play moves on it with live engine analysis",
     accent: "#df5353",
   },
   {

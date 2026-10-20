@@ -63,7 +63,9 @@ export const useGameLifecycle = () => {
 
     addGame(finished)
       .then((id) => setSavedGameId(id))
-      .catch((error) => console.error("Could not save the finished game", error));
+      .catch((error) =>
+        console.error("Could not save the finished game", error)
+      );
   }, [
     isInProgress,
     info,

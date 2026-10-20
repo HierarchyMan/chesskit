@@ -214,7 +214,9 @@ export const describeStrength = (
   }
 };
 
-export const maxDepthForTime = (remainingMs: number | undefined): number | undefined => {
+export const maxDepthForTime = (
+  remainingMs: number | undefined
+): number | undefined => {
   if (remainingMs === undefined) return undefined;
   if (remainingMs < 3_000) return 3;
   if (remainingMs < 10_000) return 6;

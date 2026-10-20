@@ -9,6 +9,7 @@ import { MAIN_THEME_COLOR } from "@/constants";
 import SettingsDialog from "../settings/settingsDialog";
 import SmartImportDialog from "../importDialog/smartImportDialog";
 import GlobalImportListeners from "../importDialog/globalListeners";
+import MoveStoryDialog from "@/components/moveStoryDialog";
 
 export default function Layout({ children }: PropsWithChildren) {
   const [isDarkMode, setDarkMode] = useLocalStorage("useDarkMode", true);
@@ -74,6 +75,7 @@ export default function Layout({ children }: PropsWithChildren) {
       <SmartImportDialog />
       <CommandPalette switchDarkMode={switchDarkMode} />
       <GlobalImportListeners />
+      <MoveStoryDialog />
     </ThemeProvider>
   );
 }

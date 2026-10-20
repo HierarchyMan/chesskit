@@ -39,10 +39,18 @@ export const hasMatingMaterial = (game: Chess, color: ChessColor): boolean => {
   return own.length === 1 && opponent.length > 0;
 };
 
-export const getGameResult = (game: Chess, end: GameEnd | null): GameResultInfo => {
+export const getGameResult = (
+  game: Chess,
+  end: GameEnd | null
+): GameResultInfo => {
   if (end?.type === "resign") {
     const winner = otherColor(end.loser);
-    return { over: true, winner, result: resultForWinner(winner), reason: "Resignation" };
+    return {
+      over: true,
+      winner,
+      result: resultForWinner(winner),
+      reason: "Resignation",
+    };
   }
 
   if (end?.type === "draw-agreed") {
@@ -58,22 +66,34 @@ export const getGameResult = (game: Chess, end: GameEnd | null): GameResultInfo 
         reason: "Timeout, but the opponent cannot checkmate",
       };
     }
-    return { over: true, winner, result: resultForWinner(winner), reason: "Timeout" };
+    return {
+      over: true,
+      winner,
+      result: resultForWinner(winner),
+      reason: "Timeout",
+    };
   }
 
   if (game.isCheckmate()) {
     const winner = otherColor(game.turn() as Color);
-    return { over: true, winner, result: resultForWinner(winner), reason: "Checkmate" };
+    return {
+      over: true,
+      winner,
+      result: resultForWinner(winner),
+      reason: "Checkmate",
+    };
   }
 
-  if (game.isStalemate()) return { over: true, result: "1/2-1/2", reason: "Stalemate" };
+  if (game.isStalemate())
+    return { over: true, result: "1/2-1/2", reason: "Stalemate" };
   if (game.isInsufficientMaterial()) {
     return { over: true, result: "1/2-1/2", reason: "Insufficient material" };
   }
   if (game.isThreefoldRepetition()) {
     return { over: true, result: "1/2-1/2", reason: "Threefold repetition" };
   }
-  if (game.isDraw()) return { over: true, result: "1/2-1/2", reason: "Fifty-move rule" };
+  if (game.isDraw())
+    return { over: true, result: "1/2-1/2", reason: "Fifty-move rule" };
 
   return { over: false, result: "*", reason: "" };
 };

@@ -6,6 +6,10 @@ import FlipBoardButton from "./flipBoardButton";
 import NextMoveButton from "./nextMoveButton";
 import GoToLastPositionButton from "./goToLastPositionButton";
 import SaveButton from "./saveButton";
+import AutoPlayButton from "./autoPlayButton";
+import TopMovesButton from "./topMovesButton";
+import ClearMovesButton from "./clearMovesButton";
+import MoreMenu from "./moreMenu";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { ToolbarButton } from "@/components/ToolbarButton";
 import { CopyPgnButton } from "./copyPgnButton";
@@ -26,42 +30,53 @@ export default function PanelToolBar() {
 
   const isSmOrGreater = useMediaQuery((theme) => theme.breakpoints.up("sm"));
 
-  return (
+  const navigation = (
     <>
+      <ToolbarButton
+        tooltip="Back to start (↓)"
+        onClick={() => resetBoard()}
+        icon="ri:skip-back-line"
+        disabled={boardHistory.length === 0}
+      />
+
+      <ToolbarButton
+        tooltip="Previous move (←)"
+        onClick={() => undoBoardMove()}
+        icon="ri:arrow-left-s-line"
+        disabled={boardHistory.length === 0}
+        iconHeight={30}
+      />
+
+      <AutoPlayButton />
+
+      <NextMoveButton />
+
+      <GoToLastPositionButton />
+    </>
+  );
+
+  const tools = (
+    <>
+      <FlipBoardButton />
+      <TopMovesButton />
+      <ClearMovesButton />
+      <CopyPgnButton />
+      <SaveButton />
+      <MoreMenu />
+    </>
+  );
+
+  return (
+    <Stack width="100%" gap={0.5}>
       <Stack
         direction="row"
         justifyContent={{ xs: "space-around", md: "center" }}
         alignItems="center"
-        gap={{ xs: undefined, md: 3 }}
+        gap={{ xs: undefined, md: isSmOrGreater ? 1.5 : 0 }}
         width="100%"
       >
-        {isSmOrGreater && <FlipBoardButton />}
-
-        <ToolbarButton
-          tooltip="Back to start (↓)"
-          onClick={() => resetBoard()}
-          icon="ri:skip-back-line"
-          disabled={boardHistory.length === 0}
-        />
-
-        <ToolbarButton
-          tooltip="Previous move (←)"
-          onClick={() => undoBoardMove()}
-          icon="ri:arrow-left-s-line"
-          disabled={boardHistory.length === 0}
-          iconHeight={30}
-        />
-
-        <NextMoveButton />
-
-        <GoToLastPositionButton />
-
-        {isSmOrGreater && (
-          <>
-            <CopyPgnButton />
-            <SaveButton />
-          </>
-        )}
+        {navigation}
+        {isSmOrGreater && tools}
       </Stack>
 
       {!isSmOrGreater && (
@@ -71,11 +86,9 @@ export default function PanelToolBar() {
           alignItems="center"
           width="100%"
         >
-          <FlipBoardButton />
-          <CopyPgnButton />
-          <SaveButton />
+          {tools}
         </Stack>
       )}
-    </>
+    </Stack>
   );
 }

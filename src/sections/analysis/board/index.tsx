@@ -1,5 +1,6 @@
 import { useAtomValue } from "jotai";
 import {
+  boardArrowsAtom,
   boardAtom,
   boardOrientationAtom,
   currentPositionAtom,
@@ -7,29 +8,17 @@ import {
   showBestMoveArrowAtom,
   showPlayerMoveIconAtom,
 } from "../states";
-import { useMemo } from "react";
-import { useScreenSize } from "@/hooks/useScreenSize";
 import { Color } from "@/types/enums";
 import Board from "@/components/board";
 import { usePlayersData } from "@/hooks/usePlayersData";
+import { useAnalysisBoardSize } from "../hooks/useAnalysisBoardSize";
 
 export default function BoardContainer() {
-  const screenSize = useScreenSize();
+  const boardSize = useAnalysisBoardSize();
   const boardOrientation = useAtomValue(boardOrientationAtom);
   const showBestMoveArrow = useAtomValue(showBestMoveArrowAtom);
+  const extraArrows = useAtomValue(boardArrowsAtom);
   const { white, black } = usePlayersData(gameAtom);
-
-  const boardSize = useMemo(() => {
-    const width = screenSize.width;
-    const height = screenSize.height;
-
-    // 1200 is the lg layout breakpoint
-    if (window?.innerWidth < 1200) {
-      return Math.min(width, height - 150);
-    }
-
-    return Math.min(width - 700, height * 0.92);
-  }, [screenSize]);
 
   return (
     <Board
@@ -44,6 +33,7 @@ export default function BoardContainer() {
       showBestMoveArrow={showBestMoveArrow}
       showPlayerMoveIconAtom={showPlayerMoveIconAtom}
       showEvaluationBar={true}
+      extraArrows={extraArrows}
     />
   );
 }

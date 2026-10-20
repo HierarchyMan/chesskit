@@ -2,7 +2,13 @@ import MiniBoard from "@/components/board/miniBoard";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { setHandoff } from "@/lib/handoff";
 import { fetchLichessGame } from "@/lib/lichess";
-import { DetectedInput, ParsedGame, detectInput, loadGameFromText } from "@/lib/pgn";
+import {
+  DetectedInput,
+  ParsedGame,
+  detectInput,
+  fenToPgn,
+  loadGameFromText,
+} from "@/lib/pgn";
 import { Icon } from "@iconify/react";
 import {
   Alert,
@@ -14,9 +20,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  List,
-  ListItem,
-  ListItemText,
   Stack,
   TextField,
   Typography,
@@ -26,6 +29,7 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { importDialogAtom } from "../layout/states";
+import PgnGameList from "../loadGame/pgnGameList";
 
 interface LichessState {
   status: "idle" | "loading" | "done" | "error";
@@ -163,7 +167,13 @@ export default function SmartImportDialog() {
         : undefined;
 
   return (
-    <Dialog open={dialog.open} onClose={close} fullWidth maxWidth="sm" scroll="paper">
+    <Dialog
+      open={dialog.open}
+      onClose={close}
+      fullWidth
+      maxWidth="sm"
+      scroll="paper"
+    >
       <DialogTitle>Import</DialogTitle>
       <DialogContent>
         <Stack spacing={2} pt={0.5}>
@@ -230,7 +240,13 @@ export default function SmartImportDialog() {
                   borderColor: "divider",
                 }}
               >
-                <Image src={image} alt="Board to scan" fill style={{ objectFit: "contain" }} unoptimized />
+                <Image
+                  src={image}
+                  alt="Board to scan"
+                  fill
+                  style={{ objectFit: "contain" }}
+                  unoptimized
+                />
               </Box>
               <Button
                 variant="contained"
@@ -246,20 +262,41 @@ export default function SmartImportDialog() {
           )}
 
           {detected.kind === "fen" && (
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              alignItems="center"
+            >
               <MiniBoard fen={detected.fen} size={170} animationDuration={0} />
               <Stack spacing={1} width="100%">
-                <Chip label="Position (FEN)" color="primary" size="small" sx={{ alignSelf: "flex-start" }} />
-                <Button variant="contained" onClick={() => openFen(detected.fen, "/editor")}>
+                <Chip
+                  label="Position (FEN)"
+                  color="primary"
+                  size="small"
+                  sx={{ alignSelf: "flex-start" }}
+                />
+                <Button
+                  variant="contained"
+                  onClick={() => openFen(detected.fen, "/editor")}
+                >
                   Edit on the board
                 </Button>
-                <Button variant="outlined" onClick={() => openPgn(fenToPgn(detected.fen), "/analysis")}>
+                <Button
+                  variant="outlined"
+                  onClick={() => openPgn(fenToPgn(detected.fen), "/analysis")}
+                >
                   Analyze this position
                 </Button>
-                <Button variant="outlined" onClick={() => openFen(detected.fen, "/play")}>
+                <Button
+                  variant="outlined"
+                  onClick={() => openFen(detected.fen, "/play")}
+                >
                   Play it against a bot
                 </Button>
-                <Button variant="outlined" onClick={() => openFen(detected.fen, "/arena")}>
+                <Button
+                  variant="outlined"
+                  onClick={() => openFen(detected.fen, "/arena")}
+                >
                   Watch engines play it
                 </Button>
               </Stack>
@@ -324,7 +361,9 @@ function PgnChoices({
         <Chip
           size="small"
           color="primary"
-          label={games.length === 1 ? "Game (PGN)" : `${games.length} games (PGN)`}
+          label={
+            games.length === 1 ? "Game (PGN)" : `${games.length} games (PGN)`
+          }
         />
         <Button
           size="small"
@@ -332,47 +371,34 @@ function PgnChoices({
           disabled={!readable.length}
           onClick={() => onSave(readable)}
         >
-          {readable.length === 1 ? "Save to database" : `Save all ${readable.length} to database`}
+          {readable.length === 1
+            ? "Save to database"
+            : `Save all ${readable.length} to database`}
         </Button>
       </Stack>
 
-      <List
-        dense
-        disablePadding
-        sx={{ maxHeight: 280, overflowY: "auto", border: 1, borderColor: "divider", borderRadius: 2 }}
-      >
-        {games.map((game) => (
-          <ListItem
-            key={game.index}
-            divider
-            secondaryAction={
-              game.error ? undefined : (
-                <Stack direction="row" gap={0.5}>
-                  <Button size="small" variant="contained" onClick={() => onAnalyze(game)}>
-                    Analyze
-                  </Button>
-                  <Button size="small" variant="outlined" onClick={() => onReview(game)}>
-                    Learn
-                  </Button>
-                </Stack>
-              )
-            }
-            sx={{ pr: game.error ? 2 : 22 }}
-          >
-            <ListItemText
-              primary={game.error ? `Game ${game.index + 1} could not be read` : `${game.white} vs ${game.black}`}
-              secondary={
-                game.error
-                  ? game.error
-                  : [game.result, `${Math.ceil(game.movesNb / 2)} moves`, game.date, game.event]
-                      .filter(Boolean)
-                      .join(" · ")
-              }
-              slotProps={{ primary: { noWrap: true }, secondary: { noWrap: true } }}
-            />
-          </ListItem>
-        ))}
-      </List>
+      <PgnGameList
+        games={games}
+        actionsWidth={170}
+        renderActions={(game) => (
+          <Stack direction="row" gap={0.5}>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => onAnalyze(game)}
+            >
+              Analyze
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => onReview(game)}
+            >
+              Learn
+            </Button>
+          </Stack>
+        )}
+      />
     </Stack>
   );
 }
@@ -381,6 +407,3 @@ const detectInputGames = (pgn: string): ParsedGame[] | undefined => {
   const detected = detectInput(pgn);
   return detected.kind === "pgn" ? detected.games : undefined;
 };
-
-const fenToPgn = (fen: string): string =>
-  `[SetUp "1"]\n[FEN "${fen}"]\n\n*`;

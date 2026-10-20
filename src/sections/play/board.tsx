@@ -51,9 +51,8 @@ export default function BoardContainer({ engine, boardSize }: Props) {
       setBotThinking(true);
 
       const minimumThinkTime = sleep(350 + Math.random() * 450);
-      const botClock = store.get(clocksAtom)?.[
-        playerColor === Color.White ? "b" : "w"
-      ];
+      const botClock =
+        store.get(clocksAtom)?.[playerColor === Color.White ? "b" : "w"];
 
       try {
         const move = await getBotMove(

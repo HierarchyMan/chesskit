@@ -17,7 +17,11 @@ import { useAtom, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { HOME_ITEM, NAV_ITEMS } from "./navItems";
-import { commandPaletteOpenAtom, importDialogAtom, settingsOpenAtom } from "./states";
+import {
+  commandPaletteOpenAtom,
+  importDialogAtom,
+  settingsOpenAtom,
+} from "./states";
 
 interface Command {
   id: string;
@@ -120,7 +124,17 @@ export default function CommandPalette({ switchDarkMode }: Props) {
       onClose={() => setOpen(false)}
       fullWidth
       maxWidth="sm"
-      slotProps={{ paper: { sx: { position: "absolute", top: "12vh", m: 0, width: "calc(100% - 32px)", maxWidth: 560 } } }}
+      slotProps={{
+        paper: {
+          sx: {
+            position: "absolute",
+            top: "12vh",
+            m: 0,
+            width: "calc(100% - 32px)",
+            maxWidth: 560,
+          },
+        },
+      }}
     >
       <TextField
         autoFocus
@@ -169,7 +183,9 @@ export default function CommandPalette({ switchDarkMode }: Props) {
           </ListItemButton>
         ))}
         {!filtered.length && (
-          <Typography sx={{ p: 2, opacity: 0.7 }}>Nothing matches “{query}”.</Typography>
+          <Typography sx={{ p: 2, opacity: 0.7 }}>
+            Nothing matches “{query}”.
+          </Typography>
         )}
       </List>
     </Dialog>

@@ -31,6 +31,7 @@ export class UciEngine {
     | undefined = undefined;
   private multiPv = 3;
   private elo: number | undefined = undefined;
+  private stopInFlight: Promise<void> | undefined = undefined;
 
   private constructor(
     engineName: EngineName,
@@ -156,16 +157,26 @@ export class UciEngine {
     worker.terminate();
   }
 
-  public async stopAllCurrentJobs(): Promise<void> {
+  public stopAllCurrentJobs(): Promise<void> {
     const abandonedJobs = [...this.workerQueue];
     this.workerQueue = [];
 
-    for (const worker of this.workers) {
-      worker.listen = () => null;
-    }
-
     for (const job of abandonedJobs) {
       job.resolve([]);
+    }
+
+    if (!this.stopInFlight) {
+      this.stopInFlight = this.stopWorkers().finally(() => {
+        this.stopInFlight = undefined;
+      });
+    }
+
+    return this.stopInFlight;
+  }
+
+  private async stopWorkers(): Promise<void> {
+    for (const worker of this.workers) {
+      worker.listen = () => null;
     }
 
     await this.sendCommandsToEachWorker(["stop", "isready"], "readyok");
@@ -423,7 +434,10 @@ export class UciEngine {
       onNewMessage
     );
 
-    return parseEvaluationResults(results, fen);
+    const finalEval = parseEvaluationResults(results, fen);
+    setPartialEval?.(finalEval);
+
+    return finalEval;
   }
 
   public async getEngineNextMove(

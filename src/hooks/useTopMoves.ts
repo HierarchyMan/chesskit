@@ -1,4 +1,9 @@
-import { MoveSide, TopMove, getFenForSide, linesToTopMoves } from "@/lib/engine/topMoves";
+import {
+  MoveSide,
+  TopMove,
+  getFenForSide,
+  linesToTopMoves,
+} from "@/lib/engine/topMoves";
 import { UciEngine } from "@/lib/engine/uciEngine";
 import { useCallback, useRef, useState } from "react";
 

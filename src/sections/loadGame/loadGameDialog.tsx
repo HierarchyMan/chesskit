@@ -1,5 +1,6 @@
 import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { getGameFromPgn } from "@/lib/chess";
+import { parseGames } from "@/lib/pgn";
 import { GameOrigin } from "@/types/enums";
 import {
   MenuItem,
@@ -18,7 +19,7 @@ import {
 } from "@mui/material";
 import { setContext as setSentryContext } from "@sentry/react";
 import { Chess } from "chess.js";
-import { useRef, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import GamePgnInput from "./gamePgnInput";
 import ChessComInput from "./chessComInput";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -42,6 +43,13 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
   const parsingErrorTimeout = useRef<NodeJS.Timeout | null>(null);
   const setBoardOrientation = useSetAtom(boardOrientationAtom);
   const { addGame } = useGameDatabase();
+
+  const deferredPgn = useDeferredValue(pgn);
+  const parsedGames = useMemo(
+    () => (deferredPgn.trim() ? parseGames(deferredPgn) : []),
+    [deferredPgn]
+  );
+  const readableGames = parsedGames.filter((game) => !game.error);
 
   const handleAddGame = async (pgn: string, boardOrientation?: boolean) => {
     if (!pgn) return;
@@ -75,6 +83,13 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
         setParsingError("");
       }, 3000);
     }
+  };
+
+  const handleAddAll = async () => {
+    for (const game of readableGames) {
+      await addGame(getGameFromPgn(game.pgn));
+    }
+    handleClose();
   };
 
   const handleClose = () => {
@@ -136,7 +151,13 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
           </FormControl>
 
           {gameOrigin === GameOrigin.Pgn && (
-            <GamePgnInput pgn={pgn} setPgn={setPgn} />
+            <GamePgnInput
+              pgn={pgn}
+              setPgn={setPgn}
+              games={parsedGames}
+              actionLabel={setGame ? "Analyze" : "Add"}
+              onSelectGame={(selected) => handleAddGame(selected)}
+            />
           )}
 
           {gameOrigin === GameOrigin.ChessCom && (
@@ -163,17 +184,29 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
         <Button variant="outlined" onClick={handleClose}>
           Cancel
         </Button>
-        {gameOrigin === GameOrigin.Pgn && (
+        {gameOrigin === GameOrigin.Pgn && readableGames.length <= 1 && (
           <Button
             variant="contained"
             sx={{ marginLeft: 2 }}
+            disabled={readableGames.length === 0}
             onClick={() => {
-              handleAddGame(pgn);
+              handleAddGame(readableGames[0]?.pgn ?? pgn);
             }}
           >
-            Add
+            {setGame ? "Analyze" : "Add"}
           </Button>
         )}
+        {gameOrigin === GameOrigin.Pgn &&
+          !setGame &&
+          readableGames.length > 1 && (
+            <Button
+              variant="contained"
+              sx={{ marginLeft: 2 }}
+              onClick={handleAddAll}
+            >
+              Add all {readableGames.length} games
+            </Button>
+          )}
       </DialogActions>
     </Dialog>
   );
