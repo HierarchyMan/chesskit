@@ -4,6 +4,7 @@ import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
 const nextConfig = (phase: string): NextConfig => ({
   output: phase === PHASE_PRODUCTION_BUILD ? "export" : undefined,
+  distDir: process.env.NEXT_DIST_DIR || undefined,
   trailingSlash: false,
   reactStrictMode: true,
   reactCompiler: true,

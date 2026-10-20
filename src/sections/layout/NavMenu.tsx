@@ -25,7 +25,7 @@ import {
   NavItem,
   isNavItemActive,
 } from "./navItems";
-import { navExpandedAtom } from "./states";
+import { navPreferenceAtom } from "./states";
 
 export const NAV_COLLAPSED_WIDTH = 68;
 export const NAV_EXPANDED_WIDTH = 228;
@@ -38,10 +38,11 @@ interface Props {
 export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
-  const [navExpanded, setNavExpanded] = useAtom(navExpandedAtom);
+  const isNarrow = useMediaQuery("(max-width:1279.95px)");
+  const [navPreference, setNavPreference] = useAtom(navPreferenceAtom);
   const router = useRouter();
 
-  const expanded = isDesktop ? navExpanded : true;
+  const expanded = isDesktop ? (navPreference ?? !isNarrow) : true;
   const width = expanded ? NAV_EXPANDED_WIDTH : NAV_COLLAPSED_WIDTH;
 
   const renderItem = (item: NavItem) => {
@@ -160,7 +161,7 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
           >
             <IconButton
               size="small"
-              onClick={() => setNavExpanded((value) => !value)}
+              onClick={() => setNavPreference(!expanded)}
               aria-label={expanded ? "Collapse menu" : "Expand menu"}
             >
               <Icon

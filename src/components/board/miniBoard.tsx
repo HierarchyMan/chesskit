@@ -3,6 +3,7 @@ import { Box } from "@mui/material";
 import { CSSProperties, useId, useMemo } from "react";
 import { Chessboard } from "react-chessboard";
 import { Arrow } from "react-chessboard/dist/chessboard/types";
+import { uniqueArrows } from "@/lib/arrows";
 import { useBoardAppearance } from "./appearance";
 
 interface Props {
@@ -32,6 +33,10 @@ export default function MiniBoard({
 }: Props) {
   const appearance = useBoardAppearance();
   const id = useId();
+  const uniqueMiniArrows = useMemo(
+    () => (arrows ? uniqueArrows(arrows) : arrows),
+    [arrows]
+  );
 
   const squareStyles = useMemo(
     () => ({
@@ -52,7 +57,7 @@ export default function MiniBoard({
         arePiecesDraggable={false}
         areArrowsAllowed={false}
         boardOrientation={orientation === Color.White ? "white" : "black"}
-        customArrows={arrows}
+        customArrows={uniqueMiniArrows}
         customSquareStyles={squareStyles}
         customBoardStyle={appearance.customBoardStyle}
         customDarkSquareStyle={appearance.customDarkSquareStyle}

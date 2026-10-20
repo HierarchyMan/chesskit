@@ -2,6 +2,7 @@ import { useBoardAppearance } from "@/components/board/appearance";
 import Panel from "@/components/panel";
 import { useBoardLayout } from "@/hooks/useBoardLayout";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
+import { uniqueArrows } from "@/lib/arrows";
 import { FILES, RANKS } from "@/lib/vision";
 import { Icon } from "@iconify/react";
 import {
@@ -119,7 +120,7 @@ const buildBoard = (trainer: VisionTrainer) => {
     styles[square as Square] = squareStyle(correct ? CORRECT : WRONG);
   }
 
-  return { styles, arrows, position };
+  return { styles, arrows: uniqueArrows(arrows), position };
 };
 
 export default function VisionPage() {

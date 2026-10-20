@@ -1,5 +1,7 @@
 import { ENGINE_LABELS } from "@/constants";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
+import { OPENING_LINES } from "@/data/openingLines";
+import { ENDGAMES } from "@/lib/endgames";
 import { probeRecklessBridge } from "@/lib/engine/reckless";
 import { statsAtom } from "@/lib/stats";
 import { engineNameAtom } from "@/sections/analysis/states";
@@ -360,15 +362,27 @@ function Progress() {
       },
       {
         label: "Openings learned",
-        value: String(openings.learned.length),
+        value: `${openings.learned.length}/${OPENING_LINES.length}`,
         icon: "mdi:book-open-page-variant-outline",
-        hint: "Finish a drill to add one",
+        hint: "A clean drill adds one",
       },
       {
         label: "Endgames done",
-        value: String(endgames.completed.length),
+        value: `${endgames.completed.length}/${ENDGAMES.length}`,
         icon: "mdi:chess-king",
-        hint: `Board vision best: ${vision.bestScore}`,
+        hint: "Win it or hold the draw",
+      },
+      {
+        label: "Board vision",
+        value: String(vision.bestScore),
+        icon: "mdi:eye-outline",
+        hint: `best round · ${vision.sessions} played`,
+      },
+      {
+        label: "Streak",
+        value: String(puzzles.streak),
+        icon: "mdi:fire",
+        hint: `best puzzle streak ${puzzles.bestStreak}`,
       },
     ];
 

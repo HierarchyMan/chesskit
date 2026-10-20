@@ -1,10 +1,12 @@
 import { storedAtom } from "@/lib/storedAtom";
 import { atom } from "jotai";
 
-export const navExpandedAtom = storedAtom<boolean>(
+// null means the user never chose, so the menu follows the window width.
+export const navPreferenceAtom = storedAtom<boolean | null>(
   "nav-expanded",
-  true,
-  (value): value is boolean => typeof value === "boolean"
+  null,
+  (value): value is boolean | null =>
+    value === null || typeof value === "boolean"
 );
 
 export const settingsOpenAtom = atom(false);

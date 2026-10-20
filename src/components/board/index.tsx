@@ -20,6 +20,7 @@ import PlayerHeader from "./playerHeader";
 import { boardHueAtom } from "./states";
 import { useBoardAppearance } from "./appearance";
 import tinycolor from "tinycolor2";
+import { uniqueArrows } from "@/lib/arrows";
 
 const noPositionAtom = atom<CurrentPosition>({});
 
@@ -244,7 +245,7 @@ export default function Board({
       arrows.push(bestMoveArrow);
     }
 
-    return arrows;
+    return uniqueArrows(arrows);
   }, [position, showBestMoveArrow, boardHue, extraArrows]);
 
   const SquareRenderer: CustomSquareRenderer = useMemo(() => {
