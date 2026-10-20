@@ -21,6 +21,8 @@ import { boardHueAtom } from "./states";
 import { useBoardAppearance } from "./appearance";
 import tinycolor from "tinycolor2";
 
+const noPositionAtom = atom<CurrentPosition>({});
+
 export interface Props {
   id: string;
   canPlay?: Color | boolean;
@@ -45,7 +47,7 @@ export default function Board({
   whitePlayer,
   blackPlayer,
   boardOrientation = Color.White,
-  currentPositionAtom = atom({}),
+  currentPositionAtom = noPositionAtom,
   showBestMoveArrow = false,
   showPlayerMoveIconAtom,
   showEvaluationBar = false,

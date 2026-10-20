@@ -12,6 +12,8 @@ import { boardHueAtom } from "./states";
 import { areObjectsEqual, isObject } from "@/lib/object";
 import { useMediaQuery } from "@mui/material";
 
+const moveIconOffAtom = atom(false);
+
 export interface Props {
   currentPositionAtom: PrimitiveAtom<CurrentPosition>;
   clickedSquaresAtom: PrimitiveAtom<Square[]>;
@@ -24,7 +26,7 @@ export function getSquareRenderer({
   currentPositionAtom,
   clickedSquaresAtom,
   playableSquaresAtom,
-  showPlayerMoveIconAtom = atom(false),
+  showPlayerMoveIconAtom = moveIconOffAtom,
   boardSize,
 }: Props) {
   const squareRenderer = memo(

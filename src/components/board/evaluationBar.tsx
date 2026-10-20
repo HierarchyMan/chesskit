@@ -5,6 +5,8 @@ import { getEvaluationBarValue } from "@/lib/chess";
 import { Color } from "@/types/enums";
 import { CurrentPosition } from "@/types/eval";
 
+const noPositionAtom = atom<CurrentPosition>({});
+
 interface Props {
   height: number;
   boardOrientation?: Color;
@@ -14,7 +16,7 @@ interface Props {
 export default function EvaluationBar({
   height,
   boardOrientation,
-  currentPositionAtom = atom({}),
+  currentPositionAtom = noPositionAtom,
 }: Props) {
   const [evalBar, setEvalBar] = useState({
     whiteBarPercentage: 50,

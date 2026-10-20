@@ -26,7 +26,7 @@ export const MISTAKE_LEVELS: MoveClassification[] = [
   MoveClassification.Blunder,
 ];
 
-const moverPercentage = (
+export const moverPercentage = (
   line: LineEval | undefined,
   color: "w" | "b"
 ): number => {

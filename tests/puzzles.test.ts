@@ -5,8 +5,10 @@ import { MistakeEntry } from "@/lib/mistakes";
 import {
   Puzzle,
   checkPuzzleMove,
+  evaluatePuzzleStep,
   mistakeToPuzzle,
   puzzleFromLichess,
+  solutionToSan,
   solverColor,
 } from "@/lib/puzzles";
 
@@ -96,5 +98,91 @@ describe("mistakeToPuzzle", () => {
 
   it("returns nothing when no better move is known", () => {
     assert.equal(mistakeToPuzzle({ ...entry, bestUci: undefined }), undefined);
+  });
+
+  it("also accepts other moves the engine rated almost as high", () => {
+    const line = (cp: number, move: string) => ({
+      pv: [move],
+      cp,
+      depth: 14,
+      multiPv: 1,
+    });
+    const withLines = mistakeToPuzzle({
+      ...entry,
+      beforeLines: [
+        line(-100, "d7d6"),
+        line(-95, "h7h6"),
+        line(300, "g8f6"),
+        line(-20, "b7b6"),
+      ],
+    });
+
+    assert.deepEqual(withLines?.alternatives, ["h7h6"]);
+
+    const outcome = evaluatePuzzleStep(
+      withLines as Puzzle,
+      0,
+      entry.fenBefore,
+      "h7h6"
+    );
+    assert.equal(outcome.verdict, "correct");
+    assert.equal("solved" in outcome && outcome.solved, true);
+
+    const played = evaluatePuzzleStep(
+      withLines as Puzzle,
+      0,
+      entry.fenBefore,
+      "g8f6"
+    );
+    assert.equal(played.verdict, "wrong");
+  });
+});
+
+describe("evaluatePuzzleStep", () => {
+  const puzzle = puzzleFromLichess(DAILY);
+
+  it("replies with the opponent move and carries on", () => {
+    const outcome = evaluatePuzzleStep(puzzle, 0, puzzle.fen, "e3h3");
+    assert.deepEqual(outcome, {
+      verdict: "correct",
+      solved: false,
+      reply: "h7g8",
+      nextStep: 2,
+    });
+  });
+
+  it("is solved when the last move of the line is played", () => {
+    const outcome = evaluatePuzzleStep(puzzle, 6, puzzle.fen, "h6g7");
+    assert.deepEqual(outcome, {
+      verdict: "correct",
+      solved: true,
+      nextStep: 7,
+    });
+  });
+
+  it("is solved straight away by a different mating move", () => {
+    const mate: Puzzle = {
+      id: "m",
+      fen: "6k1/5ppp/8/8/8/8/5PPP/R2R2K1 w - - 0 1",
+      solution: ["a1a8", "g8f8", "d1d8"],
+      themes: [],
+      source: "offline",
+    };
+    const outcome = evaluatePuzzleStep(mate, 0, mate.fen, "d1d8");
+    assert.deepEqual(outcome, { verdict: "mate", solved: true, nextStep: 3 });
+  });
+
+  it("reports a wrong move without advancing", () => {
+    assert.deepEqual(evaluatePuzzleStep(puzzle, 0, puzzle.fen, "a2a3"), {
+      verdict: "wrong",
+    });
+  });
+});
+
+describe("solutionToSan", () => {
+  it("replays the whole line in algebraic notation", () => {
+    const moves = solutionToSan(puzzleFromLichess(DAILY));
+    assert.equal(moves.length, 7);
+    assert.equal(moves[0], "Rh3+");
   });
 });
