@@ -1,7 +1,8 @@
 import { useAtomValue } from "jotai";
 import { boardAtom, gameAtom } from "../states";
 import { useChessActions } from "@/hooks/useChessActions";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { ToolbarButton } from "@/components/ToolbarButton";
 
 export default function NextMoveButton() {
@@ -35,23 +36,11 @@ export default function NextMoveButton() {
     }
   }, [isButtonEnabled, boardHistory, game, playBoardMove]);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") {
-        addNextGameMoveToBoard();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [addNextGameMoveToBoard]);
+  useKeyboardShortcut("ArrowRight", addNextGameMoveToBoard);
 
   return (
     <ToolbarButton
-      tooltip="Go to next move"
+      tooltip="Next move (→)"
       onClick={() => addNextGameMoveToBoard()}
       icon="ri:arrow-right-s-line"
       disabled={!isButtonEnabled}

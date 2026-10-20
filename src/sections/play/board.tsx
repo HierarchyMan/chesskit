@@ -1,73 +1,92 @@
-import { useAtomValue } from "jotai";
-import {
-  engineEloAtom,
-  gameAtom,
-  playerColorAtom,
-  isGameInProgressAtom,
-  gameDataAtom,
-  enginePlayNameAtom,
-} from "./states";
-import { useChessActions } from "@/hooks/useChessActions";
-import { useEffect, useMemo } from "react";
-import { useScreenSize } from "@/hooks/useScreenSize";
-import { useEngine } from "@/hooks/useEngine";
-import { uciMoveParams } from "@/lib/chess";
 import Board from "@/components/board";
+import { useChessActions } from "@/hooks/useChessActions";
 import { useGameData } from "@/hooks/useGameData";
 import { usePlayersData } from "@/hooks/usePlayersData";
+import { uciMoveParams } from "@/lib/chess";
+import { getBotMove } from "@/lib/engine/botMove";
+import { maxDepthForTime } from "@/lib/engine/strength";
+import { UciEngine } from "@/lib/engine/uciEngine";
 import { sleep } from "@/lib/helpers";
+import { Color } from "@/types/enums";
+import { useAtomValue, useSetAtom, useStore } from "jotai";
+import { useEffect } from "react";
+import {
+  boardFlippedAtom,
+  botStrengthAtom,
+  botThinkingAtom,
+  clocksAtom,
+  gameAtom,
+  gameDataAtom,
+  hintArrowsAtom,
+  isGameInProgressAtom,
+  playerColorAtom,
+} from "./states";
 
-export default function BoardContainer() {
-  const screenSize = useScreenSize();
-  const engineName = useAtomValue(enginePlayNameAtom);
-  const engine = useEngine(engineName);
+interface Props {
+  engine: UciEngine | null;
+  boardSize: number;
+}
+
+export default function BoardContainer({ engine, boardSize }: Props) {
+  const store = useStore();
   const game = useAtomValue(gameAtom);
   const { white, black } = usePlayersData(gameAtom);
   const playerColor = useAtomValue(playerColorAtom);
-  const { playMove } = useChessActions(gameAtom);
-  const engineElo = useAtomValue(engineEloAtom);
+  const flipped = useAtomValue(boardFlippedAtom);
+  const hintArrows = useAtomValue(hintArrowsAtom);
   const isGameInProgress = useAtomValue(isGameInProgressAtom);
+  const setBotThinking = useSetAtom(botThinkingAtom);
+  const { playMove } = useChessActions(gameAtom);
 
   const gameFen = game.fen();
   const isGameFinished = game.isGameOver();
+  const isBotTurn = game.turn() !== playerColor;
 
   useEffect(() => {
-    const playEngineMove = async () => {
-      if (
-        !engine?.getIsReady() ||
-        game.turn() === playerColor ||
-        isGameFinished ||
-        !isGameInProgress
-      ) {
-        return;
+    if (!engine || !isGameInProgress || isGameFinished || !isBotTurn) return;
+
+    let cancelled = false;
+
+    const playBotMove = async () => {
+      setBotThinking(true);
+
+      const minimumThinkTime = sleep(350 + Math.random() * 450);
+      const botClock = store.get(clocksAtom)?.[
+        playerColor === Color.White ? "b" : "w"
+      ];
+
+      try {
+        const move = await getBotMove(
+          engine,
+          gameFen,
+          store.get(botStrengthAtom),
+          { maxDepth: maxDepthForTime(botClock) }
+        );
+        await minimumThinkTime;
+
+        if (!cancelled && move) playMove(uciMoveParams(move));
+      } catch (error) {
+        if (!cancelled) console.error(error);
+      } finally {
+        if (!cancelled) setBotThinking(false);
       }
-
-      const timePromise = sleep(1000);
-      const move = await engine.getEngineNextMove(gameFen, engineElo);
-      await timePromise;
-
-      if (move) playMove(uciMoveParams(move));
     };
-    playEngineMove();
+    playBotMove();
 
     return () => {
-      engine?.stopAllCurrentJobs();
+      cancelled = true;
+      setBotThinking(false);
+      engine.stopAllCurrentJobs();
     };
-  }, [gameFen, isGameInProgress]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const boardSize = useMemo(() => {
-    const width = screenSize.width;
-    const height = screenSize.height;
-
-    // 900 is the md layout breakpoint
-    if (window?.innerWidth < 900) {
-      return Math.min(width, height - 150);
-    }
-
-    return Math.min(width - 300, height * 0.83);
-  }, [screenSize]);
+  }, [gameFen, isGameInProgress, isGameFinished, isBotTurn, engine]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useGameData(gameAtom, gameDataAtom);
+
+  const orientation = flipped
+    ? playerColor === Color.White
+      ? Color.Black
+      : Color.White
+    : playerColor;
 
   return (
     <Board
@@ -77,8 +96,10 @@ export default function BoardContainer() {
       boardSize={boardSize}
       whitePlayer={white}
       blackPlayer={black}
-      boardOrientation={playerColor}
+      boardOrientation={orientation}
       currentPositionAtom={gameDataAtom}
+      extraArrows={hintArrows}
+      clocksAtom={clocksAtom}
     />
   );
 }

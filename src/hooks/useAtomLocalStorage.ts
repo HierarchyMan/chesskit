@@ -13,7 +13,7 @@ export function useAtomLocalStorage<T>(
     const item = window.localStorage.getItem(key);
     if (!item) return;
     const value = parseJSON<T>(item);
-    if (value) setStoredValue(value);
+    if (value !== undefined) setStoredValue(value);
   }, [key, setStoredValue]);
 
   useEffect(() => {

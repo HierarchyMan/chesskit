@@ -14,6 +14,8 @@ import { getIsStalemate, getWhoIsCheckmated } from "../chess";
 import { getLichessEval } from "../lichess";
 import { getMovesClassification } from "./helpers/moveClassification";
 import { computeEstimatedElo } from "./helpers/estimateElo";
+import { hasNativeEloLimit } from "@/constants";
+import { NATIVE_MAX_ELO, NATIVE_MIN_ELO } from "./strength";
 import { EngineWorker, WorkerJob } from "@/types/engine";
 import { getEngineWorker, sendCommandsToWorker } from "./worker";
 import { logMessageIfLocalhost } from "../helpers";
@@ -97,10 +99,20 @@ export class UciEngine {
     this.multiPv = multiPv;
   }
 
-  private async setElo(elo: number) {
+  private async setElo(elo: number | undefined) {
+    if (!hasNativeEloLimit(this.name)) return;
     if (elo === this.elo) return;
 
-    if (elo < 1320 || elo > 3190) {
+    if (elo === undefined) {
+      await this.sendCommandsToEachWorker(
+        ["setoption name UCI_LimitStrength value false", "isready"],
+        "readyok"
+      );
+      this.elo = undefined;
+      return;
+    }
+
+    if (elo < NATIVE_MIN_ELO || elo > NATIVE_MAX_ELO) {
       throw new Error(`Invalid Elo value : ${elo}`);
     }
 
@@ -266,6 +278,7 @@ export class UciEngine {
     setEvaluationProgress?.(1);
 
     await this.setMultiPv(multiPv);
+    await this.setElo(undefined);
     await this.sendCommandsToEachWorker(["ucinewgame", "isready"], "readyok");
     this.setWorkersNb(workersNb);
 
@@ -361,13 +374,18 @@ export class UciEngine {
     depth = 16,
     multiPv = this.multiPv,
     setPartialEval,
+    useCloudEval = true,
+    movetimeMs,
   }: EvaluatePositionWithUpdateParams): Promise<PositionEval> {
     this.throwErrorIfNotReady();
 
-    const lichessEvalPromise = getLichessEval(fen, multiPv);
+    const lichessEvalPromise = useCloudEval
+      ? getLichessEval(fen, multiPv)
+      : undefined;
 
     await this.stopAllCurrentJobs();
     await this.setMultiPv(multiPv);
+    await this.setElo(undefined);
 
     let lastUpdate = 0;
     const THROTTLE_MS = 60; // Limit UI updates to ~16 updates per second to avoid performance issues
@@ -387,6 +405,7 @@ export class UciEngine {
 
     const lichessEval = await lichessEvalPromise;
     if (
+      lichessEval &&
       lichessEval.lines.length >= multiPv &&
       lichessEval.lines[0].depth >= depth
     ) {
@@ -394,8 +413,12 @@ export class UciEngine {
       return lichessEval;
     }
 
+    const goCommand = movetimeMs
+      ? `go movetime ${Math.round(movetimeMs)}`
+      : `go depth ${depth}`;
+
     const results = await this.sendCommands(
-      [`position fen ${fen}`, `go depth ${depth}`],
+      [`position fen ${fen}`, goCommand],
       "bestmove",
       onNewMessage
     );
@@ -405,7 +428,7 @@ export class UciEngine {
 
   public async getEngineNextMove(
     fen: string,
-    elo: number,
+    elo: number | undefined,
     depth = 16
   ): Promise<string | undefined> {
     this.throwErrorIfNotReady();

@@ -12,7 +12,7 @@ export function useLocalStorage<T = string | number | boolean>(
     const item = window.localStorage.getItem(key);
     if (item) {
       const value = parseJSON<T>(item);
-      if (value) {
+      if (value !== undefined) {
         setStoredValue(value);
         return;
       }

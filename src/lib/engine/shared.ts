@@ -5,6 +5,7 @@ import { Stockfish16_1 } from "./stockfish16_1";
 import { Stockfish17 } from "./stockfish17";
 import { Stockfish18 } from "./stockfish18";
 import { Stockfish17_1 } from "./stockfish17_1";
+import { Reckless } from "./reckless";
 
 export const isWasmSupported = () =>
   typeof WebAssembly === "object" &&
@@ -19,6 +20,8 @@ export const isMobileDevice = () =>
 
 export const isEngineSupported = (name: EngineName): boolean => {
   switch (name) {
+    case EngineName.Reckless:
+      return Reckless.isSupported();
     case EngineName.Stockfish18:
     case EngineName.Stockfish18Lite:
       return Stockfish18.isSupported();

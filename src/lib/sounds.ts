@@ -1,4 +1,6 @@
+import { soundEnabledAtom } from "@/components/board/states";
 import { Move } from "chess.js";
+import { getDefaultStore } from "jotai";
 
 let audioContext: AudioContext | null = null;
 let timeout: NodeJS.Timeout | null = null;
@@ -11,6 +13,7 @@ const soundUrls: Record<Sound, string> = {
   illegalMove: "/sounds/error.mp3",
 };
 export const play = async (sound: Sound) => {
+  if (!getDefaultStore().get(soundEnabledAtom)) return;
   if (timeout) clearTimeout(timeout);
 
   timeout = setTimeout(async () => {

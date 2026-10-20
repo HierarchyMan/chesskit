@@ -1,49 +1,63 @@
 import { PageTitle } from "@/components/pageTitle";
+import { useBoardLayout } from "@/hooks/useBoardLayout";
+import { useEngineState } from "@/hooks/useEngine";
+import { useHandoff } from "@/hooks/useHandoff";
 import Board from "@/sections/play/board";
-import GameInProgress from "@/sections/play/gameInProgress";
-import GameRecap from "@/sections/play/gameRecap";
-import GameSettingsButton from "@/sections/play/gameSettings/gameSettingsButton";
-import { isGameInProgressAtom } from "@/sections/play/states";
-import { Grid2 as Grid } from "@mui/material";
-import { useAtomValue } from "jotai";
+import GamePanel from "@/sections/play/gamePanel";
+import NewGamePanel from "@/sections/play/newGamePanel";
+import {
+  enginePlayNameAtom,
+  gameAtom,
+  gameEndAtom,
+  isGameInProgressAtom,
+  startingPositionAtom,
+} from "@/sections/play/states";
+import { useGameLifecycle } from "@/sections/play/useGameLifecycle";
+import { Box } from "@mui/material";
+import { useAtomValue, useSetAtom } from "jotai";
+
+const SIDE_PANEL_WIDTH = 440;
 
 export default function Play() {
-  const isGameInProgress = useAtomValue(isGameInProgressAtom);
+  const engineName = useAtomValue(enginePlayNameAtom);
+  const botEngine = useEngineState(engineName);
+  const isInProgress = useAtomValue(isGameInProgressAtom);
+  const game = useAtomValue(gameAtom);
+  const end = useAtomValue(gameEndAtom);
+  const setStartingPosition = useSetAtom(startingPositionAtom);
+  const { boardSize, sideBySide } = useBoardLayout({
+    sidePanelWidth: SIDE_PANEL_WIDTH,
+  });
+
+  useGameLifecycle();
+
+  useHandoff(["fen"], ({ fen }) => setStartingPosition(fen));
+
+  const hasGame = isInProgress || game.history().length > 0 || !!end;
 
   return (
-    <Grid container gap={4} justifyContent="space-evenly" alignItems="start">
-      <PageTitle title="Chesskit Play vs Stockfish" />
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: sideBySide ? "row" : "column",
+        justifyContent: "center",
+        alignItems: sideBySide ? "flex-start" : "center",
+        gap: 4,
+      }}
+    >
+      <PageTitle title="Chesskit Play" />
 
-      <Board />
+      <Board engine={botEngine.engine} boardSize={boardSize} />
 
-      <Grid
-        container
-        marginTop={{ xs: 0, md: "2.5em" }}
-        justifyContent="center"
-        alignItems="center"
-        borderRadius={2}
-        border={1}
-        borderColor={"secondary.main"}
-        size={{
-          xs: 12,
-          md: "grow",
-        }}
+      <Box
         sx={{
-          backgroundColor: "secondary.main",
-          borderColor: "primary.main",
-          borderWidth: 2,
-          boxShadow: "0 2px 10px rgba(0, 0, 0, 0.5)",
-        }}
-        padding={3}
-        rowGap={3}
-        style={{
-          maxWidth: "400px",
+          width: sideBySide ? SIDE_PANEL_WIDTH : "100%",
+          maxWidth: "100%",
+          mt: sideBySide ? "3.2rem" : 0,
         }}
       >
-        <GameInProgress />
-        {!isGameInProgress && <GameSettingsButton />}
-        <GameRecap />
-      </Grid>
-    </Grid>
+        {hasGame ? <GamePanel botEngine={botEngine} /> : <NewGamePanel botEngine={botEngine} />}
+      </Box>
+    </Box>
   );
 }

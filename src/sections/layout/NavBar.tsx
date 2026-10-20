@@ -1,121 +1,151 @@
-import AppBar from "@mui/material/AppBar";
-import Box from "@mui/material/Box";
-import Toolbar from "@mui/material/Toolbar";
-import Typography from "@mui/material/Typography";
-import IconButton from "@mui/material/IconButton";
-import { useEffect, useState } from "react";
-import NavMenu from "./NavMenu";
 import { Icon } from "@iconify/react";
-import { useRouter } from "next/router";
-import NavLink from "@/components/NavLink";
+import {
+  AppBar,
+  Box,
+  Button,
+  IconButton,
+  Toolbar,
+  Tooltip,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
+import { useSetAtom } from "jotai";
 import Image from "next/image";
-import { styled } from "@mui/material/styles";
+import { useRouter } from "next/router";
+import EngineChip from "./engineChip";
+import { findNavItem } from "./navItems";
+import {
+  commandPaletteOpenAtom,
+  importDialogAtom,
+  settingsOpenAtom,
+} from "./states";
 
 interface Props {
   darkMode: boolean;
   switchDarkMode: () => void;
+  onMenuClick: () => void;
 }
 
-// Styled component to make the link look like a button
-const StyledIconButtonLink = styled("a")({
-  color: "inherit",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textDecoration: "none", // Remove underline from link
-  "&:hover": {
-    cursor: "pointer", // Change cursor on hover
-  },
-});
-
-export default function NavBar({ darkMode, switchDarkMode }: Props) {
-  const [drawerOpen, setDrawerOpen] = useState(false);
+export default function NavBar({ darkMode, switchDarkMode, onMenuClick }: Props) {
   const router = useRouter();
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+  const isSmOrGreater = useMediaQuery(theme.breakpoints.up("sm"));
+  const setImportDialog = useSetAtom(importDialogAtom);
+  const setSettingsOpen = useSetAtom(settingsOpenAtom);
+  const setPaletteOpen = useSetAtom(commandPaletteOpenAtom);
 
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [router.pathname]);
+  const current = findNavItem(router.pathname);
 
   return (
-    <Box sx={{ flexGrow: 1, display: "flex" }}>
-      <AppBar
-        position="static"
-        sx={{
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          backgroundColor: darkMode ? "#19191c" : "white",
-          color: darkMode ? "white" : "black",
-        }}
-        enableColorOnDark
-      >
-        <Toolbar variant="dense">
-          <IconButton
-            size="large"
-            edge="start"
-            color="inherit"
-            aria-label="menu"
-            sx={{ mr: "min(0.5vw, 0.6rem)", padding: 1, my: 1 }}
-            onClick={() => setDrawerOpen((val) => !val)}
-          >
-            <Icon icon="mdi:menu" />
-          </IconButton>
-
-          <Image
-            src="/favicon-32x32.png"
-            alt="Chesskit logo"
-            width={32}
-            height={32}
-          />
-
-          <NavLink href="/">
-            <Typography
-              variant="h6"
-              component="div"
-              sx={{
-                flexGrow: 1,
-                ml: 1,
-                fontSize: { xs: "1rem", sm: "1.25rem" },
-              }}
+    <AppBar
+      position="sticky"
+      color="default"
+      elevation={0}
+      enableColorOnDark
+      sx={{
+        backgroundColor: "background.paper",
+        borderBottom: 1,
+        borderColor: "divider",
+        backgroundImage: "none",
+      }}
+    >
+      <Toolbar variant="dense" sx={{ minHeight: 56, gap: 0.5 }}>
+        {!isDesktop && (
+          <>
+            <IconButton
+              edge="start"
+              color="inherit"
+              aria-label="Open menu"
+              onClick={onMenuClick}
             >
-              Chesskit
-            </Typography>
-          </NavLink>
-
-          <StyledIconButtonLink
-            href="https://discord.gg/Yr99abAcUr"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <IconButton color="inherit" component="span">
-              <Icon icon="ri:discord-fill" />
+              <Icon icon="mdi:menu" />
             </IconButton>
-          </StyledIconButtonLink>
+            <Image
+              src="/favicon-32x32.png"
+              alt="Chesskit logo"
+              width={28}
+              height={28}
+            />
+          </>
+        )}
 
-          <StyledIconButtonLink
-            href="https://github.com/GuillaumeSD/Chesskit"
-            target="_blank"
-            rel="noopener noreferrer"
-            sx={{ ml: "min(0.6rem, 0.8vw)" }}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 1 }}>
+          {current && (
+            <Icon icon={current.icon} height={22} color={current.accent} />
+          )}
+          <Typography variant="h6" fontSize="1.05rem" fontWeight={600} noWrap>
+            {current?.label ?? "Chesskit"}
+          </Typography>
+        </Box>
+
+        <Box sx={{ flexGrow: 1 }} />
+
+        <Tooltip title="Paste a PGN, FEN, link or image (or just press Ctrl+V)">
+          <Button
+            color="inherit"
+            onClick={() => setImportDialog({ open: true })}
+            startIcon={<Icon icon="mdi:clipboard-plus-outline" height={20} />}
+            sx={{
+              borderRadius: 5,
+              minWidth: 0,
+              px: isSmOrGreater ? 1.5 : 1,
+              "& .MuiButton-startIcon": { mr: isSmOrGreater ? 0.75 : 0 },
+            }}
           >
-            <IconButton color="inherit" component="span">
+            {isSmOrGreater ? "Import" : ""}
+          </Button>
+        </Tooltip>
+
+        <EngineChip />
+
+        <Tooltip title="Quick actions (Ctrl+K)">
+          <IconButton
+            color="inherit"
+            aria-label="Quick actions"
+            onClick={() => setPaletteOpen(true)}
+          >
+            <Icon icon="mdi:magnify" />
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title="Settings">
+          <IconButton
+            color="inherit"
+            aria-label="Settings"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Icon icon="mdi:cog-outline" />
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title={darkMode ? "Switch to light theme" : "Switch to dark theme"}>
+          <IconButton
+            color="inherit"
+            aria-label="Switch theme"
+            onClick={switchDarkMode}
+          >
+            <Icon icon={darkMode ? "mdi:brightness-7" : "mdi:brightness-4"} />
+          </IconButton>
+        </Tooltip>
+
+        {isSmOrGreater && (
+          <Tooltip title="Source on GitHub">
+            <IconButton
+              color="inherit"
+              aria-label="GitHub"
+              component="a"
+              href="https://github.com/GuillaumeSD/Chesskit"
+              target="_blank"
+              rel="noopener noreferrer"
+              edge="end"
+            >
               <Icon icon="mdi:github" />
             </IconButton>
-          </StyledIconButtonLink>
-
-          <IconButton
-            sx={{ ml: "min(0.6rem, 0.8vw)" }}
-            onClick={switchDarkMode}
-            color="inherit"
-            edge="end"
-          >
-            {darkMode ? (
-              <Icon icon="mdi:brightness-7" />
-            ) : (
-              <Icon icon="mdi:brightness-4" />
-            )}
-          </IconButton>
-        </Toolbar>
-      </AppBar>
-      <NavMenu open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-    </Box>
+          </Tooltip>
+        )}
+      </Toolbar>
+    </AppBar>
   );
 }

@@ -4,6 +4,10 @@ import { isIosDevice, isMobileDevice } from "./shared";
 export const getEngineWorker = (enginePath: string): EngineWorker => {
   console.log(`Creating worker from ${enginePath}`);
 
+  if (enginePath.startsWith("ws://") || enginePath.startsWith("wss://")) {
+    return getSocketEngineWorker(enginePath);
+  }
+
   const worker = new window.Worker(enginePath);
 
   const engineWorker: EngineWorker = {
@@ -14,6 +18,36 @@ export const getEngineWorker = (enginePath: string): EngineWorker => {
   };
 
   worker.onmessage = (event) => {
+    engineWorker.listen(event.data);
+  };
+
+  return engineWorker;
+};
+
+const getSocketEngineWorker = (url: string): EngineWorker => {
+  const socket = new WebSocket(url);
+  const pendingCommands: string[] = [];
+
+  const engineWorker: EngineWorker = {
+    isReady: false,
+    uci: (command: string) => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(command);
+      } else {
+        pendingCommands.push(command);
+      }
+    },
+    listen: () => null,
+    terminate: () => socket.close(),
+  };
+
+  socket.onopen = () => {
+    for (const command of pendingCommands.splice(0)) {
+      socket.send(command);
+    }
+  };
+
+  socket.onmessage = (event) => {
     engineWorker.listen(event.data);
   };
 

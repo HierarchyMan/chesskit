@@ -55,7 +55,12 @@ export const getGameToSave = (game: Chess, board: Chess): Chess => {
 
 export const setGameHeaders = (
   game: Chess,
-  params: { white?: Player; black?: Player; resigned?: Color } = {}
+  params: {
+    white?: Player;
+    black?: Player;
+    resigned?: Color;
+    ended?: { result: string; termination: string };
+  } = {}
 ): Chess => {
   game.setHeader("Event", "Chesskit Game");
   game.setHeader("Site", "Chesskit.org");
@@ -64,7 +69,7 @@ export const setGameHeaders = (
     new Date().toISOString().split("T")[0].replace(/-/g, ".")
   );
 
-  const { white, black, resigned } = params;
+  const { white, black, resigned, ended } = params;
 
   const whiteHeader = game.getHeaders().White;
   const blackHeader = game.getHeaders().Black;
@@ -85,6 +90,12 @@ export const setGameHeaders = (
       "Termination",
       `${resigned === "w" ? blackName : whiteName} won by resignation`
     );
+  }
+
+  if (ended) {
+    game.setHeader("Result", ended.result);
+    game.setHeader("Termination", ended.termination);
+    return game;
   }
 
   if (!game.isGameOver()) return game;

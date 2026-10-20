@@ -1,4 +1,5 @@
 import { isWasmSupported } from "@/lib/engine/shared";
+import { Reckless } from "@/lib/engine/reckless";
 import { Stockfish11 } from "@/lib/engine/stockfish11";
 import { Stockfish16 } from "@/lib/engine/stockfish16";
 import { Stockfish16_1 } from "@/lib/engine/stockfish16_1";
@@ -7,41 +8,86 @@ import { Stockfish17_1 } from "@/lib/engine/stockfish17_1";
 import { Stockfish18 } from "@/lib/engine/stockfish18";
 import { UciEngine } from "@/lib/engine/uciEngine";
 import { EngineName } from "@/types/enums";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-export const useEngine = (engineName: EngineName | undefined) => {
+export type EngineStatus = "idle" | "loading" | "ready" | "error";
+
+export interface EngineState {
+  engine: UciEngine | null;
+  status: EngineStatus;
+  error?: string;
+  retry: () => void;
+}
+
+export const useEngineState = (
+  engineName: EngineName | undefined
+): EngineState => {
   const [engine, setEngine] = useState<UciEngine | null>(null);
+  const [status, setStatus] = useState<EngineStatus>("idle");
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let isMounted = true;
-    if (!engineName) return;
+    setEngine(null);
+    setError(undefined);
 
-    if (engineName !== EngineName.Stockfish11 && !isWasmSupported()) {
+    if (!engineName) {
+      setStatus("idle");
       return;
     }
 
-    pickEngine(engineName).then((newEngine) => {
-      if (!isMounted) {
-        newEngine.shutdown();
-        return;
-      }
+    const needsWasm =
+      engineName !== EngineName.Stockfish11 &&
+      engineName !== EngineName.Reckless;
+    if (needsWasm && !isWasmSupported()) {
+      setStatus("error");
+      setError("This browser does not support WebAssembly.");
+      return;
+    }
 
-      setEngine((prev) => {
-        prev?.shutdown();
-        return newEngine;
+    let isCurrent = true;
+    let created: UciEngine | undefined;
+    setStatus("loading");
+
+    pickEngine(engineName)
+      .then((newEngine) => {
+        if (!isCurrent) {
+          newEngine.shutdown();
+          return;
+        }
+
+        created = newEngine;
+        setEngine(newEngine);
+        setStatus("ready");
+      })
+      .catch((reason) => {
+        if (!isCurrent) return;
+
+        console.error(reason);
+        setStatus("error");
+        setError(
+          reason instanceof Error ? reason.message : "The engine did not start."
+        );
       });
-    });
 
     return () => {
-      isMounted = false;
+      isCurrent = false;
+      created?.shutdown();
     };
-  }, [engineName]);
+  }, [engineName, attempt]);
 
-  return engine;
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+
+  return { engine, status, error, retry };
 };
+
+export const useEngine = (engineName: EngineName | undefined) =>
+  useEngineState(engineName).engine;
 
 const pickEngine = (engine: EngineName): Promise<UciEngine> => {
   switch (engine) {
+    case EngineName.Reckless:
+      return Reckless.create();
     case EngineName.Stockfish18:
       return Stockfish18.create(false);
     case EngineName.Stockfish18Lite:

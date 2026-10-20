@@ -23,6 +23,11 @@ export const ENGINE_LABELS: Record<
   EngineName,
   { small: string; full: string; sizeMb: number }
 > = {
+  [EngineName.Reckless]: {
+    full: "Reckless 0.9.0 (local bridge)",
+    small: "Reckless",
+    sizeMb: 0,
+  },
   [EngineName.Stockfish18]: {
     full: "Stockfish 18 (108MB)",
     small: "Stockfish 18",
@@ -79,6 +84,13 @@ export const ENGINE_LABELS: Record<
     sizeMb: 2,
   },
 };
+
+const ENGINES_WITHOUT_NATIVE_ELO_LIMIT = new Set<EngineName>([
+  EngineName.Reckless,
+]);
+
+export const hasNativeEloLimit = (engine: EngineName): boolean =>
+  !ENGINES_WITHOUT_NATIVE_ELO_LIMIT.has(engine);
 
 export const PIECE_SETS = [
   "alpha",

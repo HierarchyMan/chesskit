@@ -45,6 +45,8 @@ export interface EvaluatePositionWithUpdateParams {
   depth?: number;
   multiPv?: number;
   setPartialEval?: (positionEval: PositionEval) => void;
+  useCloudEval?: boolean;
+  movetimeMs?: number;
 }
 
 export interface CurrentPosition {

@@ -6,7 +6,7 @@ import FlipBoardButton from "./flipBoardButton";
 import NextMoveButton from "./nextMoveButton";
 import GoToLastPositionButton from "./goToLastPositionButton";
 import SaveButton from "./saveButton";
-import { useEffect } from "react";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { ToolbarButton } from "@/components/ToolbarButton";
 import { CopyPgnButton } from "./copyPgnButton";
 
@@ -17,22 +17,12 @@ export default function PanelToolBar() {
 
   const boardHistory = board.history();
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (boardHistory.length === 0) return;
-      if (e.key === "ArrowLeft") {
-        undoBoardMove();
-      } else if (e.key === "ArrowDown") {
-        resetBoard();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [undoBoardMove, boardHistory, resetBoard, board]);
+  useKeyboardShortcut("ArrowLeft", () => {
+    if (boardHistory.length) undoBoardMove();
+  });
+  useKeyboardShortcut("ArrowDown", () => {
+    if (boardHistory.length) resetBoard();
+  });
 
   const isSmOrGreater = useMediaQuery((theme) => theme.breakpoints.up("sm"));
 
@@ -48,14 +38,14 @@ export default function PanelToolBar() {
         {isSmOrGreater && <FlipBoardButton />}
 
         <ToolbarButton
-          tooltip="Reset board"
+          tooltip="Back to start (↓)"
           onClick={() => resetBoard()}
           icon="ri:skip-back-line"
           disabled={boardHistory.length === 0}
         />
 
         <ToolbarButton
-          tooltip="Go to previous move"
+          tooltip="Previous move (←)"
           onClick={() => undoBoardMove()}
           icon="ri:arrow-left-s-line"
           disabled={boardHistory.length === 0}

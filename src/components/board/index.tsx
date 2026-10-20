@@ -1,11 +1,9 @@
-import { Box, Grid2 as Grid } from "@mui/material";
+import { Grid2 as Grid } from "@mui/material";
 import { Chessboard } from "react-chessboard";
-import { PrimitiveAtom, atom, useAtomValue, useSetAtom } from "jotai";
+import { Atom, PrimitiveAtom, atom, useAtomValue, useSetAtom } from "jotai";
 import {
   Arrow,
-  CustomPieces,
   CustomSquareRenderer,
-  Piece,
   PromotionPieceOption,
   Square,
 } from "react-chessboard/dist/chessboard/types";
@@ -19,7 +17,8 @@ import EvaluationBar from "./evaluationBar";
 import { CLASSIFICATION_COLORS } from "@/constants";
 import { Player } from "@/types/game";
 import PlayerHeader from "./playerHeader";
-import { boardHueAtom, pieceSetAtom } from "./states";
+import { boardHueAtom } from "./states";
+import { useBoardAppearance } from "./appearance";
 import tinycolor from "tinycolor2";
 
 export interface Props {
@@ -34,6 +33,8 @@ export interface Props {
   showBestMoveArrow?: boolean;
   showPlayerMoveIconAtom?: PrimitiveAtom<boolean>;
   showEvaluationBar?: boolean;
+  extraArrows?: Arrow[];
+  clocksAtom?: Atom<{ w: number; b: number } | null>;
 }
 
 export default function Board({
@@ -48,6 +49,8 @@ export default function Board({
   showBestMoveArrow = false,
   showPlayerMoveIconAtom,
   showEvaluationBar = false,
+  extraArrows,
+  clocksAtom,
 }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const game = useAtomValue(gameAtom);
@@ -60,7 +63,15 @@ export default function Board({
   const [showPromotionDialog, setShowPromotionDialog] = useState(false);
   const [moveClickFrom, setMoveClickFrom] = useState<Square | null>(null);
   const [moveClickTo, setMoveClickTo] = useState<Square | null>(null);
-  const pieceSet = useAtomValue(pieceSetAtom);
+  const appearance = useBoardAppearance();
+  const whiteClockAtom = useMemo(
+    () => (clocksAtom ? atom((get) => get(clocksAtom)?.w) : undefined),
+    [clocksAtom]
+  );
+  const blackClockAtom = useMemo(
+    () => (clocksAtom ? atom((get) => get(clocksAtom)?.b) : undefined),
+    [clocksAtom]
+  );
   const boardHue = useAtomValue(boardHueAtom);
 
   const gameFen = game.fen();
@@ -210,6 +221,7 @@ export default function Board({
   const customArrows: Arrow[] = useMemo(() => {
     const bestMove = position?.lastEval?.bestMove;
     const moveClassification = position?.eval?.moveClassification;
+    const arrows: Arrow[] = [...(extraArrows ?? [])];
 
     if (
       bestMove &&
@@ -227,11 +239,11 @@ export default function Board({
           .toHexString(),
       ] as Arrow;
 
-      return [bestMoveArrow];
+      arrows.push(bestMoveArrow);
     }
 
-    return [];
-  }, [position, showBestMoveArrow, boardHue]);
+    return arrows;
+  }, [position, showBestMoveArrow, boardHue, extraArrows]);
 
   const SquareRenderer: CustomSquareRenderer = useMemo(() => {
     return getSquareRenderer({
@@ -248,41 +260,6 @@ export default function Board({
     showPlayerMoveIconAtom,
     boardSize,
   ]);
-
-  const customPieces = useMemo(
-    () =>
-      PIECE_CODES.reduce<CustomPieces>((acc, piece) => {
-        acc[piece] = ({ squareWidth }) => (
-          <Box
-            width={squareWidth}
-            height={squareWidth}
-            sx={{
-              backgroundImage: `url(/piece/${pieceSet}/${piece}.svg)`,
-              backgroundSize: "contain",
-            }}
-          />
-        );
-
-        return acc;
-      }, {}),
-    [pieceSet]
-  );
-
-  const customBoardStyle = useMemo(() => {
-    const commonBoardStyle = {
-      borderRadius: "5px",
-      boxShadow: "0 2px 10px rgba(0, 0, 0, 0.5)",
-    };
-
-    if (boardHue) {
-      return {
-        ...commonBoardStyle,
-        filter: `hue-rotate(${boardHue}deg)`,
-      };
-    }
-
-    return commonBoardStyle;
-  }, [boardHue]);
 
   return (
     <Grid
@@ -312,6 +289,9 @@ export default function Board({
           color={boardOrientation === Color.White ? Color.Black : Color.White}
           gameAtom={gameAtom}
           player={boardOrientation === Color.White ? blackPlayer : whitePlayer}
+          clockMsAtom={
+            boardOrientation === Color.White ? blackClockAtom : whiteClockAtom
+          }
         />
 
         <Grid
@@ -328,7 +308,10 @@ export default function Board({
             boardOrientation={
               boardOrientation === Color.White ? "white" : "black"
             }
-            customBoardStyle={customBoardStyle}
+            customBoardStyle={appearance.customBoardStyle}
+            customDarkSquareStyle={appearance.customDarkSquareStyle}
+            customLightSquareStyle={appearance.customLightSquareStyle}
+            showBoardNotation={appearance.showBoardNotation}
             customArrows={customArrows}
             isDraggablePiece={isPiecePlayable}
             customSquare={SquareRenderer}
@@ -340,7 +323,7 @@ export default function Board({
             showPromotionDialog={showPromotionDialog}
             promotionToSquare={moveClickTo}
             animationDuration={200}
-            customPieces={customPieces}
+            customPieces={appearance.customPieces}
           />
         </Grid>
 
@@ -348,23 +331,11 @@ export default function Board({
           color={boardOrientation}
           gameAtom={gameAtom}
           player={boardOrientation === Color.White ? whitePlayer : blackPlayer}
+          clockMsAtom={
+            boardOrientation === Color.White ? whiteClockAtom : blackClockAtom
+          }
         />
       </Grid>
     </Grid>
   );
 }
-
-export const PIECE_CODES = [
-  "wP",
-  "wB",
-  "wN",
-  "wR",
-  "wQ",
-  "wK",
-  "bP",
-  "bB",
-  "bN",
-  "bR",
-  "bQ",
-  "bK",
-] as const satisfies Piece[];

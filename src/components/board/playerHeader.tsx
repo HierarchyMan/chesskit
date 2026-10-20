@@ -2,7 +2,7 @@ import { Color } from "@/types/enums";
 import { Player } from "@/types/game";
 import { Avatar, Grid2 as Grid, Stack, Typography } from "@mui/material";
 import CapturedPieces from "./capturedPieces";
-import { PrimitiveAtom, useAtomValue } from "jotai";
+import { Atom, PrimitiveAtom, atom, useAtomValue } from "jotai";
 import { Chess } from "chess.js";
 import { useMemo } from "react";
 import { getPaddedNumber } from "@/lib/helpers";
@@ -11,14 +11,23 @@ export interface Props {
   player: Player;
   color: Color;
   gameAtom: PrimitiveAtom<Chess>;
+  clockMsAtom?: Atom<number | undefined>;
 }
 
-export default function PlayerHeader({ color, player, gameAtom }: Props) {
+const NO_CLOCK_ATOM = atom<number | undefined>(undefined);
+
+export default function PlayerHeader({
+  color,
+  player,
+  gameAtom,
+  clockMsAtom = NO_CLOCK_ATOM,
+}: Props) {
   const game = useAtomValue(gameAtom);
+  const liveClockMs = useAtomValue(clockMsAtom);
 
   const gameFen = game.fen();
 
-  const clock = useMemo(() => {
+  const pgnClock = useMemo(() => {
     const turn = game.turn();
 
     if (turn === color) {
@@ -35,6 +44,9 @@ export default function PlayerHeader({ color, player, gameAtom }: Props) {
     const comment = game.getComment();
     return getClock(comment);
   }, [game, color]);
+
+  const clock = liveClockMs !== undefined ? msToClock(liveClockMs) : pgnClock;
+  const isLowOnTime = liveClockMs !== undefined && liveClockMs < 10_000;
 
   return (
     <Grid
@@ -79,7 +91,11 @@ export default function PlayerHeader({ color, player, gameAtom }: Props) {
           align="center"
           sx={{
             backgroundColor: color === Color.White ? "white" : "black",
-            color: color === Color.White ? "black" : "white",
+            color: isLowOnTime
+              ? "#ff6b6b"
+              : color === Color.White
+                ? "black"
+                : "white",
           }}
           borderRadius="5px"
           padding={0.8}
@@ -109,5 +125,17 @@ const getClock = (comment: string | undefined) => {
     minutes: parseInt(match[2]),
     seconds: parseInt(match[3]),
     tenths: match[4] ? parseInt(match[4]) : 0,
+  };
+};
+
+const msToClock = (ms: number) => {
+  const clamped = Math.max(0, ms);
+  const totalSeconds = Math.floor(clamped / 1000);
+
+  return {
+    hours: Math.floor(totalSeconds / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: totalSeconds % 60,
+    tenths: Math.floor((clamped % 1000) / 100),
   };
 };
