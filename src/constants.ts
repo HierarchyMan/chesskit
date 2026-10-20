@@ -85,8 +85,11 @@ export const ENGINE_LABELS: Record<
   },
 };
 
+// Stockfish 11 only offers "Skill Level" (checked by sending it "uci"), and
+// Reckless has no UCI_Elo either, so both use the emulated strength model.
 const ENGINES_WITHOUT_NATIVE_ELO_LIMIT = new Set<EngineName>([
   EngineName.Reckless,
+  EngineName.Stockfish11,
 ]);
 
 export const hasNativeEloLimit = (engine: EngineName): boolean =>

@@ -25,10 +25,7 @@ const drawn: GameResultInfo = {
 
 describe("endgame positions", () => {
   it("has unique ids and known levels", () => {
-    assert.equal(
-      new Set(ENDGAMES.map(({ id }) => id)).size,
-      ENDGAMES.length
-    );
+    assert.equal(new Set(ENDGAMES.map(({ id }) => id)).size, ENDGAMES.length);
     for (const endgame of ENDGAMES) {
       assert.ok(ENDGAME_LEVELS.includes(endgame.level), endgame.id);
       assert.ok(endgame.tips.length >= 2, endgame.id);
