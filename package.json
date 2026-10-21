@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/start.mjs",
     "lint": "eslint --ext .ts,.tsx src/ && tsc --noEmit",
     "deploy": "npm run lint && npm run build && cdk deploy",
     "test": "node --import ./tests/register.mjs --test tests/*.test.ts",
-    "icons": "node scripts/build-icons.mjs"
+    "icons": "node scripts/build-icons.mjs",
+    "serve": "node scripts/serve.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

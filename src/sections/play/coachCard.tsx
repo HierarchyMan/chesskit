@@ -1,4 +1,4 @@
-import { moveStoryAtom } from "@/components/moveStoryDialog";
+import { moveStoryAtom } from "@/lib/moveStoryState";
 import Panel from "@/components/panel";
 import { CLASSIFICATION_COLORS } from "@/constants";
 import { useChessActions } from "@/hooks/useChessActions";

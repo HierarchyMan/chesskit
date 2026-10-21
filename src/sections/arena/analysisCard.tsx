@@ -1,4 +1,4 @@
-import { moveStoryAtom } from "@/components/moveStoryDialog";
+import { moveStoryAtom } from "@/lib/moveStoryState";
 import AnalysisOptionsPanel, {
   AnalysisOptionCopy,
 } from "@/components/analysisOptions/analysisOptionsPanel";

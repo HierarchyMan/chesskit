@@ -6,7 +6,10 @@ import { EngineWorker } from "@/types/engine";
 import { ENGINE_MODELS } from "./models";
 
 export class Stockfish16 {
-  public static async create(nnue?: boolean): Promise<UciEngine> {
+  public static async create(
+    nnue?: boolean,
+    signal?: AbortSignal
+  ): Promise<UciEngine> {
     if (!Stockfish16.isSupported()) {
       throw new Error("Stockfish 16 is not supported");
     }
@@ -26,7 +29,8 @@ export class Stockfish16 {
     return UciEngine.create(
       engineName,
       ENGINE_MODELS[engineName].script,
-      customEngineInit
+      customEngineInit,
+      signal
     );
   }
 

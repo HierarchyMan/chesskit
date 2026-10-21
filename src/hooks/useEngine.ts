@@ -49,33 +49,42 @@ export const useEngineState = (
     }
 
     let isCurrent = true;
+    const controller = new AbortController();
     let created: UciEngine | undefined;
     setStatus("loading");
 
-    pickEngine(engineName)
-      .then((newEngine) => {
-        if (!isCurrent) {
-          newEngine.shutdown();
-          return;
-        }
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        void pickEngine(engineName, controller.signal)
+          .then((newEngine) => {
+            if (!isCurrent) {
+              newEngine.shutdown();
+              return;
+            }
 
-        created = newEngine;
-        markLoaded({ name: engineName, delta: 1 });
-        setEngine(newEngine);
-        setStatus("ready");
-      })
-      .catch((reason) => {
-        if (!isCurrent) return;
+            created = newEngine;
+            markLoaded({ name: engineName, delta: 1 });
+            setEngine(newEngine);
+            setStatus("ready");
+          })
+          .catch((reason) => {
+            if (!isCurrent) return;
 
-        console.error(reason);
-        setStatus("error");
-        setError(
-          reason instanceof Error ? reason.message : "The engine did not start."
-        );
+            console.error(reason);
+            setStatus("error");
+            setError(
+              reason instanceof Error
+                ? reason.message
+                : "The engine did not start."
+            );
+          });
       });
+    });
 
     return () => {
       isCurrent = false;
+      cancelAnimationFrame(frame);
+      controller.abort();
       if (created) {
         markLoaded({ name: engineName, delta: -1 });
         created.shutdown();
@@ -91,31 +100,34 @@ export const useEngineState = (
 export const useEngine = (engineName: EngineName | undefined) =>
   useEngineState(engineName).engine;
 
-const pickEngine = (engine: EngineName): Promise<UciEngine> => {
+const pickEngine = (
+  engine: EngineName,
+  signal: AbortSignal
+): Promise<UciEngine> => {
   switch (engine) {
     case EngineName.Reckless:
-      return Reckless.create();
+      return Reckless.create(signal);
     case EngineName.Stockfish18:
-      return Stockfish18.create(false);
+      return Stockfish18.create(false, signal);
     case EngineName.Stockfish18Lite:
-      return Stockfish18.create(true);
+      return Stockfish18.create(true, signal);
     case EngineName.Stockfish17_1:
-      return Stockfish17_1.create(false);
+      return Stockfish17_1.create(false, signal);
     case EngineName.Stockfish17_1Lite:
-      return Stockfish17_1.create(true);
+      return Stockfish17_1.create(true, signal);
     case EngineName.Stockfish17:
-      return Stockfish17.create(false);
+      return Stockfish17.create(false, signal);
     case EngineName.Stockfish17Lite:
-      return Stockfish17.create(true);
+      return Stockfish17.create(true, signal);
     case EngineName.Stockfish16_1:
-      return Stockfish16_1.create(false);
+      return Stockfish16_1.create(false, signal);
     case EngineName.Stockfish16_1Lite:
-      return Stockfish16_1.create(true);
+      return Stockfish16_1.create(true, signal);
     case EngineName.Stockfish16:
-      return Stockfish16.create(false);
+      return Stockfish16.create(false, signal);
     case EngineName.Stockfish16NNUE:
-      return Stockfish16.create(true);
+      return Stockfish16.create(true, signal);
     case EngineName.Stockfish11:
-      return Stockfish11.create();
+      return Stockfish11.create(signal);
   }
 };

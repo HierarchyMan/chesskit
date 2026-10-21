@@ -1,5 +1,5 @@
 import { ENGINE_LABELS } from "@/constants";
-import { useGameDatabase } from "@/hooks/useGameDatabase";
+import { useRecentGames } from "@/hooks/useGameDatabase";
 import { OPENING_LINES } from "@/data/openingLines";
 import { ENDGAMES } from "@/lib/endgames";
 import { useModels } from "@/hooks/useModels";
@@ -20,7 +20,7 @@ import {
 import { useAtomValue, useSetAtom } from "jotai";
 import NextLink from "next/link";
 import { useRouter } from "next/router";
-import { ReactNode, useEffect, useMemo } from "react";
+import { ReactNode, useEffect } from "react";
 import { NAV_GROUPS, NAV_ITEMS, NavItem } from "../layout/navItems";
 import {
   importDialogAtom,
@@ -94,7 +94,7 @@ export default function Hub() {
       >
         <Box>
           <Typography variant="h4" fontWeight={700}>
-            {greeting()}
+            <span suppressHydrationWarning>{greeting()}</span>
           </Typography>
           <Typography sx={{ opacity: 0.75 }}>
             What would you like to work on today?
@@ -152,6 +152,7 @@ export default function Hub() {
             >
               <CardActionArea
                 component={NextLink}
+                prefetch={false}
                 href={href}
                 sx={{ p: 2, height: "100%" }}
               >
@@ -234,6 +235,7 @@ function FeatureCard({ item }: { item: NavItem }) {
     >
       <CardActionArea
         component={NextLink}
+        prefetch={false}
         href={item.href}
         sx={{ p: 2, height: "100%" }}
       >
@@ -282,20 +284,20 @@ function Panel({
 }
 
 function RecentGames() {
-  const { games } = useGameDatabase(true);
+  const recent = useRecentGames();
   const router = useRouter();
-
-  const recent = useMemo(
-    () => [...games].sort((a, b) => b.id - a.id).slice(0, 4),
-    [games]
-  );
 
   return (
     <Panel
       title="Recent games"
       icon="mdi:history"
       action={
-        <Button size="small" component={NextLink} href="/database">
+        <Button
+          size="small"
+          component={NextLink}
+          prefetch={false}
+          href="/database"
+        >
           All games
         </Button>
       }
@@ -321,7 +323,11 @@ function RecentGames() {
                   {game.white.name} vs {game.black.name}
                 </Typography>
                 <Typography variant="body2" noWrap sx={{ opacity: 0.7 }}>
-                  {[game.result, game.date, game.eval ? "analyzed" : undefined]
+                  {[
+                    game.result,
+                    game.date,
+                    game.hasEvaluation ? "analyzed" : undefined,
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
                 </Typography>

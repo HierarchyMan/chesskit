@@ -1,7 +1,6 @@
 import { ENGINE_LABELS } from "@/constants";
 import { useModels } from "@/hooks/useModels";
-import { Stockfish16_1 } from "@/lib/engine/stockfish16_1";
-import { isEngineSupported } from "@/lib/engine/shared";
+import { isEngineSupported, isWasmSupported } from "@/lib/engine/shared";
 import { describeModel } from "@/lib/engine/modelStatus";
 import { EngineName } from "@/types/enums";
 import { engineNameAtom, useCloudEvalAtom } from "@/sections/analysis/states";
@@ -40,9 +39,7 @@ export default function EngineChip() {
     if (isEngineSupported(engineName)) return;
 
     setEngineName(
-      Stockfish16_1.isSupported()
-        ? EngineName.Stockfish16_1Lite
-        : EngineName.Stockfish11
+      isWasmSupported() ? EngineName.Stockfish16_1Lite : EngineName.Stockfish11
     );
   }, [engineName, setEngineName]);
 

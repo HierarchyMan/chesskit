@@ -159,9 +159,9 @@ export default function VisionPage() {
     <Box
       sx={{
         display: "flex",
-        flexDirection: sideBySide ? "row" : "column",
+        flexDirection: { xs: "column", sm: sideBySide ? "row" : "column" },
         justifyContent: "center",
-        alignItems: sideBySide ? "flex-start" : "center",
+        alignItems: { xs: "center", sm: sideBySide ? "flex-start" : "center" },
         gap: 4,
       }}
     >
@@ -185,7 +185,12 @@ export default function VisionPage() {
         />
       </Box>
 
-      <Stack spacing={2} sx={{ width: sideBySide ? SIDE_PANEL_WIDTH : "100%" }}>
+      <Stack
+        spacing={2}
+        sx={{
+          width: { xs: "100%", sm: sideBySide ? SIDE_PANEL_WIDTH : "100%" },
+        }}
+      >
         <Panel>
           <Stack spacing={1.5}>
             <ToggleButtonGroup

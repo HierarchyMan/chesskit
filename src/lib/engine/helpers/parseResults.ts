@@ -1,62 +1,58 @@
 import { formatUciPv } from "@/lib/chess";
 import { LineEval, PositionEval } from "@/types/eval";
 
-export const parseEvaluationResults = (
-  results: string[],
-  fen: string
-): PositionEval => {
-  const parsedResults: PositionEval = {
-    lines: [],
-  };
-  const tempResults: Record<string, LineEval> = {};
-
-  for (const result of results) {
-    if (result.startsWith("bestmove")) {
-      const bestMove = getResultProperty(result, "bestmove");
-      if (bestMove) {
-        parsedResults.bestMove = bestMove;
-      }
-    }
-
-    if (result.startsWith("info")) {
-      const pv = getResultPv(result, fen);
-      const multiPv = getResultProperty(result, "multipv");
-      const depth = getResultProperty(result, "depth");
-      if (!pv || !multiPv || !depth) continue;
-
-      if (
-        tempResults[multiPv] &&
-        parseInt(depth) < tempResults[multiPv].depth
-      ) {
+export class EvaluationParser {
+  private consumed = 0;
+  private bestMove?: string;
+  private lines: Record<string, LineEval> = {};
+  constructor(private fen: string) {}
+  update(results: string[]): PositionEval {
+    for (; this.consumed < results.length; this.consumed++) {
+      const result = results[this.consumed];
+      const tokens = result.split(" ");
+      const property = (name: string) => {
+        const i = tokens.indexOf(name);
+        return i < 0 ? undefined : tokens[i + 1];
+      };
+      if (result.startsWith("bestmove"))
+        this.bestMove = property("bestmove") ?? this.bestMove;
+      if (!result.startsWith("info")) continue;
+      const pvIndex = tokens.indexOf("pv");
+      const multiPv = property("multipv"),
+        depth = property("depth");
+      if (pvIndex < 0 || pvIndex + 1 >= tokens.length || !multiPv || !depth)
         continue;
-      }
-
-      const cp = getResultProperty(result, "cp");
-      const mate = getResultProperty(result, "mate");
-
-      tempResults[multiPv] = {
-        pv,
+      if (this.lines[multiPv] && Number(depth) < this.lines[multiPv].depth)
+        continue;
+      const cp = property("cp"),
+        mate = property("mate");
+      this.lines[multiPv] = {
+        pv: formatUciPv(this.fen, tokens.slice(pvIndex + 1)),
         cp: cp ? parseInt(cp) : undefined,
         mate: mate ? parseInt(mate) : undefined,
         depth: parseInt(depth),
         multiPv: parseInt(multiPv),
       };
     }
+    const whiteToPlay = this.fen.split(" ")[1] === "w";
+    const lines = Object.values(this.lines).sort(sortLines);
+    const result: PositionEval = {
+      lines: whiteToPlay
+        ? lines
+        : lines.map((line) => ({
+            ...line,
+            cp: line.cp ? -line.cp : line.cp,
+            mate: line.mate ? -line.mate : line.mate,
+          })),
+    };
+    if (this.bestMove !== undefined) result.bestMove = this.bestMove;
+    return result;
   }
-
-  parsedResults.lines = Object.values(tempResults).sort(sortLines);
-
-  const whiteToPlay = fen.split(" ")[1] === "w";
-  if (!whiteToPlay) {
-    parsedResults.lines = parsedResults.lines.map((line) => ({
-      ...line,
-      cp: line.cp ? -line.cp : line.cp,
-      mate: line.mate ? -line.mate : line.mate,
-    }));
-  }
-
-  return parsedResults;
-};
+}
+export const parseEvaluationResults = (
+  results: string[],
+  fen: string
+): PositionEval => new EvaluationParser(fen).update(results);
 
 export const sortLines = (a: LineEval, b: LineEval): number => {
   if (a.mate !== undefined && b.mate !== undefined) {
@@ -88,16 +84,4 @@ export const getResultProperty = (
   }
 
   return splitResult[propertyIndex + 1];
-};
-
-const getResultPv = (result: string, fen: string): string[] | undefined => {
-  const splitResult = result.split(" ");
-  const pvIndex = splitResult.indexOf("pv");
-
-  if (pvIndex === -1 || pvIndex + 1 >= splitResult.length) {
-    return undefined;
-  }
-
-  const rawPv = splitResult.slice(pvIndex + 1);
-  return formatUciPv(fen, rawPv);
 };

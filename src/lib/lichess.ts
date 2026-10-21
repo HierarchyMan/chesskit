@@ -10,7 +10,7 @@ import { logErrorToSentry } from "./sentry";
 import { formatUciPv } from "./chess";
 import { LoadedGame } from "@/types/game";
 
-export const getLichessEval = async (
+const loadLichessEval = async (
   fen: string,
   multiPv = 1
 ): Promise<PositionEval> => {
@@ -54,6 +54,33 @@ export const getLichessEval = async (
       lines: [],
     };
   }
+};
+
+// Full FEN (including turn/counters) and MultiPV are part of the cache identity.
+const cloudCache = new Map<
+  string,
+  { expires: number; value: Promise<PositionEval> }
+>();
+export const getLichessEval = (
+  fen: string,
+  multiPv = 1
+): Promise<PositionEval> => {
+  const key = `${fen}|${multiPv}`;
+  const cached = cloudCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.value;
+  const entry = {
+    expires: Date.now() + 30_000,
+    value: Promise.resolve({ lines: [] } as PositionEval),
+  };
+  entry.value = loadLichessEval(fen, multiPv).then((result) => {
+    entry.expires = Date.now() + (result.lines.length ? 300_000 : 30_000);
+    return result;
+  });
+  cloudCache.delete(key);
+  cloudCache.set(key, entry);
+  while (cloudCache.size > 256)
+    cloudCache.delete(cloudCache.keys().next().value!);
+  return entry.value;
 };
 
 export const getLichessUserRecentGames = async (

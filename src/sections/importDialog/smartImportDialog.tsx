@@ -2,13 +2,7 @@ import MiniBoard from "@/components/board/miniBoard";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { setHandoff } from "@/lib/handoff";
 import { fetchLichessGame } from "@/lib/lichess";
-import {
-  DetectedInput,
-  ParsedGame,
-  detectInput,
-  fenToPgn,
-  loadGameFromText,
-} from "@/lib/pgn";
+import { ParsedGame, fenToPgn } from "@/lib/pgn";
 import { Icon } from "@iconify/react";
 import {
   Alert,
@@ -27,8 +21,9 @@ import {
 import { useAtom } from "jotai";
 import Image from "next/image";
 import { useRouter } from "next/router";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { importDialogAtom } from "../layout/states";
+import { useParsedInput } from "@/hooks/useParsedInput";
 import PgnGameList from "../loadGame/pgnGameList";
 
 interface LichessState {
@@ -45,7 +40,7 @@ export default function SmartImportDialog() {
   const [notice, setNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const { addGame } = useGameDatabase();
+  const { addGames } = useGameDatabase();
 
   useEffect(() => {
     if (!dialog.open) return;
@@ -56,11 +51,12 @@ export default function SmartImportDialog() {
     setNotice("");
   }, [dialog]);
 
-  const deferredText = useDeferredValue(text);
-  const detected: DetectedInput = useMemo(
-    () => (image ? { kind: "unknown" } : detectInput(deferredText)),
-    [deferredText, image]
-  );
+  const {
+    detected,
+    loading: parsing,
+    error: inputError,
+  } = useParsedInput(image ? "" : text, dialog.open);
+  const { detected: fetched } = useParsedInput(lichess.pgn ?? "", dialog.open);
 
   const lichessId = detected.kind === "lichess" ? detected.id : undefined;
 
@@ -112,17 +108,16 @@ export default function SmartImportDialog() {
   };
 
   const saveGames = async (games: ParsedGame[]) => {
-    let saved = 0;
-    for (const game of games) {
-      if (game.error) continue;
-      try {
-        await addGame(loadGameFromText(game.pgn));
-        saved++;
-      } catch (error) {
-        console.error(error);
-      }
+    try {
+      const { saved, errors } = await addGames(
+        games.filter((game) => !game.error).map((game) => game.pgn)
+      );
+      setNotice(
+        `Saved ${saved} game${saved === 1 ? "" : "s"} to your database.${errors.length ? ` ${errors.length} could not be saved.` : ""}`
+      );
+    } catch (error) {
+      setNotice(String(error));
     }
-    setNotice(`Saved ${saved} game${saved === 1 ? "" : "s"} to your database.`);
   };
 
   const readFile = (file: File) => {
@@ -166,7 +161,9 @@ export default function SmartImportDialog() {
     detected.kind === "pgn"
       ? detected.games
       : lichess.status === "done" && lichess.pgn
-        ? detectInputGames(lichess.pgn)
+        ? fetched.kind === "pgn"
+          ? fetched.games
+          : undefined
         : undefined;
 
   return (
@@ -224,6 +221,7 @@ export default function SmartImportDialog() {
             />
           </Stack>
 
+          {inputError && <Alert severity="error">{inputError}</Alert>}
           {notice && (
             <Alert severity="info" onClose={() => setNotice("")}>
               {notice}
@@ -329,6 +327,7 @@ export default function SmartImportDialog() {
 
           {!image &&
             detected.kind === "unknown" &&
+            !parsing &&
             lichess.status === "idle" &&
             text.trim().length > 0 && (
               <Alert severity="warning">
@@ -405,8 +404,3 @@ function PgnChoices({
     </Stack>
   );
 }
-
-const detectInputGames = (pgn: string): ParsedGame[] | undefined => {
-  const detected = detectInput(pgn);
-  return detected.kind === "pgn" ? detected.games : undefined;
-};

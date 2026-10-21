@@ -73,10 +73,10 @@ Requirements: [Node.js](https://nodejs.org) 22.11 or newer.
 
 ```bash
 npm install
-npm run dev
+npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). `npm start` builds a fresh static export when the source/configuration/assets change, then serves it on port 3000. On Windows, the repo's `start-chesskit.bat` installs missing dependencies and runs the same production path. Use `npm run dev` for hot-reload development.
 
 Stockfish runs in the browser as WebAssembly, so no engine install is needed.
 
@@ -89,7 +89,10 @@ Stockfish runs in the browser as WebAssembly, so no engine install is needed.
 ```bash
 npm test               # unit tests (Node test runner)
 npm run lint           # eslint and tsc
-npm run build          # production build
+npm run build          # production static export
+npm start              # rebuild if needed, then serve for normal local use
+npm run serve          # serve an already-built export
+npm run dev            # hot-reload development server
 npm run icons          # rebuild the offline icon bundle after adding an icon
 node --import ./tests/register.mjs scripts/verify-endgames.mjs   # check endgame positions with a UCI engine
 node scripts/fetch-offline-puzzles.mjs                          # refresh the offline puzzle set

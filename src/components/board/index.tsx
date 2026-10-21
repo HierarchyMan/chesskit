@@ -256,7 +256,6 @@ export default function Board({
       playableSquaresAtom,
       checkedKingAtom,
       showPlayerMoveIconAtom,
-      boardSize: boardSize || 400,
     });
   }, [
     currentPositionAtom,
@@ -264,7 +263,6 @@ export default function Board({
     playableSquaresAtom,
     checkedKingAtom,
     showPlayerMoveIconAtom,
-    boardSize,
   ]);
 
   return (
@@ -274,6 +272,7 @@ export default function Board({
       alignItems="center"
       wrap="nowrap"
       width={boardSize}
+      sx={{ "--board-size": `${boardSize || 400}px`, maxWidth: "100%" }}
     >
       {showEvaluationBar && (
         <EvaluationBar
@@ -306,6 +305,7 @@ export default function Board({
           justifyContent="center"
           alignItems="center"
           ref={boardRef}
+          sx={{ aspectRatio: "1 / 1", width: "100%" }}
           size={12}
         >
           <Chessboard

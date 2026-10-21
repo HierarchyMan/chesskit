@@ -6,7 +6,7 @@ import {
 } from "@/lib/editorPosition";
 import { EngineName, MoveClassification } from "@/types/enums";
 import { GameEval } from "@/types/eval";
-import { Chess } from "chess.js";
+import { Chess, DEFAULT_POSITION } from "chess.js";
 
 export interface AnalysisLine {
   id: string;
@@ -57,18 +57,40 @@ export const newAnalysisSession = (
   };
 };
 
-const historyKey = (game: Chess) =>
-  game.history({ verbose: true }).map((m) => m.lan);
-export const isAnalysisPrefix = (prefix: Chess, full: Chess): boolean => {
-  if (
-    (prefix.getHeaders().FEN ?? new Chess().fen()) !==
-    (full.getHeaders().FEN ?? new Chess().fen())
-  )
-    return false;
-  const a = historyKey(prefix),
-    b = historyKey(full);
-  return a.length <= b.length && a.every((move, index) => move === b[index]);
+interface AnalysisPath {
+  root: string;
+  moves: string[];
+  sans: string[];
+}
+const linePaths = new Map<string, AnalysisPath>();
+let cachedCharacters = 0;
+const gamePath = (game: Chess): AnalysisPath => {
+  const history = game.history({ verbose: true });
+  return {
+    root: game.getHeaders().FEN ?? DEFAULT_POSITION,
+    moves: history.map((move) => move.lan),
+    sans: history.map((move) => move.san),
+  };
 };
+export const analysisLinePath = (line: AnalysisLine): AnalysisPath => {
+  const cached = linePaths.get(line.pgn);
+  if (cached) return cached;
+  const result = gamePath(loadGameFromText(line.pgn));
+  linePaths.set(line.pgn, result);
+  cachedCharacters += line.pgn.length;
+  while (linePaths.size > 256 || cachedCharacters > 8_000_000) {
+    const key = linePaths.keys().next().value!;
+    linePaths.delete(key);
+    cachedCharacters -= key.length;
+  }
+  return result;
+};
+const pathIsPrefix = (a: AnalysisPath, b: AnalysisPath) =>
+  a.root === b.root &&
+  a.moves.length <= b.moves.length &&
+  a.moves.every((move, index) => move === b.moves[index]);
+export const isAnalysisPrefix = (prefix: Chess, full: Chess): boolean =>
+  pathIsPrefix(gamePath(prefix), gamePath(full));
 
 export const sessionLine = (session: AnalysisSession, storeBranches: boolean) =>
   (storeBranches
@@ -78,10 +100,11 @@ export const sessionLine = (session: AnalysisSession, storeBranches: boolean) =>
 export const replayAnalysis = (line: AnalysisLine, ply?: number): Chess => {
   const game = loadGameFromText(line.pgn);
   if (ply !== undefined) {
-    if (!Number.isInteger(ply) || ply < 0 || ply > game.history().length) {
+    const length = game.history().length;
+    if (!Number.isInteger(ply) || ply < 0 || ply > length) {
       throw new Error("Invalid analysis replay position.");
     }
-    while (game.history().length > ply) game.undo();
+    for (let current = length; current > ply; current--) game.undo();
   }
   return game;
 };
@@ -96,8 +119,9 @@ export const captureAnalysisBoard = (
   const lines = storeBranches
     ? [selected, session.main, ...session.branches]
     : [session.main];
+  const boardPath = gamePath(board);
   const prefix = lines.find((line) =>
-    isAnalysisPrefix(board, replayAnalysis(line))
+    pathIsPrefix(boardPath, analysisLinePath(line))
   );
   if (prefix) {
     return {
@@ -108,7 +132,7 @@ export const captureAnalysisBoard = (
     };
   }
   const extension = lines.find((line) =>
-    isAnalysisPrefix(replayAnalysis(line), board)
+    pathIsPrefix(analysisLinePath(line), boardPath)
   );
   if (extension) {
     const updated = { ...extension, pgn: board.pgn(), evaluation: undefined };
@@ -125,7 +149,7 @@ export const captureAnalysisBoard = (
   }
   if (!storeBranches) return session;
   // An unrelated root is a new session, never a variation of this game.
-  if (!isAnalysisPrefix(replayAnalysis(session.main, 0), board)) return session;
+  if (analysisLinePath(session.main).root !== boardPath.root) return session;
   const branch = { id: crypto.randomUUID(), pgn: board.pgn() };
   return {
     ...session,

@@ -4,7 +4,7 @@ import {
   getPositionWinPercentage,
 } from "./winPercentage";
 import { MoveClassification } from "@/types/enums";
-import { openings } from "@/data/openings";
+import { openingForPlacement } from "@/lib/openingIndex";
 import { getIsPieceSacrifice, isSimplePieceRecapture } from "@/lib/chess";
 
 export const getMovesClassification = (
@@ -19,7 +19,7 @@ export const getMovesClassification = (
     if (index === 0) return rawPosition;
 
     const currentFen = fens[index].split(" ")[0];
-    const opening = openings.find((opening) => opening.fen === currentFen);
+    const opening = openingForPlacement(currentFen);
     if (opening) {
       currentOpening = opening.name;
       return {

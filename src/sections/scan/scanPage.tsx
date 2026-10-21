@@ -4,13 +4,14 @@ import { useHandoff } from "@/hooks/useHandoff";
 import { positionFromFen, validatePosition } from "@/lib/editorPosition";
 import { setHandoff } from "@/lib/handoff";
 import { fenToPgn } from "@/lib/pgn";
-import { detectBoardGrid, GridRect } from "@/lib/scan/gridDetect";
+import { GridRect } from "@/lib/scan/gridDetect";
 import {
   LoadedImage,
   loadRawImage,
   readFileAsDataUrl,
 } from "@/lib/scan/loadImage";
-import { scanBoard } from "@/lib/scan/scanBoard";
+import type { ScanOutcome } from "@/lib/scan/scanBoard";
+import { ScanProcessor } from "@/lib/scan/processor";
 import { createSampleBoardImage } from "@/lib/scan/templates";
 import { Icon } from "@iconify/react";
 import {
@@ -34,7 +35,6 @@ import { useRouter } from "next/router";
 import {
   CSSProperties,
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -70,27 +70,50 @@ export default function ScanPage() {
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const deferredGrid = useDeferredValue(grid);
-
-  const loadSource = useCallback(async (src: string) => {
-    setBusy(true);
-    setMessage("");
-
-    try {
-      const image = await loadRawImage(src);
-      setLoaded(image);
-
-      const detected = detectBoardGrid(image.raw);
-      setGrid(detected ?? defaultGrid(image.raw.width, image.raw.height));
-      setDetection(detected ? "found" : "missed");
-      setOrientation("auto");
-    } catch (error) {
-      console.error(error);
-      setMessage("That file could not be read as a picture.");
-    } finally {
-      setBusy(false);
-    }
+  const processor = useRef<ScanProcessor | null>(null);
+  const generation = useRef(0);
+  const getProcessor = useCallback(() => {
+    if (!processor.current || processor.current.disposed)
+      processor.current = new ScanProcessor();
+    return processor.current;
   }, []);
+  const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
+  useEffect(
+    () => () => {
+      generation.current++;
+      processor.current?.dispose();
+      processor.current = null;
+    },
+    []
+  );
+
+  const loadSource = useCallback(
+    async (src: string) => {
+      const request = ++generation.current;
+      setBusy(true);
+      setMessage("");
+
+      try {
+        const image = await loadRawImage(src);
+        if (request !== generation.current) return;
+        setLoaded(image);
+        setGrid(undefined);
+        setOutcome(null);
+        const detected = await getProcessor().image(image.raw);
+        if (request !== generation.current) return;
+        setGrid(detected ?? defaultGrid(image.raw.width, image.raw.height));
+        setDetection(detected ? "found" : "missed");
+        setOrientation("auto");
+      } catch (error) {
+        console.error(error);
+        if (request === generation.current)
+          setMessage("That file could not be read as a picture.");
+      } finally {
+        if (request === generation.current) setBusy(false);
+      }
+    },
+    [getProcessor]
+  );
 
   const loadFile = useCallback(
     async (file: Blob) => loadSource(await readFileAsDataUrl(file)),
@@ -132,18 +155,28 @@ export default function ScanPage() {
     };
   }, [loadFile]);
 
-  const outcome = useMemo(
-    () =>
-      loaded && templates && deferredGrid
-        ? scanBoard(
-            loaded.raw,
-            templates,
-            deferredGrid,
-            orientation === "auto" ? undefined : orientation === "white"
-          )
-        : null,
-    [loaded, templates, deferredGrid, orientation]
-  );
+  useEffect(() => {
+    if (!loaded || !templates || !grid) return;
+    let current = true;
+    const frame = requestAnimationFrame(() => {
+      void getProcessor()
+        .scan(
+          templates,
+          grid,
+          orientation === "auto" ? undefined : orientation === "white"
+        )
+        .then((result) => {
+          if (current && result) setOutcome(result);
+        })
+        .catch((error) => {
+          if (current) setMessage(String(error));
+        });
+    });
+    return () => {
+      current = false;
+      cancelAnimationFrame(frame);
+    };
+  }, [loaded, templates, grid, orientation, getProcessor]);
 
   const fen = useMemo(() => {
     if (!outcome) return "";
@@ -324,8 +357,10 @@ export default function ScanPage() {
                 variant="outlined"
                 color="inherit"
                 startIcon={<Icon icon="mdi:crosshairs-gps" height={18} />}
-                onClick={() => {
-                  const detected = detectBoardGrid(loaded.raw);
+                onClick={async () => {
+                  const request = generation.current;
+                  const detected = await getProcessor().detect();
+                  if (request !== generation.current) return;
                   setGrid(
                     detected ?? defaultGrid(loaded.raw.width, loaded.raw.height)
                   );

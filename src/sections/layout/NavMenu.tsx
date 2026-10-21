@@ -51,6 +51,7 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
     const button = (
       <ListItemButton
         component={NextLink}
+        prefetch={false}
         href={item.href}
         selected={active}
         onClick={isDesktop ? undefined : onMobileClose}
@@ -179,40 +180,47 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
     </Stack>
   );
 
-  if (!isDesktop) {
-    return (
+  const reservedWidth =
+    navPreference === null
+      ? {
+          width: NAV_COLLAPSED_WIDTH,
+          "@media (min-width:1280px)": { width: NAV_EXPANDED_WIDTH },
+        }
+      : { width };
+  return (
+    <>
       <Drawer
         variant="temporary"
-        open={mobileOpen}
+        open={mobileOpen && !isDesktop}
         onClose={onMobileClose}
         ModalProps={{ keepMounted: false }}
+        sx={{ display: { xs: "block", md: "none" } }}
         slotProps={{ paper: { sx: { width: NAV_EXPANDED_WIDTH } } }}
       >
         {content}
       </Drawer>
-    );
-  }
-
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width,
-        flexShrink: 0,
-        transition: theme.transitions.create("width", {
-          duration: theme.transitions.duration.shorter,
-        }),
-        "& .MuiDrawer-paper": {
-          width,
-          boxSizing: "border-box",
-          overflowX: "hidden",
+      <Drawer
+        variant="permanent"
+        sx={{
+          ...reservedWidth,
+          display: { xs: "none", md: "block" },
+          flexShrink: 0,
           transition: theme.transitions.create("width", {
             duration: theme.transitions.duration.shorter,
           }),
-        },
-      }}
-    >
-      {content}
-    </Drawer>
+          "& .MuiDrawer-paper": {
+            ...reservedWidth,
+            display: { xs: "none", md: "block" },
+            boxSizing: "border-box",
+            overflowX: "hidden",
+            transition: theme.transitions.create("width", {
+              duration: theme.transitions.duration.shorter,
+            }),
+          },
+        }}
+      >
+        {content}
+      </Drawer>
+    </>
   );
 }

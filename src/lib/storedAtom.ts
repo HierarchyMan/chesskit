@@ -15,5 +15,5 @@ export const storedAtom = <T>(
     },
   };
 
-  return atomWithStorage<T>(key, initialValue, storage, { getOnInit: true });
+  return atomWithStorage<T>(key, initialValue, storage, { getOnInit: false });
 };

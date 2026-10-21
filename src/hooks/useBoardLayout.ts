@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useViewport } from "./useViewport";
 
 interface Options {
   sidePanelWidth?: number;
@@ -14,28 +14,7 @@ export const useBoardLayout = ({
   extraWidth = 0,
   minBoardSize = 280,
 }: Options = {}) => {
-  const [dims, setDims] = useState({ width: 900, height: 800 });
-
-  useEffect(() => {
-    const main = document.querySelector("main");
-
-    const update = () =>
-      setDims({
-        width: main?.clientWidth ?? window.innerWidth,
-        height: window.innerHeight,
-      });
-
-    update();
-
-    const observer = new ResizeObserver(update);
-    if (main) observer.observe(main);
-    window.addEventListener("resize", update);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", update);
-    };
-  }, []);
+  const dims = useViewport("main", 900, 800);
 
   const widthLeftForBoard = dims.width - sidePanelWidth - GAP - extraWidth;
   const sideBySide = widthLeftForBoard >= 380;

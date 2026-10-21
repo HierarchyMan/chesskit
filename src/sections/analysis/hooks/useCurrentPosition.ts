@@ -13,11 +13,14 @@ import { useAtom, useAtomValue } from "jotai";
 import { useEffect } from "react";
 import { getEvaluateGameParams } from "@/lib/chess";
 import { getMovesClassification } from "@/lib/engine/helpers/moveClassification";
-import { openings } from "@/data/openings";
+import { openingForPlacement } from "@/lib/openingIndex";
 import { UciEngine } from "@/lib/engine/uciEngine";
 import { isAnalysisPrefix } from "@/lib/analysisSession";
 
-export const useCurrentPosition = (engine: UciEngine | null) => {
+export const useCurrentPosition = (
+  engine: UciEngine | null,
+  enabled = true
+) => {
   const [currentPosition, setCurrentPosition] = useAtom(currentPositionAtom);
   const gameEval = useAtomValue(gameEvalAtom);
   const game = useAtomValue(gameAtom);
@@ -65,7 +68,7 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
     if (!position.eval?.opening) {
       for (const move of boardHistory.slice().reverse()) {
         const moveFen = move.after.split(" ")[0];
-        const opening = openings.find((opening) => opening.fen === moveFen);
+        const opening = openingForPlacement(moveFen);
         if (opening) {
           position.opening = opening.name;
           break;
@@ -76,6 +79,7 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
     setCurrentPosition(position);
 
     if (
+      enabled &&
       !position.eval &&
       engine?.getIsReady() &&
       engine.name &&
@@ -112,6 +116,7 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
           useCloudEval,
         });
 
+        if (!isCurrent) return rawPositionEval;
         setSavedEvals((prev) => ({
           ...prev,
           [fen]: { ...rawPositionEval, engine: engine.name },
@@ -140,6 +145,7 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
         const fens = params.fens.slice(board.turn() === "w" ? -3 : -4);
         const uciMoves = params.uciMoves.slice(board.turn() === "w" ? -2 : -3);
 
+        if (!isCurrent) return;
         const lastRawEval = await getFenEngineEval(fens.slice(-2)[0]);
         const rawPositions: PositionEval[] = fens.map((_, idx) => {
           if (idx === fens.length - 2) return lastRawEval;
@@ -178,11 +184,11 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
     return () => {
       isCurrent = false;
       if (engine?.getIsReady()) {
-        engine?.stopAllCurrentJobs();
+        void engine.stopAllCurrentJobs().catch((error) => console.error(error));
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameEval, board, game, engine, depth, multiPv, useCloudEval]);
+  }, [gameEval, board, game, engine, depth, multiPv, useCloudEval, enabled]);
 
   return currentPosition;
 };

@@ -1,4 +1,4 @@
-import { moveStoryAtom } from "@/components/moveStoryDialog";
+import { moveStoryAtom } from "@/lib/moveStoryState";
 import Panel from "@/components/panel";
 import { setHandoff } from "@/lib/handoff";
 import { PUZZLE_THEMES } from "@/lib/puzzles";

@@ -1,4 +1,4 @@
-import { probeRecklessBridge } from "@/lib/engine/reckless";
+import { probeRecklessBridge } from "@/lib/engine/bridge";
 import {
   BridgeStatus,
   ModelProgress,

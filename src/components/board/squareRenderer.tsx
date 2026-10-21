@@ -21,7 +21,6 @@ export interface Props {
   playableSquaresAtom: PrimitiveAtom<Square[]>;
   checkedKingAtom: Atom<CheckedKing | null>;
   showPlayerMoveIconAtom?: PrimitiveAtom<boolean>;
-  boardSize: number;
 }
 
 export function getSquareRenderer({
@@ -30,7 +29,6 @@ export function getSquareRenderer({
   playableSquaresAtom,
   checkedKingAtom,
   showPlayerMoveIconAtom = moveIconOffAtom,
-  boardSize,
 }: Props) {
   const squareRenderer = memo(
     forwardRef<HTMLDivElement, CustomSquareProps>((props, ref) => {
@@ -137,12 +135,14 @@ export function getSquareRenderer({
             <Image
               src={`/icons/${moveClassification}.png`}
               alt="move-icon"
-              width={Math.min(40, boardSize * 0.06)}
-              height={Math.min(40, boardSize * 0.06)}
+              width={40}
+              height={40}
               style={{
                 position: "absolute",
-                top: Math.max(-13.5, boardSize * -0.03) + iconOffset + "px",
-                right: Math.max(-13.5, boardSize * -0.03) + iconOffset + "px",
+                width: "min(40px, calc(var(--board-size) * 0.06))",
+                height: "min(40px, calc(var(--board-size) * 0.06))",
+                top: `calc(max(-13.5px, calc(var(--board-size) * -0.03)) + ${iconOffset}px)`,
+                right: `calc(max(-13.5px, calc(var(--board-size) * -0.03)) + ${iconOffset}px)`,
                 zIndex: 100,
               }}
             />

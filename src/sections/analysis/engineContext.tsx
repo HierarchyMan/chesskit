@@ -2,7 +2,12 @@ import { EngineState, useEngineState } from "@/hooks/useEngine";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { PropsWithChildren, createContext, useContext, useEffect } from "react";
 import { useCurrentPosition } from "./hooks/useCurrentPosition";
-import { engineNameAtom, evaluationProgressAtom, gameAtom } from "./states";
+import {
+  arrangeModeAtom,
+  engineNameAtom,
+  evaluationProgressAtom,
+  gameAtom,
+} from "./states";
 import {
   analysisFullRequestAtom,
   analysisSessionAtom,
@@ -18,6 +23,7 @@ const FALLBACK: EngineState = {
 const AnalysisEngineContext = createContext<EngineState>(FALLBACK);
 
 export function AnalysisEngineProvider({ children }: PropsWithChildren) {
+  const arranging = useAtomValue(arrangeModeAtom);
   const engineName = useAtomValue(engineNameAtom);
   const engineState = useEngineState(engineName);
   const session = useAtomValue(analysisSessionAtom);
@@ -44,7 +50,7 @@ export function AnalysisEngineProvider({ children }: PropsWithChildren) {
     [setRequest, setProgress]
   );
 
-  useCurrentPosition(engineState.engine);
+  useCurrentPosition(engineState.engine, !arranging);
 
   return (
     <AnalysisEngineContext.Provider value={engineState}>

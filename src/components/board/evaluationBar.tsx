@@ -50,6 +50,7 @@ export default function EvaluationBar({
       height={height}
       border="1px solid black"
       borderRadius={{ xs: "3px", sm: "5px" }}
+      sx={{ contain: "layout" }}
       role="img"
       aria-label={`Position evaluation: ${displayedEval.label}`}
     >

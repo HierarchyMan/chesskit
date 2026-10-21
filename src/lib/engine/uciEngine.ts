@@ -6,6 +6,7 @@ import {
   PositionEval,
 } from "@/types/eval";
 import {
+  EvaluationParser,
   getResultProperty,
   parseEvaluationResults,
 } from "./helpers/parseResults";
@@ -23,8 +24,12 @@ import { logMessageIfLocalhost } from "../helpers";
 export class UciEngine {
   public readonly name: EngineName;
   private workers: EngineWorker[] = [];
+  private pendingWorkers = new Set<EngineWorker>();
+  private closed = false;
   private workerQueue: WorkerJob[] = [];
   private isReady = false;
+  private positionGeneration = 0;
+  private positionSetup: Promise<unknown> = Promise.resolve();
   private enginePath: string;
   private customEngineInit?:
     | ((worker: EngineWorker) => Promise<void>)
@@ -46,14 +51,27 @@ export class UciEngine {
   public static async create(
     engineName: EngineName,
     enginePath: string,
-    customEngineInit?: UciEngine["customEngineInit"]
+    customEngineInit?: UciEngine["customEngineInit"],
+    signal?: AbortSignal
   ): Promise<UciEngine> {
     const engine = new UciEngine(engineName, enginePath, customEngineInit);
 
-    await engine.addNewWorker();
-    engine.isReady = true;
-
-    return engine;
+    const abort = () => engine.shutdown();
+    signal?.addEventListener("abort", abort, { once: true });
+    try {
+      if (signal?.aborted)
+        throw new DOMException("Engine startup cancelled", "AbortError");
+      await engine.addNewWorker();
+      if (engine.closed)
+        throw new DOMException("Engine startup cancelled", "AbortError");
+      engine.isReady = true;
+      return engine;
+    } catch (error) {
+      engine.shutdown();
+      throw error;
+    } finally {
+      signal?.removeEventListener("abort", abort);
+    }
   }
 
   private acquireWorker(): EngineWorker | undefined {
@@ -68,21 +86,27 @@ export class UciEngine {
   }
 
   private async releaseWorker(worker: EngineWorker) {
+    if (this.stopInFlight || worker.failed || !this.workers.includes(worker))
+      return;
     const nextJob = this.workerQueue.shift();
     if (!nextJob) {
       worker.isReady = true;
       return;
     }
 
-    const res = await sendCommandsToWorker(
-      worker,
-      nextJob.commands,
-      nextJob.finalMessage,
-      nextJob.onNewMessage
-    );
-
-    this.releaseWorker(worker);
-    nextJob.resolve(res);
+    try {
+      const res = await sendCommandsToWorker(
+        worker,
+        nextJob.commands,
+        nextJob.finalMessage,
+        nextJob.onNewMessage
+      );
+      nextJob.resolve(res);
+    } catch (error) {
+      nextJob.reject(error as Error);
+    } finally {
+      void this.releaseWorker(worker);
+    }
   }
 
   private async setMultiPv(multiPv: number) {
@@ -142,22 +166,36 @@ export class UciEngine {
 
   public shutdown(): void {
     this.isReady = false;
+    this.closed = true;
+    this.positionGeneration++;
+    for (const job of this.workerQueue) job.resolve([]);
     this.workerQueue = [];
 
-    for (const worker of this.workers) {
+    for (const worker of [...this.workers, ...this.pendingWorkers]) {
       this.terminateWorker(worker);
     }
     this.workers = [];
+    this.pendingWorkers.clear();
   }
 
   private terminateWorker(worker: EngineWorker) {
     console.log(`Terminating worker from ${this.enginePath}`);
     worker.isReady = false;
-    worker.uci("quit");
+    worker.cancelPending?.();
+    try {
+      worker.uci("quit");
+    } catch {
+      /* Failed transport is already closed. */
+    }
     worker.terminate();
   }
 
   public stopAllCurrentJobs(): Promise<void> {
+    this.positionGeneration++;
+    return this.stopCurrentJobs();
+  }
+
+  private stopCurrentJobs(): Promise<void> {
     const abandonedJobs = [...this.workerQueue];
     this.workerQueue = [];
 
@@ -168,6 +206,7 @@ export class UciEngine {
     if (!this.stopInFlight) {
       this.stopInFlight = this.stopWorkers().finally(() => {
         this.stopInFlight = undefined;
+        for (const worker of this.workers) void this.releaseWorker(worker);
       });
     }
 
@@ -176,6 +215,7 @@ export class UciEngine {
 
   private async stopWorkers(): Promise<void> {
     for (const worker of this.workers) {
+      worker.cancelPending?.();
       worker.listen = () => null;
     }
 
@@ -204,25 +244,31 @@ export class UciEngine {
     const worker = this.acquireWorker();
 
     if (!worker) {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         this.workerQueue.push({
           commands,
           finalMessage,
           onNewMessage,
           resolve,
+          reject,
         });
       });
     }
 
-    const res = await sendCommandsToWorker(
-      worker,
-      commands,
-      finalMessage,
-      onNewMessage
-    );
-
-    this.releaseWorker(worker);
-    return res;
+    try {
+      return await sendCommandsToWorker(
+        worker,
+        commands,
+        finalMessage,
+        onNewMessage
+      );
+    } catch (error) {
+      for (const job of this.workerQueue.splice(0)) job.reject(error as Error);
+      this.shutdown();
+      throw error;
+    } finally {
+      void this.releaseWorker(worker);
+    }
   }
 
   private async sendCommandsToEachWorker(
@@ -244,19 +290,33 @@ export class UciEngine {
   }
 
   private async addNewWorker() {
+    if (this.closed) throw new DOMException("Engine closed", "AbortError");
     const worker = getEngineWorker(this.enginePath);
-
-    await sendCommandsToWorker(worker, ["uci"], "uciok");
-    await sendCommandsToWorker(
-      worker,
-      [`setoption name MultiPV value ${this.multiPv}`, "isready"],
-      "readyok"
-    );
-    await this.customEngineInit?.(worker);
-    await sendCommandsToWorker(worker, ["ucinewgame", "isready"], "readyok");
-
-    this.workers.push(worker);
-    this.releaseWorker(worker);
+    this.pendingWorkers.add(worker);
+    try {
+      const check = () => {
+        if (this.closed) throw new DOMException("Engine closed", "AbortError");
+      };
+      await sendCommandsToWorker(worker, ["uci"], "uciok");
+      check();
+      await sendCommandsToWorker(
+        worker,
+        [`setoption name MultiPV value ${this.multiPv}`, "isready"],
+        "readyok"
+      );
+      check();
+      await this.customEngineInit?.(worker);
+      check();
+      await sendCommandsToWorker(worker, ["ucinewgame", "isready"], "readyok");
+      check();
+      this.workers.push(worker);
+      void this.releaseWorker(worker);
+    } catch (error) {
+      this.terminateWorker(worker);
+      throw error;
+    } finally {
+      this.pendingWorkers.delete(worker);
+    }
   }
 
   private async setWorkersNb(workersNb: number) {
@@ -301,7 +361,7 @@ export class UciEngine {
     await this.setMultiPv(multiPv);
     await this.setElo(undefined);
     await this.sendCommandsToEachWorker(["ucinewgame", "isready"], "readyok");
-    this.setWorkersNb(workersNb);
+    await this.setWorkersNb(workersNb);
 
     const positions: PositionEval[] = new Array(fens.length);
     let completed = 0;
@@ -402,54 +462,65 @@ export class UciEngine {
     elo,
   }: EvaluatePositionWithUpdateParams): Promise<PositionEval> {
     this.throwErrorIfNotReady();
-
-    const lichessEvalPromise = useCloudEval
+    const generation = ++this.positionGeneration;
+    const current = () =>
+      generation === this.positionGeneration && this.isReady;
+    const cloudPromise = useCloudEval
       ? getLichessEval(fen, multiPv)
       : undefined;
+    const prepare = this.positionSetup
+      .catch(() => undefined)
+      .then(async () => {
+        if (!current()) return;
+        await this.stopCurrentJobs();
+        if (!current()) return;
+        await this.setMultiPv(multiPv);
+        if (!current()) return;
+        await this.setElo(elo);
+      });
+    this.positionSetup = prepare;
+    await prepare;
+    if (!current()) return { lines: [] };
 
-    await this.stopAllCurrentJobs();
-    await this.setMultiPv(multiPv);
-    await this.setElo(elo);
-
-    let lastUpdate = 0;
-    const THROTTLE_MS = 60; // Limit UI updates to ~16 updates per second to avoid performance issues
-
+    const parser = new EvaluationParser(fen);
+    let publishLocal = !useCloudEval;
+    let buffered: PositionEval | undefined;
+    let lastUpdate = -Infinity;
     const onNewMessage = (messages: string[]) => {
-      if (!setPartialEval) return;
-
-      const now = performance.now();
-      if (now < lastUpdate + THROTTLE_MS) return;
-      lastUpdate = now;
-
-      const parsedResults = parseEvaluationResults(messages, fen);
-      setPartialEval(parsedResults);
+      if (!current() || performance.now() < lastUpdate + 60) return;
+      lastUpdate = performance.now();
+      buffered = parser.update(messages);
+      if (publishLocal) setPartialEval?.(buffered);
     };
-
-    logMessageIfLocalhost(`Evaluating position: ${fen}`);
-
-    const lichessEval = await lichessEvalPromise;
-    if (
-      lichessEval &&
-      lichessEval.lines.length >= multiPv &&
-      lichessEval.lines[0].depth >= depth
-    ) {
-      setPartialEval?.(lichessEval);
-      return lichessEval;
-    }
-
-    const goCommand = movetimeMs
+    const go = movetimeMs
       ? `go movetime ${Math.round(movetimeMs)}`
       : `go depth ${depth}`;
-
-    const results = await this.sendCommands(
-      [`position fen ${fen}`, goCommand],
+    // Begin immediately, but retain cloud preference and keep speculative updates private.
+    const local = this.sendCommands(
+      [`position fen ${fen}`, go],
       "bestmove",
       onNewMessage
     );
-
-    const finalEval = parseEvaluationResults(results, fen);
+    // Attach a rejection handler immediately while the independent cloud request is pending.
+    void local.catch(() => undefined);
+    const cloud = await cloudPromise;
+    if (!current()) return { lines: [] };
+    if (
+      cloud &&
+      cloud.lines.length >= multiPv &&
+      cloud.lines[0].depth >= depth
+    ) {
+      await this.stopCurrentJobs();
+      if (!current()) return { lines: [] };
+      setPartialEval?.(cloud);
+      return cloud;
+    }
+    publishLocal = true;
+    if (buffered) setPartialEval?.(buffered);
+    const results = await local;
+    if (!current()) return { lines: [] };
+    const finalEval = parser.update(results);
     setPartialEval?.(finalEval);
-
     return finalEval;
   }
 

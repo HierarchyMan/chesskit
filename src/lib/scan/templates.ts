@@ -1,3 +1,4 @@
+import { openDB } from "idb";
 import { PIECE_SETS } from "@/constants";
 import { Chess, PieceSymbol, Square } from "chess.js";
 import { describeShape } from "./cell";
@@ -62,6 +63,26 @@ export const loadShapeTemplates = (
       )
     );
 
+    // Cache the exact browser-rendered Float32 descriptors, rather than substituting
+    // descriptors rasterised on a different OS/browser. Asset content invalidates them.
+    const cacheKey = `${process.env.NEXT_PUBLIC_PIECE_VERSION}:descriptor-v1:${navigator.userAgent}`;
+    const cacheDb = await openDB("chesskit-scan-templates", 1, {
+      upgrade(db) {
+        db.createObjectStore("descriptors");
+      },
+    }).catch(() => undefined);
+    const saved = (await cacheDb
+      ?.get("descriptors", cacheKey)
+      .catch(() => undefined)) as ShapeTemplate[] | undefined;
+    if (
+      saved?.length === jobs.length &&
+      saved.every((item) => item.shape instanceof Float32Array)
+    ) {
+      cacheDb?.close();
+      onProgress?.(jobs.length, jobs.length);
+      return saved;
+    }
+
     const templates: ShapeTemplate[] = [];
     let done = 0;
 
@@ -90,7 +111,21 @@ export const loadShapeTemplates = (
       onProgress?.(done, jobs.length);
     }
 
-    return normalizeTemplateHeights(templates);
+    const normalised = normalizeTemplateHeights(templates);
+    if (cacheDb) {
+      if (normalised.length === jobs.length) {
+        const transaction = cacheDb.transaction("descriptors", "readwrite");
+        try {
+          await transaction.store.clear();
+          await transaction.store.put(normalised, cacheKey);
+          await transaction.done;
+        } catch {
+          /* Optional cache must never prevent recognition. */
+        }
+      }
+      cacheDb.close();
+    }
+    return normalised;
   })().catch((error) => {
     cachedTemplates = undefined;
     throw error;

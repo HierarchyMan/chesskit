@@ -4,7 +4,10 @@ import { isWasmSupported } from "./shared";
 import { ENGINE_MODELS } from "./models";
 
 export class Stockfish16_1 {
-  public static async create(lite?: boolean): Promise<UciEngine> {
+  public static async create(
+    lite?: boolean,
+    signal?: AbortSignal
+  ): Promise<UciEngine> {
     if (!Stockfish16_1.isSupported()) {
       throw new Error("Stockfish 16.1 is not supported");
     }
@@ -13,7 +16,12 @@ export class Stockfish16_1 {
       ? EngineName.Stockfish16_1Lite
       : EngineName.Stockfish16_1;
 
-    return UciEngine.create(engineName, ENGINE_MODELS[engineName].script);
+    return UciEngine.create(
+      engineName,
+      ENGINE_MODELS[engineName].script,
+      undefined,
+      signal
+    );
   }
 
   public static isSupported() {

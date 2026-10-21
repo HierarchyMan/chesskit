@@ -1,8 +1,9 @@
 import { Head, Html, Main, NextScript } from "next/document";
+import { themeInitScript } from "@/sections/layout/theme";
 
 export default function Document() {
   return (
-    <Html lang="en">
+    <Html lang="en" suppressHydrationWarning>
       <Head>
         <link
           rel="apple-touch-icon"
@@ -56,6 +57,7 @@ export default function Document() {
         />
       </Head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <Main />
         <NextScript />
       </body>

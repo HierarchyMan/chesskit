@@ -7,7 +7,7 @@ import { moveLineUciToSan } from "@/lib/chess";
 import { MoveClassification } from "@/types/enums";
 import Image from "next/image";
 import PrettyMoveSan from "@/components/prettyMoveSan";
-import { moveStoryAtom } from "@/components/moveStoryDialog";
+import { moveStoryAtom } from "@/lib/moveStoryState";
 import { buildMoveStory } from "@/lib/visualize/moveStory";
 import {
   CLASSIFICATION_PHRASES,

@@ -5,9 +5,14 @@ import {
   copyAnalysisSession,
   newAnalysisSession,
   parseAnalysisSessionBackup,
-  replayAnalysis,
+  analysisLinePath,
 } from "@/lib/analysisSession";
-import { listAnalysisSessions, saveAnalysisSession } from "@/lib/gameDatabase";
+import {
+  AnalysisSessionSummary,
+  getAnalysisSession,
+  listAnalysisSessionSummaries,
+  saveAnalysisSession,
+} from "@/lib/gameDatabase";
 import {
   Alert,
   Box,
@@ -56,7 +61,7 @@ export default function SessionPanel() {
   const arranging = useAtomValue(arrangeModeAtom);
   const setPosition = useSetAtom(editablePositionAtom);
   const [open, setOpen] = useState(false);
-  const [sessions, setSessions] = useState<AnalysisSession[]>([]);
+  const [sessions, setSessions] = useState<AnalysisSessionSummary[]>([]);
   const [error, setError] = useState("");
   const [cleared, setCleared] = useState<AnalysisSession | null>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -65,7 +70,7 @@ export default function SessionPanel() {
   useEffect(() => {
     if (!open) return;
     let current = true;
-    void listAnalysisSessions()
+    void listAnalysisSessionSummaries()
       .then((rows) => {
         if (current) setSessions(rows);
       })
@@ -194,7 +199,7 @@ export default function SessionPanel() {
               <MenuItem value="main">Main game</MenuItem>
               {session.branches.map((line, index) => (
                 <MenuItem key={line.id} value={line.id}>
-                  Branch {index + 1}: {replayAnalysis(line).history().join(" ")}
+                  Branch {index + 1}: {analysisLinePath(line).sans.join(" ")}
                 </MenuItem>
               ))}
             </Select>
@@ -329,11 +334,16 @@ export default function SessionPanel() {
                 variant={saved.id === session.id ? "outlined" : "text"}
                 sx={{ justifyContent: "flex-start", textAlign: "left" }}
                 onClick={() => {
-                  void changeSession(saved);
+                  void getAnalysisSession(saved.id)
+                    .then((next) => {
+                      if (next) return changeSession(next);
+                      throw new Error("This session is no longer available.");
+                    })
+                    .catch((reason) => setError(String(reason)));
                 }}
               >
                 {saved.title} · {new Date(saved.updatedAt).toLocaleString()}
-                {branches ? ` · ${saved.branches.length} branches` : ""}
+                {branches ? ` · ${saved.branchCount} branches` : ""}
               </Button>
             ))}
             <Button onClick={() => setOpen(false)}>Close</Button>

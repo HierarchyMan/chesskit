@@ -8,7 +8,7 @@ import {
   MoveStory,
   StoryLine,
 } from "@/lib/visualize/moveStory";
-import { Color, MoveClassification } from "@/types/enums";
+import { Color } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
   Alert,
@@ -27,20 +27,13 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { atom, useAtom } from "jotai";
+import { useAtom } from "jotai";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Arrow, Square } from "react-chessboard/dist/chessboard/types";
 
-export interface MoveStoryDialogState {
-  open: boolean;
-  story?: MoveStory;
-  classification?: MoveClassification;
-  loading?: boolean;
-  error?: string;
-}
-
-export const moveStoryAtom = atom<MoveStoryDialogState>({ open: false });
+import { moveStoryAtom, MoveStoryDialogState } from "@/lib/moveStoryState";
+export { moveStoryAtom } from "@/lib/moveStoryState";
 
 type LineKey = "played" | "better";
 

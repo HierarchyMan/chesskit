@@ -11,7 +11,7 @@ import {
 import { useCallback, useMemo } from "react";
 import { blue, red } from "@mui/material/colors";
 import LoadGameButton from "@/sections/loadGame/loadGameButton";
-import { useGameDatabase } from "@/hooks/useGameDatabase";
+import { useGameSummaries } from "@/hooks/useGameDatabase";
 import { useRouter } from "next/router";
 import { PageTitle } from "@/components/pageTitle";
 
@@ -21,7 +21,7 @@ const gridLocaleText: GridLocaleText = {
 };
 
 export default function GameDatabase() {
-  const { games, deleteGame } = useGameDatabase(true);
+  const { games, deleteGame, getGame } = useGameSummaries();
   const router = useRouter();
 
   const handleDeleteGameRow = useCallback(
@@ -39,11 +39,11 @@ export default function GameDatabase() {
       if (typeof id !== "number") {
         throw new Error("Unable to copy game");
       }
-      const game = games.find((game) => game.id === id);
+      const game = await getGame(id);
       if (!game) throw new Error("Game not found");
       await navigator.clipboard?.writeText?.(game.pgn);
     },
-    [games]
+    [getGame]
   );
 
   const columns: GridColDef[] = useMemo(
@@ -102,7 +102,7 @@ export default function GameDatabase() {
         headerAlign: "center",
         align: "center",
         width: 100,
-        valueGetter: (_, row) => !!row.eval,
+        valueGetter: (_, row) => row.hasEvaluation,
       },
       {
         field: "openEvaluation",

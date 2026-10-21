@@ -44,9 +44,9 @@ export default function Play() {
     <Box
       sx={{
         display: "flex",
-        flexDirection: sideBySide ? "row" : "column",
+        flexDirection: { xs: "column", sm: sideBySide ? "row" : "column" },
         justifyContent: "center",
-        alignItems: sideBySide ? "flex-start" : "center",
+        alignItems: { xs: "center", sm: sideBySide ? "flex-start" : "center" },
         gap: 4,
       }}
     >
@@ -56,9 +56,9 @@ export default function Play() {
 
       <Box
         sx={{
-          width: sideBySide ? SIDE_PANEL_WIDTH : "100%",
+          width: { xs: "100%", sm: sideBySide ? SIDE_PANEL_WIDTH : "100%" },
           maxWidth: "100%",
-          mt: sideBySide ? "3.2rem" : 0,
+          mt: { xs: 0, sm: sideBySide ? "3.2rem" : 0 },
         }}
       >
         {hasGame ? (

@@ -9,7 +9,7 @@ export const useAnalysisBoardSize = (): number => {
     const height = screenSize.height;
 
     // 1200 is the lg layout breakpoint
-    if (window?.innerWidth < 1200) {
+    if (screenSize.windowWidth < 1200) {
       return Math.min(width, height - 150);
     }
 

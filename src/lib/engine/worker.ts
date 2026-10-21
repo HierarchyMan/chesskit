@@ -21,6 +21,13 @@ export const getEngineWorker = (enginePath: string): EngineWorker => {
     terminate: () => worker.terminate(),
   };
 
+  worker.onerror = (event) =>
+    failWorker(
+      engineWorker,
+      new Error(event.message || "Engine worker failed")
+    );
+  worker.onmessageerror = () =>
+    failWorker(engineWorker, new Error("Engine message could not be read"));
   worker.onmessage = (event) => {
     trackBestMove(engineWorker, event.data);
     engineWorker.listen(event.data);
@@ -58,6 +65,10 @@ const getSocketEngineWorker = (url: string): EngineWorker => {
     terminate: () => socket.close(),
   };
 
+  socket.onerror = () =>
+    failWorker(engineWorker, new Error("Engine connection failed"));
+  socket.onclose = () =>
+    failWorker(engineWorker, new Error("Engine connection closed"));
   socket.onopen = () => {
     for (const command of pendingCommands.splice(0)) {
       socket.send(command);
@@ -72,32 +83,71 @@ const getSocketEngineWorker = (url: string): EngineWorker => {
   return engineWorker;
 };
 
+const failWorker = (worker: EngineWorker, error: Error) => {
+  worker.failed = error;
+  worker.isReady = false;
+  worker.onFailure?.(error);
+};
+
 export const sendCommandsToWorker = (
   worker: EngineWorker,
   commands: string[],
   finalMessage: string,
   onNewMessage?: (messages: string[]) => void
-): Promise<string[]> => {
-  return new Promise((resolve) => {
+): Promise<string[]> =>
+  new Promise((resolve, reject) => {
+    if (worker.failed) {
+      reject(worker.failed);
+      return;
+    }
+    worker.cancelPending?.();
     const messages: string[] = [];
-
+    // Searches may intentionally run for a long time; handshakes and stop drains may not hang forever.
+    const timer =
+      finalMessage !== "bestmove" || commands.includes("stop")
+        ? setTimeout(
+            () =>
+              failWorker(
+                worker,
+                new Error(`Engine timed out waiting for ${finalMessage}`)
+              ),
+            finalMessage === "uciok" ? 600_000 : 30_000
+          )
+        : undefined;
+    const cleanup = () => {
+      clearTimeout(timer);
+      worker.listen = () => null;
+      worker.cancelPending = undefined;
+      worker.onFailure = undefined;
+    };
+    worker.cancelPending = () => {
+      cleanup();
+      resolve([]);
+    };
+    worker.onFailure = (error) => {
+      cleanup();
+      reject(error);
+    };
     worker.listen = (data) => {
       messages.push(data);
       onNewMessage?.(messages);
-
       if (data.startsWith(finalMessage)) {
-        worker.listen = () => null;
+        cleanup();
         resolve(messages);
       }
     };
-
-    for (const command of commands) {
-      worker.uci(command);
+    try {
+      for (const command of commands) worker.uci(command);
+    } catch (error) {
+      failWorker(
+        worker,
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   });
-};
 
 export const getRecommendedWorkersNb = (): number => {
+  if (typeof navigator === "undefined") return 1;
   const maxWorkersNbFromThreads = Math.max(
     1,
     Math.round(navigator.hardwareConcurrency - 4),

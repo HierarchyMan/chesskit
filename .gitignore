@@ -21,3 +21,6 @@ tsconfig.tsbuildinfo
 .cdk.staging
 cdk.out
 cdk.context.json
+
+# Local performance verification artefacts
+.performance/

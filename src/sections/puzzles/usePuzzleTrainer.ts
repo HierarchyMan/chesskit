@@ -1,6 +1,6 @@
 import { useChessActions } from "@/hooks/useChessActions";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
-import { collectMistakes } from "@/lib/mistakes";
+import { useMistakes } from "@/hooks/useMistakes";
 import { pickOfflinePuzzle } from "@/lib/offlinePuzzles";
 import {
   Puzzle,
@@ -61,9 +61,10 @@ export const usePuzzleTrainer = () => {
   const [preferred, setPreferred] = useAtom(preferredSourceAtom);
   const [theme, setTheme] = useAtom(puzzleThemeAtom);
   const [seen, setSeen] = useAtom(seenPuzzlesAtom);
-  const { games, isReady } = useGameDatabase(true);
-
   const [source, setSourceState] = useState<PuzzleSource | null>(null);
+  const { games, isReady, gamesLoaded } = useGameDatabase(
+    source === "mistakes"
+  );
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
   const [step, setStep] = useState(0);
@@ -104,22 +105,27 @@ export const usePuzzleTrainer = () => {
   );
 
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || !gamesLoaded) return;
 
     const timer = window.setTimeout(
       () => setGamesChecked(true),
       GAMES_CHECK_DELAY_MS
     );
     return () => window.clearTimeout(timer);
-  }, [isReady]);
+  }, [isReady, gamesLoaded]);
 
+  const {
+    entries: mistakes,
+    loading: mistakesLoading,
+    error: mistakesError,
+  } = useMistakes(games, source === "mistakes");
   const mistakePuzzles = useMemo(
     () =>
-      collectMistakes(games, { onlyMine: true }).flatMap((entry) => {
+      mistakes.flatMap((entry) => {
         const item = mistakeToPuzzle(entry);
         return item ? [{ entry, puzzle: item }] : [];
       }),
-    [games]
+    [mistakes]
   );
 
   const begin = (next: Puzzle, message: string | null = null) => {
@@ -176,10 +182,14 @@ export const usePuzzleTrainer = () => {
     clearTimers();
 
     if (source === "mistakes") {
+      if (mistakesError) {
+        setNotice(mistakesError);
+        return;
+      }
       const item = mistakePuzzles[mistakeIndex % (mistakePuzzles.length || 1)];
       if (item) {
         begin(item.puzzle);
-      } else if (gamesChecked) {
+      } else if (gamesChecked && !mistakesLoading) {
         showEmpty();
       } else {
         setPhase("loading");
@@ -249,7 +259,14 @@ export const usePuzzleTrainer = () => {
 
   useEffect(() => {
     loadRef.current();
-  }, [source, theme, mistakeIndex, mistakePuzzles.length, gamesChecked]);
+  }, [
+    source,
+    theme,
+    mistakeIndex,
+    mistakePuzzles,
+    gamesChecked,
+    mistakesLoading,
+  ]);
 
   const setSource = (next: PuzzleSource) => {
     if (next !== "mistakes") setPreferred(next as PreferredSource);

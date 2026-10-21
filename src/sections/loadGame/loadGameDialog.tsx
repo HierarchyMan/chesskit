@@ -1,6 +1,6 @@
 import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { getGameFromPgn } from "@/lib/chess";
-import { parseGames } from "@/lib/pgn";
+import { useParsedInput } from "@/hooks/useParsedInput";
 import { GameOrigin } from "@/types/enums";
 import {
   MenuItem,
@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { setContext as setSentryContext } from "@sentry/react";
 import { Chess } from "chess.js";
-import { useDeferredValue, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import GamePgnInput from "./gamePgnInput";
 import ChessComInput from "./chessComInput";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -42,13 +42,10 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
   const [parsingError, setParsingError] = useState("");
   const parsingErrorTimeout = useRef<NodeJS.Timeout | null>(null);
   const setBoardOrientation = useSetAtom(boardOrientationAtom);
-  const { addGame } = useGameDatabase();
+  const { addGame, addGames } = useGameDatabase();
 
-  const deferredPgn = useDeferredValue(pgn);
-  const parsedGames = useMemo(
-    () => (deferredPgn.trim() ? parseGames(deferredPgn) : []),
-    [deferredPgn]
-  );
+  const { detected, error: inputError } = useParsedInput(pgn, open, "parse");
+  const parsedGames = detected.kind === "pgn" ? detected.games : [];
   const readableGames = parsedGames.filter((game) => !game.error);
 
   const handleAddGame = async (pgn: string, boardOrientation?: boolean) => {
@@ -86,10 +83,16 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
   };
 
   const handleAddAll = async () => {
-    for (const game of readableGames) {
-      await addGame(getGameFromPgn(game.pgn));
+    try {
+      const result = await addGames(readableGames.map((game) => game.pgn));
+      if (result.errors.length) {
+        setParsingError(result.errors.join("; "));
+        return;
+      }
+      handleClose();
+    } catch (error) {
+      setParsingError(String(error));
     }
-    handleClose();
   };
 
   const handleClose = () => {
@@ -118,6 +121,7 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
         },
       }}
     >
+      {inputError && <Alert severity="error">{inputError}</Alert>}
       <DialogTitle marginY={1} variant="h5">
         {setGame ? "Load a game" : "Add a game to your database"}
       </DialogTitle>

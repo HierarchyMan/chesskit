@@ -1,5 +1,6 @@
 import { Box, Grid2 as Grid, Grid2Props as GridProps } from "@mui/material";
 import { useAtomValue } from "jotai";
+import { useVisibleAtomValue } from "@/hooks/useVisibleAtomValue";
 import {
   Area,
   AreaChart,
@@ -28,7 +29,10 @@ import { useChessActions } from "@/hooks/useChessActions";
 
 export default function GraphTab(props: GridProps) {
   const gameEval = useAtomValue(gameEvalAtom);
-  const currentPosition = useAtomValue(currentPositionAtom);
+  const currentPosition = useVisibleAtomValue(
+    currentPositionAtom,
+    !props.hidden
+  );
   const { goToMove } = useChessActions(boardAtom);
   const game = useAtomValue(gameAtom);
 

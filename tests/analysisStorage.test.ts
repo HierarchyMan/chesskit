@@ -12,6 +12,7 @@ import {
 import {
   getGameDatabase,
   listAnalysisSessions,
+  listAnalysisSessionSummaries,
   saveAnalysisSession,
 } from "@/lib/gameDatabase";
 import { formatGameToDatabase } from "@/lib/chess";
@@ -30,7 +31,9 @@ describe("analysis durable storage", () => {
     await old.put("games", record);
     old.close();
     const db = await getGameDatabase();
-    assert.equal(db.version, 2);
+    assert.equal(db.version, 4);
+    assert.deepEqual(await db.get("gameSummaries", 9), { ...Object.fromEntries(Object.entries(record).filter(([key]) => key !== "pgn")), hasEvaluation: false });
+    assert.ok(db.objectStoreNames.contains("analysisSessionSummaries"));
     assert.deepEqual(await db.get("games", 9), record);
     assert.ok(db.objectStoreNames.contains("analysisSessions"));
     assert.equal((await db.getAll("games")).length, 1);
@@ -55,6 +58,9 @@ describe("analysis durable storage", () => {
       revision: 2,
     });
     assert.equal((await listAnalysisSessions()).length, 1);
+    const summaries = await listAnalysisSessionSummaries();
+    assert.deepEqual(summaries[0], { id: second.id, title: second.title, updatedAt: second.updatedAt, branchCount: second.branches.length });
+    assert.equal("main" in summaries[0], false);
     assert.equal((await db.get("games", 9))?.event, "Existing game");
     await saveAnalysisSession(clearAnalysisBranches(second));
     const cleared = await db.get("analysisSessions", first.id);

@@ -15,7 +15,7 @@ export default function ClassificationTab(props: GridProps) {
         props.hidden ? { display: "none" } : { overflow: "hidden", ...props.sx }
       }
     >
-      <MovesPanel />
+      <MovesPanel visible={!props.hidden} />
 
       <MovesClassificationsRecap />
     </Grid>

@@ -27,7 +27,11 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { ChessboardDnDProvider } from "react-chessboard";
 import TopMovesSection from "@/sections/analysis/panelBody/topMovesSection";
-import GraphTab from "@/sections/analysis/panelBody/graphTab";
+import dynamic from "next/dynamic";
+const GraphTab = dynamic(
+  () => import("@/sections/analysis/panelBody/graphTab"),
+  { ssr: false }
+);
 import { PageTitle } from "@/components/pageTitle";
 import { AnalysisEngineProvider } from "./engineContext";
 import ArrangeBoard from "./arrange/arrangeBoard";
@@ -237,11 +241,13 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
               </Box>
             )}
 
-            <GraphTab
-              role="tabpanel"
-              hidden={tab !== 2 && !isLgOrGreater}
-              id="tabContent2"
-            />
+            {gameEval && (
+              <GraphTab
+                role="tabpanel"
+                hidden={tab !== 2 && !isLgOrGreater}
+                id="tabContent2"
+              />
+            )}
 
             <AnalysisTab
               role="tabpanel"

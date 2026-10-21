@@ -1,8 +1,9 @@
-import { moveStoryAtom } from "@/components/moveStoryDialog";
+import { moveStoryAtom } from "@/lib/moveStoryState";
 import Panel from "@/components/panel";
 import { CLASSIFICATION_COLORS } from "@/constants";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
-import { MistakeEntry, collectMistakes } from "@/lib/mistakes";
+import { MistakeEntry } from "@/lib/mistakes";
+import { useMistakes } from "@/hooks/useMistakes";
 import { buildMoveStory } from "@/lib/visualize/moveStory";
 import { NAV_ITEMS } from "@/sections/layout/navItems";
 import { Icon } from "@iconify/react";
@@ -87,10 +88,11 @@ export default function LearnPage() {
     () => games.filter((game) => game.eval),
     [games]
   );
-  const mistakes = useMemo(
-    () => collectMistakes(games, { onlyMine: true, limit: 12 }),
-    [games]
-  );
+  const {
+    entries: mistakes,
+    loading: mistakesLoading,
+    error: mistakesError,
+  } = useMistakes(games, true, 12);
 
   const visualize = (mistake: MistakeEntry) =>
     setStory({
@@ -168,7 +170,11 @@ export default function LearnPage() {
               </Typography>
             }
           >
-            {mistakes.length === 0 ? (
+            {mistakesLoading || mistakesError ? (
+              <Typography role="status">
+                {mistakesError || "Loading mistakes…"}
+              </Typography>
+            ) : mistakes.length === 0 ? (
               <Stack spacing={1.5} alignItems="flex-start">
                 <Typography sx={{ opacity: 0.8 }}>
                   Play a game against a bot or import a PGN, analyze it, and the

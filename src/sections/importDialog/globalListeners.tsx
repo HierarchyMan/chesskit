@@ -1,4 +1,4 @@
-import { detectInput } from "@/lib/pgn";
+import { detectInputAsync } from "@/lib/processing";
 import { Icon } from "@iconify/react";
 import { Box, Typography } from "@mui/material";
 import { useSetAtom } from "jotai";
@@ -29,23 +29,40 @@ export default function GlobalImportListeners() {
 
   useEffect(() => {
     let dragDepth = 0;
+    let controller: AbortController | undefined;
+    const beginInput = () => {
+      controller?.abort();
+      controller = new AbortController();
+      return controller;
+    };
 
     const onPaste = async (event: ClipboardEvent) => {
       if (isTextField(event.target) || !event.clipboardData) return;
 
+      const request = beginInput();
       const imageFile = Array.from(event.clipboardData.files).find((file) =>
         file.type.startsWith("image/")
       );
       if (imageFile) {
         event.preventDefault();
-        setDialog({ open: true, initialImage: await readAsDataUrl(imageFile) });
+        const image = await readAsDataUrl(imageFile);
+        if (!request.signal.aborted)
+          setDialog({ open: true, initialImage: image });
         return;
       }
 
       const text = event.clipboardData.getData("text/plain");
-      if (detectInput(text).kind !== "unknown") {
-        event.preventDefault();
-        setDialog({ open: true, initialText: text });
+      if (!text.trim()) return;
+      // No editable target: consume synchronously before awaiting the worker.
+      event.preventDefault();
+      try {
+        if (
+          (await detectInputAsync(text, request.signal)).kind !== "unknown" &&
+          !request.signal.aborted
+        )
+          setDialog({ open: true, initialText: text });
+      } catch (error) {
+        if (!request.signal.aborted) console.error(error);
       }
     };
 
@@ -73,10 +90,15 @@ export default function GlobalImportListeners() {
       if (!file) return;
       event.preventDefault();
 
+      const request = beginInput();
       if (file.type.startsWith("image/")) {
-        setDialog({ open: true, initialImage: await readAsDataUrl(file) });
+        const image = await readAsDataUrl(file);
+        if (!request.signal.aborted)
+          setDialog({ open: true, initialImage: image });
       } else {
-        setDialog({ open: true, initialText: await file.text() });
+        const text = await file.text();
+        if (!request.signal.aborted)
+          setDialog({ open: true, initialText: text });
       }
     };
 
@@ -87,6 +109,7 @@ export default function GlobalImportListeners() {
     window.addEventListener("drop", onDrop);
 
     return () => {
+      controller?.abort();
       window.removeEventListener("paste", onPaste);
       window.removeEventListener("dragenter", onDragEnter);
       window.removeEventListener("dragleave", onDragLeave);

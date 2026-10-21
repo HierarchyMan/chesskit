@@ -1,5 +1,6 @@
 import { Grid2 as Grid } from "@mui/material";
-import { useAtomValue } from "jotai";
+import { useVisibleAtomValue } from "@/hooks/useVisibleAtomValue";
+import { memo } from "react";
 import {
   boardAtom,
   currentPositionAtom,
@@ -9,10 +10,10 @@ import {
 import { useChessActions } from "@/hooks/useChessActions";
 import MovesList from "@/components/movesList";
 
-export default function MovesPanel() {
-  const game = useAtomValue(gameAtom);
-  const evaluation = useAtomValue(gameEvalAtom);
-  const position = useAtomValue(currentPositionAtom);
+function MovesPanel({ visible }: { visible: boolean }) {
+  const game = useVisibleAtomValue(gameAtom, visible);
+  const evaluation = useVisibleAtomValue(gameEvalAtom, visible);
+  const position = useVisibleAtomValue(currentPositionAtom, visible);
   const { goToMove } = useChessActions(boardAtom);
   const history = game.history({ verbose: true });
   if (!history.length) return null;
@@ -37,3 +38,5 @@ export default function MovesPanel() {
     </Grid>
   );
 }
+
+export default memo(MovesPanel);
