@@ -10,6 +10,8 @@ export const navPreferenceAtom = storedAtom<boolean | null>(
 );
 
 export const settingsOpenAtom = atom(false);
+export type SettingsTab = "engine" | "board" | "models";
+export const settingsTabAtom = atom<SettingsTab>("engine");
 export const importDialogAtom = atom<{
   open: boolean;
   initialText?: string;

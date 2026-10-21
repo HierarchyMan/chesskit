@@ -2,7 +2,7 @@ import { ENGINE_LABELS } from "@/constants";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { OPENING_LINES } from "@/data/openingLines";
 import { ENDGAMES } from "@/lib/endgames";
-import { probeRecklessBridge } from "@/lib/engine/reckless";
+import { useModels } from "@/hooks/useModels";
 import { statsAtom } from "@/lib/stats";
 import { engineNameAtom } from "@/sections/analysis/states";
 import { Icon } from "@iconify/react";
@@ -20,9 +20,13 @@ import {
 import { useAtomValue, useSetAtom } from "jotai";
 import NextLink from "next/link";
 import { useRouter } from "next/router";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo } from "react";
 import { NAV_GROUPS, NAV_ITEMS, NavItem } from "../layout/navItems";
-import { importDialogAtom, settingsOpenAtom } from "../layout/states";
+import {
+  importDialogAtom,
+  settingsOpenAtom,
+  settingsTabAtom,
+} from "../layout/states";
 
 const greeting = (): string => {
   const hour = new Date().getHours();
@@ -426,18 +430,17 @@ function Progress() {
 function EngineStatus() {
   const engineName = useAtomValue(engineNameAtom);
   const setSettingsOpen = useSetAtom(settingsOpenAtom);
-  const [bridge, setBridge] = useState<"checking" | "up" | "down">("checking");
+  const setSettingsTab = useSetAtom(settingsTabAtom);
+  const { bridge, refresh } = useModels();
 
   useEffect(() => {
-    let cancelled = false;
-    probeRecklessBridge().then((reachable) => {
-      if (!cancelled) setBridge(reachable ? "up" : "down");
-    });
+    void refresh();
+  }, [refresh]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const openModels = () => {
+    setSettingsTab("models");
+    setSettingsOpen(true);
+  };
 
   return (
     <Stack direction="row" gap={1} flexWrap="wrap">
@@ -450,15 +453,15 @@ function EngineStatus() {
       <Chip
         icon={<Icon icon="mdi:lightning-bolt" height={18} />}
         label={
-          bridge === "checking"
-            ? "Reckless: checking…"
-            : bridge === "up"
-              ? "Reckless: ready"
-              : "Reckless: bridge off"
+          bridge === "up"
+            ? "Reckless: ready"
+            : bridge === "down"
+              ? "Reckless: bridge off"
+              : "Reckless: checking…"
         }
         color={bridge === "up" ? "success" : "default"}
         variant="outlined"
-        onClick={() => setSettingsOpen(true)}
+        onClick={openModels}
       />
     </Stack>
   );

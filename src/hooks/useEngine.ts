@@ -7,8 +7,10 @@ import { Stockfish17 } from "@/lib/engine/stockfish17";
 import { Stockfish17_1 } from "@/lib/engine/stockfish17_1";
 import { Stockfish18 } from "@/lib/engine/stockfish18";
 import { UciEngine } from "@/lib/engine/uciEngine";
+import { markEngineLoadedAtom } from "./useModels";
 import { EngineName } from "@/types/enums";
 import { useCallback, useEffect, useState } from "react";
+import { useSetAtom } from "jotai";
 
 export type EngineStatus = "idle" | "loading" | "ready" | "error";
 
@@ -26,6 +28,7 @@ export const useEngineState = (
   const [status, setStatus] = useState<EngineStatus>("idle");
   const [error, setError] = useState<string | undefined>(undefined);
   const [attempt, setAttempt] = useState(0);
+  const markLoaded = useSetAtom(markEngineLoadedAtom);
 
   useEffect(() => {
     setEngine(null);
@@ -57,6 +60,7 @@ export const useEngineState = (
         }
 
         created = newEngine;
+        markLoaded({ name: engineName, delta: 1 });
         setEngine(newEngine);
         setStatus("ready");
       })
@@ -72,9 +76,12 @@ export const useEngineState = (
 
     return () => {
       isCurrent = false;
-      created?.shutdown();
+      if (created) {
+        markLoaded({ name: engineName, delta: -1 });
+        created.shutdown();
+      }
     };
-  }, [engineName, attempt]);
+  }, [engineName, attempt, markLoaded]);
 
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
 

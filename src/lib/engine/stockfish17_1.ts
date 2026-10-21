@@ -1,6 +1,7 @@
 import { EngineName } from "@/types/enums";
 import { UciEngine } from "./uciEngine";
 import { isWasmSupported } from "./shared";
+import { ENGINE_MODELS } from "./models";
 
 export class Stockfish17_1 {
   public static async create(lite?: boolean): Promise<UciEngine> {
@@ -8,15 +9,11 @@ export class Stockfish17_1 {
       throw new Error("Stockfish 17_1 is not supported");
     }
 
-    const enginePath = `engines/stockfish-17.1/stockfish-17.1${
-      lite ? "-lite" : ""
-    }-single.js`;
-
     const engineName = lite
       ? EngineName.Stockfish17_1Lite
       : EngineName.Stockfish17_1;
 
-    return UciEngine.create(engineName, enginePath);
+    return UciEngine.create(engineName, ENGINE_MODELS[engineName].script);
   }
 
   public static isSupported() {

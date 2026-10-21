@@ -9,11 +9,11 @@ import {
   showCoordinatesAtom,
   soundEnabledAtom,
 } from "@/components/board/states";
-import { ENGINE_LABELS, PIECE_SETS } from "@/constants";
-import { isEngineSupported } from "@/lib/engine/shared";
+import { PIECE_SETS, ENGINE_LABELS } from "@/constants";
+import { useModels } from "@/hooks/useModels";
 import { getRecommendedWorkersNb } from "@/lib/engine/worker";
-import { probeRecklessBridge } from "@/lib/engine/reckless";
 import { EngineName } from "@/types/enums";
+import ModelMenuLabel from "@/components/modelMenuLabel";
 import {
   engineDepthAtom,
   engineMultiPvAtom,
@@ -46,17 +46,21 @@ import {
   useTheme,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom } from "jotai";
 import Image from "next/image";
-import { useState } from "react";
-import { settingsOpenAtom } from "../layout/states";
+import {
+  settingsOpenAtom,
+  settingsTabAtom,
+  SettingsTab,
+} from "../layout/states";
+import ModelsTab from "./modelsTab";
 
 const PREVIEW_FEN =
   "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
 
 export default function SettingsDialog() {
   const [open, setOpen] = useAtom(settingsOpenAtom);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useAtom(settingsTabAtom);
 
   return (
     <Dialog
@@ -69,30 +73,33 @@ export default function SettingsDialog() {
       <DialogTitle sx={{ pb: 0 }}>Settings</DialogTitle>
       <Tabs
         value={tab}
-        onChange={(_, value) => setTab(value)}
+        onChange={(_, value: SettingsTab) => setTab(value)}
         variant="fullWidth"
         sx={{ px: 1, borderBottom: 1, borderColor: "divider" }}
       >
         <Tab
+          value="engine"
           label="Engine"
           icon={<Icon icon="mdi:chip" height={20} />}
           iconPosition="start"
         />
         <Tab
+          value="board"
           label="Board"
           icon={<Icon icon="mdi:chess-pawn" height={20} />}
           iconPosition="start"
         />
         <Tab
-          label="Reckless"
-          icon={<Icon icon="mdi:lightning-bolt" height={20} />}
+          value="models"
+          label="Models"
+          icon={<Icon icon="mdi:database-outline" height={20} />}
           iconPosition="start"
         />
       </Tabs>
       <DialogContent sx={{ pt: 3, minHeight: 420 }}>
-        {tab === 0 && <EngineTab />}
-        {tab === 1 && <BoardTab />}
-        {tab === 2 && <RecklessTab />}
+        {tab === "engine" && <EngineTab />}
+        {tab === "board" && <BoardTab />}
+        {tab === "models" && <ModelsTab />}
       </DialogContent>
       <DialogActions sx={{ m: 1 }}>
         <Button variant="contained" onClick={() => setOpen(false)}>
@@ -111,6 +118,7 @@ function EngineTab() {
   const [cloud, setCloud] = useAtom(useCloudEvalAtom);
   const [showArrow, setShowArrow] = useAtom(showBestMoveArrowAtom);
   const [showIcon, setShowIcon] = useAtom(showPlayerMoveIconAtom);
+  const { models, refresh } = useModels();
 
   return (
     <Grid container spacing={3} justifyContent="center">
@@ -121,24 +129,27 @@ function EngineTab() {
             labelId="settings-engine-label"
             input={<OutlinedInput label="Analysis engine" />}
             value={engineName}
+            onOpen={() => refresh()}
             onChange={(event) =>
               setEngineName(event.target.value as EngineName)
             }
+            renderValue={(value) => ENGINE_LABELS[value as EngineName].full}
           >
-            {Object.values(EngineName).map((name) => (
+            {models.map((view) => (
               <MenuItem
-                key={name}
-                value={name}
-                disabled={!isEngineSupported(name)}
+                key={view.model.name}
+                value={view.model.name}
+                disabled={!view.supported}
               >
-                {ENGINE_LABELS[name].full}
+                <ModelMenuLabel view={view} />
               </MenuItem>
             ))}
           </Select>
         </FormControl>
         <Typography variant="caption" sx={{ opacity: 0.7 }}>
           Used for analysis, hints, the editor and the coach. Bots in Play and
-          the Arena have their own engine pickers.
+          the Arena have their own engine pickers. Download engines and check
+          Reckless in the Models tab.
         </Typography>
       </Grid>
 
@@ -310,57 +321,5 @@ function BoardTab() {
         </Stack>
       </Grid>
     </Grid>
-  );
-}
-
-function RecklessTab() {
-  const [status, setStatus] = useState<"unknown" | "checking" | "up" | "down">(
-    "unknown"
-  );
-  const engineName = useAtomValue(engineNameAtom);
-
-  const check = async () => {
-    setStatus("checking");
-    setStatus((await probeRecklessBridge()) ? "up" : "down");
-  };
-
-  return (
-    <Stack spacing={2}>
-      <Typography>
-        Reckless is a native engine, so it runs outside the browser through a
-        small local bridge. The bridge listens only on this computer and only
-        accepts connections from this app.
-      </Typography>
-      <Typography>
-        To start it, double-click <b>start-reckless-bridge.bat</b>, or use
-        <b> start-chess.bat</b> to start the bridge and the app together.
-      </Typography>
-      <Stack direction="row" alignItems="center" gap={2}>
-        <Button
-          variant="outlined"
-          onClick={check}
-          disabled={status === "checking"}
-        >
-          Check bridge
-        </Button>
-        <Typography
-          color={
-            status === "up"
-              ? "success.main"
-              : status === "down"
-                ? "error.main"
-                : undefined
-          }
-        >
-          {status === "up" && "Reckless bridge is running."}
-          {status === "down" && "The bridge is not running."}
-          {status === "checking" && "Checking…"}
-        </Typography>
-      </Stack>
-      <Typography variant="body2" sx={{ opacity: 0.8 }}>
-        Currently selected analysis engine: {ENGINE_LABELS[engineName].full}.
-        Pick Reckless from the engine menu in the top bar.
-      </Typography>
-    </Stack>
   );
 }

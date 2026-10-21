@@ -1,7 +1,7 @@
 import { ENGINE_LABELS } from "@/constants";
+import { useModels } from "@/hooks/useModels";
 import { engineNameAtom } from "@/sections/analysis/states";
-import { isEngineSupported } from "@/lib/engine/shared";
-import { EngineName } from "@/types/enums";
+import { describeModel } from "@/lib/engine/modelStatus";
 import { Icon } from "@iconify/react";
 import {
   Dialog,
@@ -21,6 +21,7 @@ import {
   commandPaletteOpenAtom,
   importDialogAtom,
   settingsOpenAtom,
+  settingsTabAtom,
 } from "./states";
 
 interface Command {
@@ -39,7 +40,9 @@ export default function CommandPalette({ switchDarkMode }: Props) {
   const [open, setOpen] = useAtom(commandPaletteOpenAtom);
   const setEngineName = useSetAtom(engineNameAtom);
   const setSettingsOpen = useSetAtom(settingsOpenAtom);
+  const setSettingsTab = useSetAtom(settingsTabAtom);
   const setImportDialog = useSetAtom(importDialogAtom);
+  const { models, refresh } = useModels();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
@@ -60,7 +63,8 @@ export default function CommandPalette({ switchDarkMode }: Props) {
     if (!open) return;
     setQuery("");
     setIndex(0);
-  }, [open]);
+    void refresh();
+  }, [open, refresh]);
 
   const commands = useMemo<Command[]>(() => {
     const pages: Command[] = [HOME_ITEM, ...NAV_ITEMS].map((item) => ({
@@ -71,14 +75,18 @@ export default function CommandPalette({ switchDarkMode }: Props) {
       run: () => router.push(item.href),
     }));
 
-    const engines: Command[] = Object.values(EngineName)
-      .filter(isEngineSupported)
-      .map((name) => ({
-        id: `engine-${name}`,
-        label: `Use ${ENGINE_LABELS[name].small} for analysis`,
-        icon: "mdi:chip",
-        run: () => setEngineName(name),
-      }));
+    const engines: Command[] = models
+      .filter((view) => view.supported)
+      .map((view) => {
+        const name = view.model.name;
+        return {
+          id: `engine-${name}`,
+          label: `Use ${ENGINE_LABELS[name].small} for analysis`,
+          hint: describeModel(view).text,
+          icon: "mdi:chip",
+          run: () => setEngineName(name),
+        };
+      });
 
     return [
       ...pages,
@@ -96,6 +104,16 @@ export default function CommandPalette({ switchDarkMode }: Props) {
         run: () => setSettingsOpen(true),
       },
       {
+        id: "models",
+        label: "Manage engines and models",
+        hint: "Download or remove engine files, check Reckless",
+        icon: "mdi:database-outline",
+        run: () => {
+          setSettingsTab("models");
+          setSettingsOpen(true);
+        },
+      },
+      {
         id: "theme",
         label: "Switch light or dark theme",
         icon: "mdi:brightness-6",
@@ -103,7 +121,15 @@ export default function CommandPalette({ switchDarkMode }: Props) {
       },
       ...engines,
     ];
-  }, [router, setEngineName, setImportDialog, setSettingsOpen, switchDarkMode]);
+  }, [
+    router,
+    models,
+    setEngineName,
+    setImportDialog,
+    setSettingsOpen,
+    setSettingsTab,
+    switchDarkMode,
+  ]);
 
   const filtered = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);

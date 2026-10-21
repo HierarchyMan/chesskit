@@ -1,9 +1,11 @@
 import { ENGINE_LABELS } from "@/constants";
+import { useModels } from "@/hooks/useModels";
 import { Stockfish16_1 } from "@/lib/engine/stockfish16_1";
 import { isEngineSupported } from "@/lib/engine/shared";
-import { probeRecklessBridge } from "@/lib/engine/reckless";
+import { describeModel } from "@/lib/engine/modelStatus";
 import { EngineName } from "@/types/enums";
 import { engineNameAtom, useCloudEvalAtom } from "@/sections/analysis/states";
+import { statusColor } from "@/components/modelMenuLabel";
 import { Icon } from "@iconify/react";
 import {
   Box,
@@ -21,17 +23,16 @@ import {
   useTheme,
 } from "@mui/material";
 import { useAtom, useSetAtom } from "jotai";
-import { useCallback, useEffect, useState } from "react";
-import { settingsOpenAtom } from "./states";
-
-type BridgeState = "unknown" | "checking" | "up" | "down";
+import { useEffect, useState } from "react";
+import { settingsOpenAtom, settingsTabAtom } from "./states";
 
 export default function EngineChip() {
   const [engineName, setEngineName] = useAtom(engineNameAtom);
   const [useCloudEval, setUseCloudEval] = useAtom(useCloudEvalAtom);
   const setSettingsOpen = useSetAtom(settingsOpenAtom);
+  const setSettingsTab = useSetAtom(settingsTabAtom);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const [bridge, setBridge] = useState<BridgeState>("unknown");
+  const { models, refresh } = useModels();
   const theme = useTheme();
   const showLabel = useMediaQuery(theme.breakpoints.up("sm"));
 
@@ -45,14 +46,9 @@ export default function EngineChip() {
     );
   }, [engineName, setEngineName]);
 
-  const checkBridge = useCallback(async () => {
-    setBridge("checking");
-    setBridge((await probeRecklessBridge()) ? "up" : "down");
-  }, []);
-
   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
-    checkBridge();
+    void refresh();
   };
 
   const handleSelect = (name: EngineName) => {
@@ -60,11 +56,10 @@ export default function EngineChip() {
     setAnchorEl(null);
   };
 
-  const bridgeLabel: Record<BridgeState, string> = {
-    unknown: "Local engine via the bridge",
-    checking: "Checking the bridge…",
-    up: "Bridge running",
-    down: "Bridge not running, start it with start-reckless-bridge.bat",
+  const openModels = () => {
+    setAnchorEl(null);
+    setSettingsTab("models");
+    setSettingsOpen(true);
   };
 
   return (
@@ -103,15 +98,15 @@ export default function EngineChip() {
           Analysis engine
         </Typography>
 
-        {Object.values(EngineName).map((name) => {
-          const isReckless = name === EngineName.Reckless;
-          const supported = isEngineSupported(name);
+        {models.map((view) => {
+          const name = view.model.name;
+          const status = describeModel(view);
 
           return (
             <MenuItem
               key={name}
               selected={name === engineName}
-              disabled={!supported}
+              disabled={!view.supported}
               onClick={() => handleSelect(name)}
             >
               <ListItemIcon>
@@ -126,16 +121,12 @@ export default function EngineChip() {
               </ListItemIcon>
               <ListItemText
                 primary={ENGINE_LABELS[name].full}
-                secondary={isReckless ? bridgeLabel[bridge] : undefined}
+                secondary={status.text}
                 slotProps={{
                   secondary: {
                     sx: {
-                      color:
-                        bridge === "down"
-                          ? "error.main"
-                          : bridge === "up"
-                            ? "success.main"
-                            : undefined,
+                      color: statusColor(status.tone),
+                      opacity: status.tone === "default" ? 0.75 : 1,
                     },
                   },
                 }}
@@ -167,8 +158,14 @@ export default function EngineChip() {
           </Typography>
         </Box>
 
+        <MenuItem sx={{ mt: 1 }} onClick={openModels}>
+          <ListItemIcon>
+            <Icon icon="mdi:database-outline" height={20} />
+          </ListItemIcon>
+          <ListItemText primary="Manage models…" />
+        </MenuItem>
+
         <MenuItem
-          sx={{ mt: 1 }}
           onClick={() => {
             setAnchorEl(null);
             setSettingsOpen(true);

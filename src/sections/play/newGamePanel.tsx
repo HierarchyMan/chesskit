@@ -1,8 +1,10 @@
+import ModelMenuLabel from "@/components/modelMenuLabel";
 import Panel from "@/components/panel";
 import StrengthControl from "@/components/strengthControl";
 import { ENGINE_LABELS } from "@/constants";
 import { EngineState } from "@/hooks/useEngine";
-import { isEngineSupported } from "@/lib/engine/shared";
+import { useModels } from "@/hooks/useModels";
+import { getEngineModel } from "@/lib/engine/models";
 import { ODDS_OPTIONS } from "@/lib/odds";
 import { Color, EngineName } from "@/types/enums";
 import { Icon } from "@iconify/react";
@@ -72,7 +74,9 @@ export default function NewGamePanel({ botEngine }: Props) {
   const [showPosition, setShowPosition] = useState(false);
   const [error, setError] = useState("");
   const { startGame } = useStartGame();
+  const { models, refresh } = useModels();
   const router = useRouter();
+  const selectedModel = models.find((view) => view.model.name === engineName);
 
   useEffect(() => {
     if (colorChoice !== "random") setPlayerColor(colorChoice);
@@ -100,23 +104,29 @@ export default function NewGamePanel({ botEngine }: Props) {
                 labelId="play-engine-label"
                 input={<OutlinedInput label="Engine" />}
                 value={engineName}
+                onOpen={() => refresh()}
                 onChange={(event) =>
                   setEngineName(event.target.value as EngineName)
                 }
+                renderValue={(value) => ENGINE_LABELS[value as EngineName].full}
               >
-                {Object.values(EngineName).map((name) => (
+                {models.map((view) => (
                   <MenuItem
-                    key={name}
-                    value={name}
-                    disabled={!isEngineSupported(name)}
+                    key={view.model.name}
+                    value={view.model.name}
+                    disabled={!view.supported}
                   >
-                    {ENGINE_LABELS[name].full}
+                    <ModelMenuLabel view={view} />
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
-            <EngineStatusLine engine={botEngine} engineName={engineName} />
+            <EngineStatusLine
+              engine={botEngine}
+              engineName={engineName}
+              downloaded={selectedModel?.downloaded ?? false}
+            />
 
             <StrengthControl
               value={strength}
@@ -308,9 +318,11 @@ function Section({
 function EngineStatusLine({
   engine,
   engineName,
+  downloaded,
 }: {
   engine: EngineState;
   engineName: EngineName;
+  downloaded: boolean;
 }) {
   if (engine.status === "ready") {
     return (
@@ -335,11 +347,13 @@ function EngineStatusLine({
     );
   }
 
+  const { sizeMb } = getEngineModel(engineName);
+
   return (
     <Typography variant="body2" sx={{ opacity: 0.75 }}>
       Loading {ENGINE_LABELS[engineName].small}
-      {ENGINE_LABELS[engineName].sizeMb > 20
-        ? ` (${ENGINE_LABELS[engineName].sizeMb}MB, first time only)`
+      {!downloaded && sizeMb > 20
+        ? ` (about ${sizeMb}MB, first time only)`
         : ""}
       …
     </Typography>

@@ -1,11 +1,12 @@
 import EngineStatusChip from "@/components/engineStatusChip";
+import ModelMenuLabel from "@/components/modelMenuLabel";
 import MovesList from "@/components/movesList";
 import Panel from "@/components/panel";
 import PrettyMoveSan from "@/components/prettyMoveSan";
 import StrengthControl from "@/components/strengthControl";
 import { ENGINE_LABELS } from "@/constants";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
-import { isEngineSupported } from "@/lib/engine/shared";
+import { useModels } from "@/hooks/useModels";
 import { linesToTopMoves } from "@/lib/engine/topMoves";
 import { EngineName } from "@/types/enums";
 import { Icon } from "@iconify/react";
@@ -74,6 +75,8 @@ function SideSetup({
   onChange: (side: ArenaSide) => void;
   state: Arena["whiteEngine"];
 }) {
+  const { models, refresh } = useModels();
+
   return (
     <Stack spacing={1.25}>
       <Typography variant="overline" sx={{ opacity: 0.7 }}>
@@ -85,17 +88,19 @@ function SideSetup({
           labelId={`arena-${title}-engine`}
           input={<OutlinedInput label="Engine" />}
           value={side.engine}
+          onOpen={() => refresh()}
           onChange={(event) =>
             onChange({ ...side, engine: event.target.value as EngineName })
           }
+          renderValue={(value) => ENGINE_LABELS[value as EngineName].full}
         >
-          {Object.values(EngineName).map((name) => (
+          {models.map((view) => (
             <MenuItem
-              key={name}
-              value={name}
-              disabled={!isEngineSupported(name)}
+              key={view.model.name}
+              value={view.model.name}
+              disabled={!view.supported}
             >
-              {ENGINE_LABELS[name].full}
+              <ModelMenuLabel view={view} />
             </MenuItem>
           ))}
         </Select>
