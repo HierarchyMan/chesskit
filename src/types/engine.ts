@@ -1,5 +1,7 @@
 export interface EngineWorker {
   isReady: boolean;
+  // True from a "go" command until that search prints its "bestmove".
+  searching: boolean;
   uci(command: string): void;
   listen: (data: string) => void;
   terminate: () => void;

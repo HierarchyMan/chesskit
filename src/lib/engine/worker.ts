@@ -12,16 +12,31 @@ export const getEngineWorker = (enginePath: string): EngineWorker => {
 
   const engineWorker: EngineWorker = {
     isReady: false,
-    uci: (command: string) => worker.postMessage(command),
+    searching: false,
+    uci: (command: string) => {
+      trackSearch(engineWorker, command);
+      worker.postMessage(command);
+    },
     listen: () => null,
     terminate: () => worker.terminate(),
   };
 
   worker.onmessage = (event) => {
+    trackBestMove(engineWorker, event.data);
     engineWorker.listen(event.data);
   };
 
   return engineWorker;
+};
+
+const trackSearch = (worker: EngineWorker, command: string) => {
+  if (command === "go" || command.startsWith("go ")) worker.searching = true;
+};
+
+const trackBestMove = (worker: EngineWorker, data: unknown) => {
+  if (typeof data === "string" && data.startsWith("bestmove")) {
+    worker.searching = false;
+  }
 };
 
 const getSocketEngineWorker = (url: string): EngineWorker => {
@@ -30,7 +45,9 @@ const getSocketEngineWorker = (url: string): EngineWorker => {
 
   const engineWorker: EngineWorker = {
     isReady: false,
+    searching: false,
     uci: (command: string) => {
+      trackSearch(engineWorker, command);
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(command);
       } else {
@@ -48,6 +65,7 @@ const getSocketEngineWorker = (url: string): EngineWorker => {
   };
 
   socket.onmessage = (event) => {
+    trackBestMove(engineWorker, event.data);
     engineWorker.listen(event.data);
   };
 

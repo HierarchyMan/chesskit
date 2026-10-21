@@ -179,7 +179,17 @@ export class UciEngine {
       worker.listen = () => null;
     }
 
-    await this.sendCommandsToEachWorker(["stop", "isready"], "readyok");
+    // A stopped search still prints its last info lines and "bestmove", and
+    // that can arrive after "readyok". Wait for it here, or the next job would
+    // read those lines as its own and score the wrong position.
+    await Promise.all(
+      this.workers.map(async (worker) => {
+        if (worker.searching) {
+          await sendCommandsToWorker(worker, ["stop"], "bestmove");
+        }
+        await sendCommandsToWorker(worker, ["isready"], "readyok");
+      })
+    );
 
     for (const worker of this.workers) {
       this.releaseWorker(worker);
