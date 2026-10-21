@@ -1,140 +1,103 @@
 <div align="center">
-  <a href="https://github.com/GuillaumeSD/Chesskit">
-    <img width="120" height="120" src="https://github.com/GuillaumeSD/Chesskit/blob/main/public/android-chrome-192x192.png" alt="Logo">
-  </a>
+  <img width="120" height="120" src="public/android-chrome-192x192.png" alt="Chesskit logo">
 
 <h3 align="center">Chesskit</h3>
   <p align="center">
-    The Ultimate Chess Web App
+    A free, open-source chess trainer and analysis board that runs in the browser
     <br />
     <a href="https://chesskit.org/" target="_blank" rel="noopener noreferrer"><strong>chesskit.org</strong></a>
-    <br />
-    <a href="https://discord.com/invite/Yr99abAcUr" target="_blank" rel="noopener noreferrer">Discord Server</a>
-    ·
-    <a href="https://chesskit.notion.site/4cf7823836724432b71aa8932ba7d5bb" target="_blank" rel="noopener noreferrer">Features Backlog</a>
   </p>
 </div>
 <br />
 
-Chesskit is an open-source chess website to play, view, analyze and review your chess games for free on any device with Stockfish !
+Chesskit lets you play, study, analyse and review chess with Stockfish on any device. This fork extends the original [Chesskit](https://github.com/GuillaumeSD/Chesskit) with a hub, training tools and an engine arena. Everything runs locally in your browser.
 
-## Mission
-
-Chesskit aims to offer all the chess related features it can, while being free and open-source. It is designed to be easy to use, fast, and reliable.
+<img src="assets/showcase.png" alt="Analysis board with engine evaluation" />
 
 ## Features
 
-- Load and review games from [chess.com](https://chess.com) and [lichess.org](https://lichess.org)
-- Analysis board with live engine evaluation, custom arrows, evaluation graph, ...
-- Moves classification (Brilliant, Great, Good, Mistake, Blunder, ...)
-- Chess960 and Puzzles support
-- Play against Stockfish at any elo
-- Store your games in your browser database
+**Play**
+- Play against Stockfish at any Elo from 400 to 3200, at a fixed depth, or at full strength.
+- Casual games offer hints, takebacks and an optional coach. Formal games have none.
+- Odds, clocks, resign and draw offers.
 
-<img src="https://github.com/GuillaumeSD/Chesskit/blob/main/assets/showcase.png" />
+**Analyse**
+- One board for analysis and the board editor: arrange any position, then play moves on it.
+- Live engine evaluation with top moves for either side, custom arrows and an evaluation graph.
+- Move classification (Brilliant, Great, Good, Mistake, Blunder, ...).
+- Load games from [chess.com](https://chess.com) and [lichess.org](https://lichess.org), or paste a PGN, a FEN, a Lichess link or a screenshot of a board (`Ctrl+V` on any page).
+- **Scan Image** turns a photo or screenshot of a board into a position, entirely in your browser.
+- **Visualize**: for any move that is not best or excellent, a pop-up walks through the moves that follow (2 to 10 plies, depending on the evaluation).
 
-## What this fork adds
+**Engine Arena**
+- Pit two engines, or two strengths of one engine, against each other. Step through with *Next*, nudge a move by clicking a candidate or dragging a piece, or let them auto-play.
 
-- **A hub** with quick actions, recent games and your progress, plus a collapsible menu and a command palette (`Ctrl+K`).
-- **Paste anything** (`Ctrl+V` on any page): a PGN (several games at once), a FEN, a Lichess link or a screenshot of a board.
-- **Play** against any engine at an Elo from 400 to 3200, at a fixed depth or at full strength. Casual games have hints, takebacks and an optional coach; formal games have none. Odds, clocks, resign and draw offers are included.
-- **Engine Arena**: two engines, or two strengths of one engine, play each other. Step with Next, or nudge a move by clicking a candidate or dragging a piece.
-- **Analysis and Board Editor** share one board. Arrange any position, switch to playing moves on it, change the engine at any moment, and ask for the top moves of either side (what the opponent would answer, or what they would play if it were their turn).
-- **Visualize**: for any move that is not best or excellent, a pop-up steps through the moves that follow. The length follows the engine's evaluation (2 to 10 plies) and you can close it at any time.
-- **Scan Image** turns a screenshot or photo of a board into a position, entirely in your browser.
-- **Learn** collects the training tools: **Puzzles** (Lichess, the daily puzzle, an offline set, and puzzles built from your own mistakes), **Openings** (twelve lines with the idea behind each move, and a drill), **Endgames** (nine positions checked with an engine, played out against it) and **Board Vision** (square names, colours and knight routes).
-- **Reckless** (a native UCI engine) through a local bridge. See below.
+**Learn**
+- **Puzzles**: Lichess puzzles, the daily puzzle, an offline set, and puzzles built from your own mistakes.
+- **Openings**: twelve main lines with the idea behind each move, plus a drill mode.
+- **Endgames**: nine positions checked against an engine. Win or hold them against the engine.
+- **Board Vision**: timed drills on square names, square colours and knight routes.
 
-### Running with Reckless
+**Everywhere**
+- A hub with quick actions, recent games and your progress.
+- A command palette (`Ctrl+K`).
+- Games and stats are stored in your browser. Nothing is uploaded.
 
-Run `start-chess.bat` from the folder above this one. It starts the bridge (`engine-bridge`, bound to `127.0.0.1` and limited to `localhost:3000`) and the dev server. The bridge needs the Reckless binary in `engines/`.
+## Getting started
 
-### Tests and scripts
+Requirements: [Node.js](https://nodejs.org) 22.11 or newer.
 
 ```bash
-npm test                                                    # unit tests
-npm run lint                                                # eslint and tsc
-npm run icons                                               # rebuild the offline icon bundle after using a new icon
-node --import ./tests/register.mjs scripts/verify-endgames.mjs   # check the endgames with a UCI engine
-node scripts/fetch-offline-puzzles.mjs                      # refresh the offline puzzle set
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+Stockfish runs in the browser as WebAssembly, so no engine install is needed.
+
+### Optional: the Reckless engine
+
+[Reckless](https://github.com/codedeliveryservice/Reckless) is a native UCI engine. The app reaches it through a small WebSocket bridge on `127.0.0.1` that accepts only the `localhost:3000` origin. The bridge is not part of this repository. If you run your own bridge that speaks the same protocol, the app will pick up the native engine when it is connected.
+
+## Scripts
+
+```bash
+npm test               # unit tests (Node test runner)
+npm run lint           # eslint and tsc
+npm run build          # production build
+npm run icons          # rebuild the offline icon bundle after adding an icon
+node --import ./tests/register.mjs scripts/verify-endgames.mjs   # check endgame positions with a UCI engine
+node scripts/fetch-offline-puzzles.mjs                          # refresh the offline puzzle set
 ```
 
 ## Stack
 
-Built with [Next.js](https://nextjs.org/docs), [React](https://react.dev/learn/describing-the-ui), [Material UI](https://mui.com/material-ui/getting-started/overview/), and [TypeScript](https://www.typescriptlang.org/docs/handbook/typescript-from-scratch.html).
+- [Next.js](https://nextjs.org/docs) (pages router, React Compiler) and [React](https://react.dev)
+- [Material UI](https://mui.com/material-ui/getting-started/overview/) and `@mui/x-data-grid`
+- [TypeScript](https://www.typescriptlang.org/), [chess.js](https://github.com/jhlywa/chess.js), [react-chessboard](https://github.com/Clariity/react-chessboard) and [Jotai](https://jotai.org)
+- Stockfish 11 to 18 in WebAssembly, loaded per engine version
 
-Deployed on AWS with [AWS CDK](https://docs.aws.amazon.com/cdk/v2/guide/home.html), see it live [here](https://chesskit.org).
-
-## Running the app in dev mode
-
-#### Using Node.js
-
-> [!IMPORTANT]  
-> At least [Node.js](https://nodejs.org) 22.11 is required.
-
-Install the dependencies :
-
-```bash
-npm i
-```
-
-Run the development server :
-
-```bash
-npm run dev
-```
-
-#### Using Docker
-
-Run the development server :
+## Docker
 
 ```bash
 HOST_UID=$(id -u) HOST_GID=$(id -g) COMMAND=dev docker compose -f ./docker/docker-compose-dev.yml up
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in the browser to see the app running.
-
-The app will automatically refresh on any source file change.
-
-## Lint
-
-Run it with :
-
-```bash
-npm run lint
-```
-
-or with docker :
-
-```bash
-HOST_UID=$(id -u) HOST_GID=$(id -g) COMMAND=lint docker compose -f ./docker/docker-compose-dev.yml up
-```
-
-## Contribute
-
-See [contributing](CONTRIBUTING.md) for details on how to contribute to the project.
-
-## Deploy
-
-To deploy the app, install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and [authenticate](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html), then run :
-
-```bash
-npm run deploy
-```
-
-## License
-
-Chesskit is licensed under the GNU Affero General Public License 3. See [copying](COPYING.md) for
-details.
-
-## Growing thanks to you ❤️
-
-[![Stargazers over time](https://starchart.cc/GuillaumeSD/Chesskit.svg?variant=adaptive)](https://starchart.cc/GuillaumeSD/Chesskit)
-
-## Self-hosting
-
-To run the project locally in production mode, you can use docker and the following command :
+For a production-style local run:
 
 ```bash
 docker compose -f ./docker/docker-compose-prod.yml up
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Credits
+
+Chesskit was created by [Guillaume Sanchez-Dumont](https://github.com/GuillaumeSD) and is maintained with its contributors. The Stockfish builds in `public/engines` are the work of the Stockfish team and are distributed under their own licences. Puzzles come from the [Lichess](https://lichess.org) API.
+
+## License
+
+Chesskit is free software licensed under the GNU Affero General Public License v3.0. See [LICENCE](LICENCE) and [COPYING.md](COPYING.md).
