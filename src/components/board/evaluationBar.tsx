@@ -11,12 +11,14 @@ interface Props {
   height: number;
   boardOrientation?: Color;
   currentPositionAtom?: PrimitiveAtom<CurrentPosition>;
+  resetWhenPending?: boolean;
 }
 
 export default function EvaluationBar({
   height,
   boardOrientation,
   currentPositionAtom = noPositionAtom,
+  resetWhenPending = false,
 }: Props) {
   const [evalBar, setEvalBar] = useState({
     whiteBarPercentage: 50,
@@ -32,6 +34,13 @@ export default function EvaluationBar({
     setEvalBar(evalBar);
   }, [position]);
 
+  const currentLine = position.eval?.lines[0];
+  const displayedEval = resetWhenPending
+    ? position.eval && currentLine && currentLine.depth >= 6
+      ? getEvaluationBarValue(position.eval)
+      : { whiteBarPercentage: 50, label: "?" }
+    : evalBar;
+
   return (
     <Grid
       container
@@ -41,6 +50,8 @@ export default function EvaluationBar({
       height={height}
       border="1px solid black"
       borderRadius={{ xs: "3px", sm: "5px" }}
+      role="img"
+      aria-label={`Position evaluation: ${displayedEval.label}`}
     >
       <Box
         sx={{
@@ -50,12 +61,12 @@ export default function EvaluationBar({
         }}
         height={`${
           boardOrientation === Color.White
-            ? 100 - evalBar.whiteBarPercentage
-            : evalBar.whiteBarPercentage
+            ? 100 - displayedEval.whiteBarPercentage
+            : displayedEval.whiteBarPercentage
         }%`}
         width="100%"
         borderRadius={
-          evalBar.whiteBarPercentage === 100
+          displayedEval.whiteBarPercentage === 100
             ? { xs: "3px", sm: "5px" }
             : { xs: "3px 3px 0 0", sm: "5px 5px 0 0" }
         }
@@ -66,10 +77,11 @@ export default function EvaluationBar({
           width="100%"
           fontSize={{ xs: "0.9rem", sm: "1rem" }}
         >
-          {(evalBar.whiteBarPercentage < 50 &&
+          {(displayedEval.whiteBarPercentage < 50 &&
             boardOrientation === Color.White) ||
-          (evalBar.whiteBarPercentage >= 50 && boardOrientation === Color.Black)
-            ? evalBar.label
+          (displayedEval.whiteBarPercentage >= 50 &&
+            boardOrientation === Color.Black)
+            ? displayedEval.label
             : ""}
         </Typography>
       </Box>
@@ -82,14 +94,14 @@ export default function EvaluationBar({
         }}
         height={`${
           boardOrientation === Color.White
-            ? evalBar.whiteBarPercentage
-            : 100 - evalBar.whiteBarPercentage
+            ? displayedEval.whiteBarPercentage
+            : 100 - displayedEval.whiteBarPercentage
         }%`}
         width="100%"
         display="flex"
         alignItems="flex-end"
         borderRadius={
-          evalBar.whiteBarPercentage === 100
+          displayedEval.whiteBarPercentage === 100
             ? { xs: "3px", sm: "5px" }
             : { xs: "0 0 3px 3px", sm: "0 0 5px 5px" }
         }
@@ -100,10 +112,11 @@ export default function EvaluationBar({
           width="100%"
           fontSize={{ xs: "0.9rem", sm: "1rem" }}
         >
-          {(evalBar.whiteBarPercentage >= 50 &&
+          {(displayedEval.whiteBarPercentage >= 50 &&
             boardOrientation === Color.White) ||
-          (evalBar.whiteBarPercentage < 50 && boardOrientation === Color.Black)
-            ? evalBar.label
+          (displayedEval.whiteBarPercentage < 50 &&
+            boardOrientation === Color.Black)
+            ? displayedEval.label
             : ""}
         </Typography>
       </Box>

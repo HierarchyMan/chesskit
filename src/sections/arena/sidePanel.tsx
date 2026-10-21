@@ -39,6 +39,7 @@ import {
   arenaVarietyAtom,
 } from "./states";
 import { Arena, sideLabel } from "./useArena";
+import AnalysisCard, { MoveFeedback } from "./analysisCard";
 
 export default function ArenaSidePanel({
   arena,
@@ -51,6 +52,7 @@ export default function ArenaSidePanel({
     <Stack spacing={2}>
       {!arena.started && <PlayersCard arena={arena} />}
       {arena.started && <ControlsCard arena={arena} />}
+      <AnalysisCard arena={arena} />
       {arena.started && !arena.isOver && (
         <ProposalCard arena={arena} onArrows={onArrows} />
       )}
@@ -221,7 +223,7 @@ function ControlsCard({ arena }: { arena: Arena }) {
           >
             {arena.running ? "Pause" : "Auto-play"}
           </Button>
-          <Tooltip title="Play the engine's proposed move">
+          <Tooltip title="Play the engine's proposed move" disableInteractive>
             <span>
               <Button
                 variant="outlined"
@@ -233,7 +235,7 @@ function ControlsCard({ arena }: { arena: Arena }) {
               </Button>
             </span>
           </Tooltip>
-          <Tooltip title="Take back the last move">
+          <Tooltip title="Take back the last move" disableInteractive>
             <span>
               <Button
                 variant="outlined"
@@ -333,14 +335,14 @@ function ProposalCard({
 
   const candidates = useMemo(
     () =>
-      proposal.status === "ready"
+      proposal.status === "ready" && proposal.fen === arena.game.fen()
         ? linesToTopMoves(proposal.fen, proposal.choice.lines, 4)
         : [],
-    [proposal]
+    [proposal, arena.game]
   );
 
   useEffect(() => {
-    if (proposal.status !== "ready") {
+    if (proposal.status !== "ready" || proposal.fen !== arena.game.fen()) {
       onArrows([]);
       return;
     }
@@ -353,7 +355,11 @@ function ProposalCard({
       ],
     ];
 
-    if (hovered && hovered !== proposal.choice.uci) {
+    if (
+      hovered &&
+      hovered !== proposal.choice.uci &&
+      candidates.some((candidate) => candidate.uci === hovered)
+    ) {
       arrows.push([
         hovered.slice(0, 2) as Square,
         hovered.slice(2, 4) as Square,
@@ -362,7 +368,7 @@ function ProposalCard({
     }
 
     onArrows(arrows);
-  }, [proposal, hovered, onArrows]);
+  }, [proposal, hovered, onArrows, candidates, arena.game]);
 
   useEffect(() => () => onArrows([]), [onArrows]);
 
@@ -478,18 +484,56 @@ function ProposalCard({
 
 function MovesCard({ arena }: { arena: Arena }) {
   const history = arena.game.history();
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const { analysis } = arena;
+  const selectedIndex = analysis.moves.findIndex(
+    (entry) => entry.key === selectedKey
+  );
+  const index = selectedIndex < 0 ? history.length - 1 : selectedIndex;
+  const entry = analysis.moves[index];
+  const firstMove = analysis.moves[0]?.move;
+
+  useEffect(() => {
+    if (!history.length) setSelectedKey(null);
+  }, [history.length]);
 
   return (
     <Panel title="Moves">
       <MovesList
         moves={history}
-        startsWithBlack={
-          arena.game.history({ verbose: true })[0]?.color === "b"
+        startsWithBlack={firstMove?.color === "b"}
+        firstMoveNumber={Number(firstMove?.before.split(" ")[5] ?? 1)}
+        currentPly={analysis.showAnnotations ? index + 1 : history.length}
+        onSelect={
+          analysis.showAnnotations
+            ? (ply) => setSelectedKey(analysis.moves[ply - 1].key)
+            : undefined
         }
-        currentPly={history.length}
+        annotations={
+          analysis.showAnnotations
+            ? analysis.moves.map((move) => ({
+                classification: move.after?.moveClassification,
+                evaluation: move.after?.lines[0],
+              }))
+            : undefined
+        }
         maxHeight={200}
-        emptyText="No moves yet. Press Next move or Auto-play."
+        emptyText={
+          arena.isOver
+            ? "This starting position is already game over."
+            : "No moves yet. Press Next move or Auto-play."
+        }
       />
+      {analysis.showAnnotations && entry && (
+        <>
+          {selectedIndex >= 0 && index !== history.length - 1 && (
+            <Button size="small" onClick={() => setSelectedKey(null)}>
+              Follow latest move
+            </Button>
+          )}
+          <MoveFeedback entry={entry} arena={arena} />
+        </>
+      )}
     </Panel>
   );
 }

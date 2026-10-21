@@ -7,6 +7,7 @@ import {
   arenaDataAtom,
   arenaFlippedAtom,
   arenaGameAtom,
+  arenaShowAnnotationsAtom,
 } from "@/sections/arena/states";
 import { sideLabel, useArena } from "@/sections/arena/useArena";
 import { Color } from "@/types/enums";
@@ -23,7 +24,7 @@ export default function Arena() {
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const { boardSize, sideBySide } = useBoardLayout({
     sidePanelWidth: SIDE_PANEL_WIDTH,
-    extraWidth: 40,
+    extraWidth: arena.started && arena.analysis.showEvaluation ? 40 : 0,
   });
 
   useHandoff(["fen"], ({ fen }) => {
@@ -51,7 +52,15 @@ export default function Arena() {
         blackPlayer={{ name: sideLabel(arena.black) }}
         boardOrientation={flipped ? Color.Black : Color.White}
         currentPositionAtom={arenaDataAtom}
-        showEvaluationBar={arena.started}
+        showEvaluationBar={arena.started && arena.analysis.showEvaluation}
+        resetEvaluationWhenPending
+        showPlayerMoveIconAtom={arenaShowAnnotationsAtom}
+        showBestMoveArrow={
+          arena.started &&
+          arena.analysis.showBestMove &&
+          arena.analysis.position.lastEval?.bestMove !==
+            arena.analysis.position.lastMove?.lan
+        }
         extraArrows={arrows}
       />
 

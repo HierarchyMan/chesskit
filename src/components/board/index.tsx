@@ -36,6 +36,7 @@ export interface Props {
   showBestMoveArrow?: boolean;
   showPlayerMoveIconAtom?: PrimitiveAtom<boolean>;
   showEvaluationBar?: boolean;
+  resetEvaluationWhenPending?: boolean;
   extraArrows?: Arrow[];
   clocksAtom?: Atom<{ w: number; b: number } | null>;
 }
@@ -52,6 +53,7 @@ export default function Board({
   showBestMoveArrow = false,
   showPlayerMoveIconAtom,
   showEvaluationBar = false,
+  resetEvaluationWhenPending = false,
   extraArrows,
   clocksAtom,
 }: Props) {
@@ -277,6 +279,7 @@ export default function Board({
           height={boardRef?.current?.offsetHeight || boardSize || 400}
           boardOrientation={boardOrientation}
           currentPositionAtom={currentPositionAtom}
+          resetWhenPending={resetEvaluationWhenPending}
         />
       )}
 

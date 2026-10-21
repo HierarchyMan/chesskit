@@ -1,6 +1,15 @@
 import PrettyMoveSan from "@/components/prettyMoveSan";
 import { Box, ButtonBase, Typography } from "@mui/material";
 import { useEffect, useRef } from "react";
+import { LineEval } from "@/types/eval";
+import { MoveClassification } from "@/types/enums";
+import { getLineEvalLabel } from "@/lib/chess";
+import Image from "next/image";
+
+interface MoveAnnotation {
+  classification?: MoveClassification;
+  evaluation?: LineEval;
+}
 
 interface Props {
   moves: string[];
@@ -10,6 +19,7 @@ interface Props {
   onSelect?: (ply: number) => void;
   maxHeight?: number | string;
   emptyText?: string;
+  annotations?: MoveAnnotation[];
 }
 
 export default function MovesList({
@@ -20,6 +30,7 @@ export default function MovesList({
   onSelect,
   maxHeight = 240,
   emptyText = "No moves yet",
+  annotations,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const offset = startsWithBlack ? 1 : 0;
@@ -60,12 +71,18 @@ export default function MovesList({
 
     const color = (ply + offset) % 2 === 0 ? "w" : "b";
     const active = currentPly !== undefined && currentPly - 1 === ply;
+    const annotation = annotations?.[ply];
 
     return (
       <ButtonBase
         data-active={active}
         disabled={!onSelect}
         onClick={() => onSelect?.(ply + 1)}
+        aria-label={
+          annotation
+            ? `${san}: ${annotation.classification ?? "analysis pending"}`
+            : undefined
+        }
         sx={{
           justifyContent: "flex-start",
           px: 0.75,
@@ -74,6 +91,9 @@ export default function MovesList({
           fontSize: "0.95rem",
           backgroundColor: active ? "primary.main" : undefined,
           color: active ? "primary.contrastText" : undefined,
+          gap: 0.5,
+          flexWrap: annotations ? "wrap" : undefined,
+          minWidth: 0,
           "&:hover": {
             backgroundColor: active ? "primary.main" : "action.hover",
           },
@@ -83,6 +103,24 @@ export default function MovesList({
           san={san}
           color={active ? (color === "w" ? "b" : "w") : color}
         />
+        {annotation && (
+          <>
+            {annotation.classification && (
+              <Image
+                src={`/icons/${annotation.classification}.png`}
+                alt=""
+                width={16}
+                height={16}
+              />
+            )}
+            <Typography component="span" variant="caption">
+              {annotation.classification ?? "Pending"}
+              {annotation.evaluation
+                ? ` · ${getLineEvalLabel(annotation.evaluation)}`
+                : ""}
+            </Typography>
+          </>
+        )}
       </ButtonBase>
     );
   };

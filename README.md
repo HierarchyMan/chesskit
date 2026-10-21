@@ -31,6 +31,8 @@ Chesskit lets you play, study, analyse and review chess with Stockfish on any de
 
 **Engine Arena**
 - Pit two engines, or two strengths of one engine, against each other. Step through with *Next*, nudge a move by clicking a candidate or dragging a piece, or let them auto-play.
+- Use **Analysis options** in the side panel to independently toggle the evaluation bar, move annotations, and a best-move arrow. Choices are remembered in this browser.
+- An independent instance of the top-bar analysis engine checks moves at depth 12. Annotations grade both players' moves on the board and in the move list; select any move for its explanation and **Visualize move**. Enabling annotations mid-game also checks earlier moves. Analysis can catch up during fast auto-play; it does not control the players' moves.
 
 **Learn**
 - **Puzzles**: Lichess puzzles, the daily puzzle, an offline set, and puzzles built from your own mistakes.

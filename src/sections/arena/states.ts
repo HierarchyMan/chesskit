@@ -57,6 +57,25 @@ export const arenaVarietyAtom = storedAtom<number>(
     typeof value === "number" && value >= 0 && value <= 1
 );
 
+const isBoolean = (value: unknown): value is boolean =>
+  typeof value === "boolean";
+
+export const arenaShowEvaluationAtom = storedAtom(
+  "arena-show-evaluation",
+  true,
+  isBoolean
+);
+export const arenaShowAnnotationsAtom = storedAtom(
+  "arena-show-annotations",
+  false,
+  isBoolean
+);
+export const arenaShowBestMoveAtom = storedAtom(
+  "arena-show-best-move",
+  false,
+  isBoolean
+);
+
 export const arenaGameAtom = atom(new Chess());
 export const arenaDataAtom = atom<CurrentPosition>({});
 export const arenaStartedAtom = atom(false);

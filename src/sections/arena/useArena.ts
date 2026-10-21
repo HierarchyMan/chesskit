@@ -20,6 +20,7 @@ import {
   arenaVarietyAtom,
   arenaWhiteAtom,
 } from "./states";
+import { useArenaAnalysis } from "./useArenaAnalysis";
 
 export type Proposal =
   | { status: "idle" }
@@ -48,6 +49,7 @@ export const useArena = () => {
   const speed = useAtomValue(arenaSpeedAtom);
   const variety = useAtomValue(arenaVarietyAtom);
   const { playMove, undoMove, reset } = useChessActions(arenaGameAtom);
+  const analysis = useArenaAnalysis(game, started);
 
   const whiteEngine = useEngineState(white.engine);
   const blackEngine = useEngineState(black.engine);
@@ -124,15 +126,8 @@ export const useArena = () => {
   ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const lastMove = game.history({ verbose: true }).at(-1);
-    const lines =
-      proposal.status === "ready" ? proposal.choice.lines : undefined;
-
-    setData({
-      lastMove,
-      eval: lines?.length ? { bestMove: lines[0].pv[0], lines } : undefined,
-    });
-  }, [game, proposal, setData]);
+    setData(analysis.position);
+  }, [analysis.position, setData]);
 
   const acceptProposal = useCallback(() => {
     if (proposal.status !== "ready" || proposal.fen !== fen) return;
@@ -212,6 +207,7 @@ export const useArena = () => {
 
   return {
     game,
+    analysis,
     white,
     black,
     setWhite,
