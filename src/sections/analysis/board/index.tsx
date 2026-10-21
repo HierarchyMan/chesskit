@@ -33,6 +33,7 @@ export default function BoardContainer() {
       showBestMoveArrow={showBestMoveArrow}
       showPlayerMoveIconAtom={showPlayerMoveIconAtom}
       showEvaluationBar={true}
+      resetEvaluationWhenPending
       extraArrows={extraArrows}
     />
   );

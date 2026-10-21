@@ -12,6 +12,7 @@ import {
   positionFromFen,
   positionToFen,
   sanitizePosition,
+  validatePosition,
 } from "@/lib/editorPosition";
 import { Icon } from "@iconify/react";
 import {
@@ -43,6 +44,7 @@ import {
   boardOrientationAtom,
   arrangeBrushAtom,
   editablePositionAtom,
+  arrangeFenDraftAtom,
 } from "../states";
 import { ARRANGE_BOARD_ID } from "./arrangeBoard";
 import { useArrangeMode } from "./useArrangeMode";
@@ -55,11 +57,21 @@ export default function ArrangePanel() {
   const setOrientation = useSetAtom(boardOrientationAtom);
   const appearance = useBoardAppearance();
   const router = useRouter();
-  const { finishArrange, validation } = useArrangeMode();
-  const [draft, setDraft] = useState<string | null>(null);
+  const { finishArrange } = useArrangeMode();
+  const [draft, setDraft] = useAtom(arrangeFenDraftAtom);
   const [copied, setCopied] = useState(false);
 
-  const fen = useMemo(() => positionToFen(position), [position]);
+  const effective = draft === null ? position : parseFenLoose(draft);
+  const validation = effective
+    ? validatePosition(sanitizePosition(effective))
+    : {
+        ok: false,
+        problems: ["Enter a valid FEN before continuing."],
+        warnings: [],
+      };
+  const fen = effective
+    ? positionToFen(sanitizePosition(effective))
+    : positionToFen(position);
   const availableCastling = useMemo(
     () => getCastlingAvailability(position.pieces),
     [position.pieces]
@@ -79,7 +91,7 @@ export default function ArrangePanel() {
   };
 
   const openElsewhere = (path: string) => {
-    setHandoff({ kind: "fen", fen });
+    setHandoff({ kind: "fen", fen }, path);
     router.push(path);
   };
 
@@ -354,7 +366,6 @@ export default function ArrangePanel() {
         label="FEN"
         value={draft ?? fen}
         onChange={(event) => setDraft(event.target.value)}
-        onBlur={applyDraft}
         onKeyDown={(event) => {
           if (event.key === "Enter") applyDraft();
           if (event.key === "Escape") setDraft(null);
@@ -403,7 +414,9 @@ export default function ArrangePanel() {
           variant="contained"
           size="large"
           disabled={!validation.ok}
-          onClick={() => finishArrange()}
+          onClick={() => {
+            if (effective && finishArrange(effective)) setDraft(null);
+          }}
           startIcon={<Icon icon="mdi:play" height={22} />}
         >
           Analyze from here

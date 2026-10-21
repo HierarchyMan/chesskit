@@ -2,17 +2,11 @@ import { formatGameToDatabase } from "@/lib/chess";
 import { GameEval } from "@/types/eval";
 import { Game } from "@/types/game";
 import { Chess } from "chess.js";
-import { openDB, DBSchema, IDBPDatabase } from "idb";
+import { IDBPDatabase } from "idb";
+import { GameDatabaseSchema, getGameDatabase } from "@/lib/gameDatabase";
 import { atom, useAtom } from "jotai";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-
-interface GameDatabaseSchema extends DBSchema {
-  games: {
-    value: Game;
-    key: number;
-  };
-}
 
 const gamesAtom = atom<Game[]>([]);
 const fetchGamesAtom = atom<boolean>(false);
@@ -31,15 +25,16 @@ export const useGameDatabase = (shouldFetchGames?: boolean) => {
 
   useEffect(() => {
     const initDatabase = async () => {
-      const db = await openDB<GameDatabaseSchema>("games", 1, {
-        upgrade(db) {
-          db.createObjectStore("games", { keyPath: "id", autoIncrement: true });
-        },
-      });
-      setDb(db);
+      const db = await getGameDatabase();
+      if (current) setDb(db);
     };
-
-    initDatabase();
+    let current = true;
+    void initDatabase().catch((error) =>
+      console.error("Unable to open game storage", error)
+    );
+    return () => {
+      current = false;
+    };
   }, []);
 
   const loadGames = useCallback(async () => {
@@ -68,13 +63,18 @@ export const useGameDatabase = (shouldFetchGames?: boolean) => {
   );
 
   const setGameEval = useCallback(
-    async (gameId: number, evaluation: GameEval) => {
+    async (gameId: number, evaluation: GameEval, expectedPgn?: string) => {
       if (!db) throw new Error("Database not initialized");
 
-      const game = await db.get("games", gameId);
+      const transaction = db.transaction("games", "readwrite");
+      const game = await transaction.store.get(gameId);
       if (!game) throw new Error("Game not found");
-
-      await db.put("games", { ...game, eval: evaluation });
+      if (expectedPgn !== undefined && game.pgn !== expectedPgn)
+        throw new Error(
+          "The saved game changed before its evaluation could be stored."
+        );
+      await transaction.store.put({ ...game, eval: evaluation });
+      await transaction.done;
 
       loadGames();
     },
@@ -105,15 +105,25 @@ export const useGameDatabase = (shouldFetchGames?: boolean) => {
   const { gameId } = router.query;
 
   useEffect(() => {
+    let current = true;
+    setGameFromUrl(undefined);
     switch (typeof gameId) {
       case "string":
-        getGame(parseInt(gameId)).then((game) => {
-          setGameFromUrl(game);
-        });
+        if (/^\d+$/.test(gameId))
+          void getGame(Number(gameId))
+            .then((game) => {
+              if (current) setGameFromUrl(game);
+            })
+            .catch((error) =>
+              console.error("Unable to load saved game", error)
+            );
         break;
       default:
         setGameFromUrl(undefined);
     }
+    return () => {
+      current = false;
+    };
   }, [gameId, setGameFromUrl, getGame]);
 
   const isReady = db !== null;

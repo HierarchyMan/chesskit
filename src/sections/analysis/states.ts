@@ -2,36 +2,31 @@ import { DEFAULT_ENGINE } from "@/constants";
 import { getRecommendedWorkersNb } from "@/lib/engine/worker";
 import { storedAtom } from "@/lib/storedAtom";
 import { EngineName } from "@/types/enums";
-import { CurrentPosition, GameEval, SavedEvals } from "@/types/eval";
-import {
-  START_FEN,
-  EditablePosition,
-  PieceCode,
-  positionFromFen,
-} from "@/lib/editorPosition";
+import { SavedEvals } from "@/types/eval";
+import { PieceCode } from "@/lib/editorPosition";
 import { MoveSide } from "@/lib/engine/topMoves";
-import { Chess } from "chess.js";
 import { atom } from "jotai";
-import { Arrow } from "react-chessboard/dist/chessboard/types";
 import { atomWithStorage } from "jotai/utils";
 
-export const gameEvalAtom = atom<GameEval | undefined>(undefined);
-export const gameAtom = atom(new Chess());
-export const boardAtom = atom(new Chess());
-export const currentPositionAtom = atom<CurrentPosition>({});
+export {
+  gameAtom,
+  boardAtom,
+  gameEvalAtom,
+  currentPositionAtom,
+  autoPlayAtom,
+  boardArrowsAtom,
+  evaluationProgressAtom,
+  arrangeModeAtom,
+  editablePositionAtom,
+  arrangeFenDraftAtom,
+  boardOrientationAtom,
+} from "./sessionAtoms";
 
-export const boardOrientationAtom = atom(true);
-export const boardArrowsAtom = atom<Arrow[]>([]);
 export const topMovesOpenAtom = atom(false);
 export const topMovesSideAtom = atom<MoveSide>("mover");
-export const autoPlayAtom = atom(false);
 
 export type ArrangeBrush = "hand" | "erase" | PieceCode;
 
-export const arrangeModeAtom = atom(false);
-export const editablePositionAtom = atom<EditablePosition>(
-  positionFromFen(START_FEN)
-);
 export const arrangeBrushAtom = atom<ArrangeBrush>("hand");
 export const arrangeStartFenAtom = atom<string | null>(null);
 
@@ -77,6 +72,5 @@ export const engineWorkersNbAtom = atomWithStorage(
   "engineWorkersNb",
   getRecommendedWorkersNb()
 );
-export const evaluationProgressAtom = atom(0);
 
 export const savedEvalsAtom = atom<SavedEvals>({});

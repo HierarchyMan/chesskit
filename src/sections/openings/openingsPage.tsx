@@ -281,7 +281,7 @@ function LearnPanel({ study }: { study: OpeningStudy }) {
   const { line, steps, ply } = study;
 
   const analyse = () => {
-    setHandoff({ kind: "pgn", pgn: lineToPgn(line, steps) });
+    setHandoff({ kind: "pgn", pgn: lineToPgn(line, steps) }, "/analysis");
     router.push("/analysis");
   };
 

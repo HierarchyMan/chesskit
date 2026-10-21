@@ -45,6 +45,27 @@ Chesskit lets you play, study, analyse and review chess with Stockfish on any de
 - A command palette (`Ctrl+K`).
 - Games and stats are stored in your browser. Nothing is uploaded.
 
+## Preserving analysis
+
+Analysis automatically saves named sessions on this device, including the main
+game, replay position, completed analysis, board orientation and unfinished board
+arrangements. Use **Sessions & options** to rename or reopen a session. The save
+status confirms when storage has finished; failures offer Retry and Save as new
+session. Conflicting edits from another tab cannot silently replace a session.
+
+**Store analysis branches** is off by default. Enable it in Sessions & options
+to preserve alternatives you play while analyzing. Choose a saved line and use
+the existing move navigation or autoplay to replay it. Clear branches keeps the
+main game, with an immediate Undo available. Disabling storage hides branches
+and stops recording new alternatives; previously saved branches remain available
+when re-enabled. Play and Arena do not record analysis branches.
+
+Download a session backup for preservation beyond this browser/device, then use
+Restore session backup to import it as a separate session. Branches are included
+only when branch storage is enabled. Clearing browser data removes local games
+and sessions. Analyze from here commits the editor's current FEN, including a
+typed FEN that has not been submitted with Enter.
+
 ## Getting started
 
 Requirements: [Node.js](https://nodejs.org) 22.11 or newer.

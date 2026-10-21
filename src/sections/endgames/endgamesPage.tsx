@@ -41,7 +41,7 @@ export default function EndgamesPage() {
   const done = ENDGAMES.filter(({ id }) => completed.includes(id)).length;
 
   const launch = (endgame: Endgame) => {
-    setHandoff({ kind: "challenge", id: endgame.id });
+    setHandoff({ kind: "challenge", id: endgame.id }, "/play");
     router.push("/play");
   };
 

@@ -358,11 +358,13 @@ export class UciEngine {
       uciMoves,
       fens
     );
-    const accuracy = computeAccuracy(positions);
+    const startsWithBlack = fens[0].split(" ")[1] === "b";
+    const accuracy = computeAccuracy(positions, startsWithBlack);
     const estimatedElo = computeEstimatedElo(
       positions,
       playersRatings?.white,
-      playersRatings?.black
+      playersRatings?.black,
+      startsWithBlack
     );
 
     return {

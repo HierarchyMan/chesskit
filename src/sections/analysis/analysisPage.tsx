@@ -11,6 +11,10 @@ import {
 } from "@/sections/analysis/states";
 import {
   Box,
+  Alert,
+  Button,
+  CircularProgress,
+  Stack,
   Divider,
   Grid2 as Grid,
   Tab,
@@ -25,13 +29,14 @@ import { ChessboardDnDProvider } from "react-chessboard";
 import TopMovesSection from "@/sections/analysis/panelBody/topMovesSection";
 import GraphTab from "@/sections/analysis/panelBody/graphTab";
 import { PageTitle } from "@/components/pageTitle";
-import { useHandoff } from "@/hooks/useHandoff";
 import { AnalysisEngineProvider } from "./engineContext";
 import ArrangeBoard from "./arrange/arrangeBoard";
 import ArrangePanel from "./arrange/arrangePanel";
 import ModeSwitch from "./arrange/modeSwitch";
 import { useArrangeMode } from "./arrange/useArrangeMode";
-import { useLoadAnalysisGame } from "./hooks/useLoadAnalysisGame";
+import { useAnalysisSources } from "./hooks/useAnalysisSources";
+import { useAnalysisPersistence } from "./hooks/useAnalysisPersistence";
+import SessionPanel from "./sessionPanel";
 
 interface Props {
   title: string;
@@ -39,6 +44,29 @@ interface Props {
 }
 
 export default function AnalysisPage(props: Props) {
+  const persistence = useAnalysisPersistence();
+  if (!persistence.ready) {
+    return (
+      <Stack spacing={2} alignItems="center" p={3}>
+        {persistence.state.error ? (
+          <Alert
+            severity="error"
+            action={<Button onClick={persistence.retry}>Retry</Button>}
+          >
+            {persistence.state.error}
+            <Button onClick={persistence.continueUnsaved}>
+              Open a new session
+            </Button>
+          </Alert>
+        ) : (
+          <>
+            <CircularProgress />
+            <span>Opening analysis sessions…</span>
+          </>
+        )}
+      </Stack>
+    );
+  }
   return (
     <AnalysisEngineProvider>
       <ChessboardDnDProvider>
@@ -57,8 +85,7 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
   const gameEval = useAtomValue(gameEvalAtom);
   const game = useAtomValue(gameAtom);
   const board = useAtomValue(boardAtom);
-  const { enterArrange, finishArrange, leaveArrange } = useArrangeMode();
-  const { loadFen } = useLoadAnalysisGame();
+  const { enterArrange } = useArrangeMode();
 
   const showMovesTab = game.history().length > 0 || board.history().length > 0;
 
@@ -74,15 +101,19 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
 
     if (startInArrangeMode && !arrange) {
       enterArrange();
-    } else if (!startInArrangeMode && arrange && !finishArrange()) {
-      leaveArrange();
     }
-  }, [startInArrangeMode, arrange, enterArrange, finishArrange, leaveArrange]);
+  }, [startInArrangeMode, arrange, enterArrange]);
 
-  useHandoff(["fen"], ({ fen }) => {
-    if (startInArrangeMode) enterArrange(fen);
-    else loadFen(fen);
-  });
+  // Establish the route's default mode before consuming an explicit handoff;
+  // otherwise the default editor effect can overwrite the requested FEN.
+  const loadingSource = useAnalysisSources(startInArrangeMode);
+  if (loadingSource)
+    return (
+      <Stack alignItems="center" spacing={2} p={3}>
+        <CircularProgress />
+        <span>Opening analysis source…</span>
+      </Stack>
+    );
 
   return (
     <Grid container gap={4} justifyContent="space-evenly" alignItems="start">
@@ -110,8 +141,9 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
         rowGap={2}
         height={{
           xs: tab === 1 && !arrange ? "40rem" : "auto",
-          lg: "calc(95vh - 60px)",
+          lg: "auto",
         }}
+        minHeight={{ lg: "calc(95vh - 60px)" }}
         display="flex"
         flexDirection="column"
         flexWrap="nowrap"
@@ -120,6 +152,7 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
           lg: "grow",
         }}
       >
+        <SessionPanel />
         <ModeSwitch />
 
         {arrange ? (

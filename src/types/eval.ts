@@ -17,13 +17,13 @@ export interface LineEval {
 }
 
 export interface Accuracy {
-  white: number;
-  black: number;
+  white: number | null;
+  black: number | null;
 }
 
 export interface EstimatedElo {
-  white: number;
-  black: number;
+  white: number | null;
+  black: number | null;
 }
 
 export interface EngineSettings {

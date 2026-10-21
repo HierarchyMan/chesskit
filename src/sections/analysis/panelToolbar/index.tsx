@@ -1,4 +1,4 @@
-import { Stack, useMediaQuery } from "@mui/material";
+import { Stack } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { boardAtom } from "../states";
 import { useChessActions } from "@/hooks/useChessActions";
@@ -27,8 +27,6 @@ export default function PanelToolBar() {
   useKeyboardShortcut("ArrowDown", () => {
     if (boardHistory.length) resetBoard();
   });
-
-  const isSmOrGreater = useMediaQuery((theme) => theme.breakpoints.up("sm"));
 
   const navigation = (
     <>
@@ -72,23 +70,21 @@ export default function PanelToolBar() {
         direction="row"
         justifyContent={{ xs: "space-around", md: "center" }}
         alignItems="center"
-        gap={{ xs: undefined, md: isSmOrGreater ? 1.5 : 0 }}
+        gap={{ xs: 0, sm: 1.5 }}
         width="100%"
       >
         {navigation}
-        {isSmOrGreater && tools}
       </Stack>
 
-      {!isSmOrGreater && (
-        <Stack
-          direction="row"
-          justifyContent="space-around"
-          alignItems="center"
-          width="100%"
-        >
-          {tools}
-        </Stack>
-      )}
+      <Stack
+        direction="row"
+        justifyContent="center"
+        alignItems="center"
+        gap={{ xs: 0, sm: 1.5 }}
+        width="100%"
+      >
+        {tools}
+      </Stack>
     </Stack>
   );
 }

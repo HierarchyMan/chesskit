@@ -15,6 +15,7 @@ import { getEvaluateGameParams } from "@/lib/chess";
 import { getMovesClassification } from "@/lib/engine/helpers/moveClassification";
 import { openings } from "@/data/openings";
 import { UciEngine } from "@/lib/engine/uciEngine";
+import { isAnalysisPrefix } from "@/lib/analysisSession";
 
 export const useCurrentPosition = (engine: UciEngine | null) => {
   const [currentPosition, setCurrentPosition] = useAtom(currentPositionAtom);
@@ -35,14 +36,13 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
 
     const gameHistory = game.history();
 
-    if (
-      boardHistory.length <= gameHistory.length &&
-      gameHistory.slice(0, boardHistory.length).join() ===
-        boardHistory.map((m) => m.san).join()
-    ) {
+    if (isAnalysisPrefix(board, game)) {
       position.currentMoveIdx = boardHistory.length;
 
-      if (gameEval) {
+      if (
+        gameEval?.positions.length === gameHistory.length + 1 &&
+        gameEval.positions[boardHistory.length]?.lines.length
+      ) {
         const evalIndex = boardHistory.length;
 
         position.eval = {
@@ -170,7 +170,9 @@ export const useCurrentPosition = (engine: UciEngine | null) => {
         });
       };
 
-      getPositionEval();
+      void getPositionEval().catch((error) => {
+        if (isCurrent) console.error("Position analysis failed", error);
+      });
     }
 
     return () => {

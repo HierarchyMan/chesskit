@@ -47,7 +47,7 @@ export default function PuzzlePanel({ trainer }: Props) {
 
   const openWithFen = (path: string) => {
     if (!puzzle) return;
-    setHandoff({ kind: "fen", fen: puzzle.fen });
+    setHandoff({ kind: "fen", fen: puzzle.fen }, path);
     router.push(path);
   };
 

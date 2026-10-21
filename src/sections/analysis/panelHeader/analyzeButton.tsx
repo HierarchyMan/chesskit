@@ -9,8 +9,15 @@ import {
   gameEvalAtom,
   savedEvalsAtom,
 } from "../states";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { getEvaluateGameParams } from "@/lib/chess";
+import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
+import { getEvaluateGameParams, getGameSignature } from "@/lib/chess";
+import {
+  analysisSessionAtom,
+  analysisSourceErrorAtom,
+  analysisFullRequestAtom,
+  analysisTargetKey,
+} from "../sessionAtoms";
+import { loadGameFromText } from "@/lib/pgn";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { LoadingButton } from "@mui/lab";
 import EngineStatusChip from "@/components/engineStatusChip";
@@ -22,6 +29,8 @@ import { Stack, Typography } from "@mui/material";
 import { useAnalysisEngine } from "../engineContext";
 
 export default function AnalyzeButton() {
+  const store = useStore();
+  const setError = useSetAtom(analysisSourceErrorAtom);
   const engineName = useAtomValue(engineNameAtom);
   const engineState = useAnalysisEngine();
   const engine = engineState.engine;
@@ -50,40 +59,75 @@ export default function AnalyzeButton() {
       return;
     }
 
-    const newGameEval = await engine.evaluateGame({
-      ...params,
-      depth: engineDepth,
-      multiPv: engineMultiPv,
-      setEvaluationProgress,
-      playersRatings: {
-        white: white?.rating,
-        black: black?.rating,
-      },
-      workersNb: engineWorkersNb,
+    const sessionId = store.get(analysisSessionAtom)?.id;
+    const signature = getGameSignature(game);
+    const requestId = crypto.randomUUID();
+    store.set(analysisFullRequestAtom, {
+      id: requestId,
+      target: analysisTargetKey(store.get(analysisSessionAtom), game),
     });
+    setError(null);
+    try {
+      const newGameEval = await engine.evaluateGame({
+        ...params,
+        depth: engineDepth,
+        multiPv: engineMultiPv,
+        setEvaluationProgress: (value) => {
+          if (
+            store.get(analysisSessionAtom)?.id === sessionId &&
+            getGameSignature(store.get(gameAtom)) === signature
+          )
+            setEvaluationProgress(value);
+        },
+        playersRatings: {
+          white: white?.rating,
+          black: black?.rating,
+        },
+        workersNb: engineWorkersNb,
+      });
 
-    setEval(newGameEval);
-    setEvaluationProgress(0);
+      if (
+        store.get(analysisSessionAtom)?.id !== sessionId ||
+        getGameSignature(store.get(gameAtom)) !== signature ||
+        store.get(engineNameAtom) !== engineName
+      )
+        return;
+      setEval(newGameEval);
+      setEvaluationProgress(0);
 
-    if (gameFromUrl) {
-      setGameEval(gameFromUrl.id, newGameEval);
+      if (
+        gameFromUrl &&
+        getGameSignature(loadGameFromText(gameFromUrl.pgn)) === signature
+      ) {
+        await setGameEval(gameFromUrl.id, newGameEval, gameFromUrl.pgn);
+      }
+
+      const gameSavedEvals: SavedEvals = params.fens.reduce((acc, fen, idx) => {
+        acc[fen] = { ...newGameEval.positions[idx], engine: engineName };
+        return acc;
+      }, {} as SavedEvals);
+      setSavedEvals((prev) => ({
+        ...prev,
+        ...gameSavedEvals,
+      }));
+
+      logAnalyticsEvent("analyze_game", {
+        engine: engineName,
+        depth: engineDepth,
+        multiPv: engineMultiPv,
+        nbPositions: params.fens.length,
+      });
+    } catch (error) {
+      if (store.get(analysisSessionAtom)?.id === sessionId)
+        setError(
+          error instanceof Error ? error.message : "Game analysis failed."
+        );
+    } finally {
+      if (store.get(analysisFullRequestAtom)?.id === requestId)
+        store.set(analysisFullRequestAtom, null);
+      if (store.get(analysisSessionAtom)?.id === sessionId)
+        setEvaluationProgress(0);
     }
-
-    const gameSavedEvals: SavedEvals = params.fens.reduce((acc, fen, idx) => {
-      acc[fen] = { ...newGameEval.positions[idx], engine: engineName };
-      return acc;
-    }, {} as SavedEvals);
-    setSavedEvals((prev) => ({
-      ...prev,
-      ...gameSavedEvals,
-    }));
-
-    logAnalyticsEvent("analyze_game", {
-      engine: engineName,
-      depth: engineDepth,
-      multiPv: engineMultiPv,
-      nbPositions: params.fens.length,
-    });
   }, [
     engine,
     engineName,
@@ -99,18 +143,16 @@ export default function AnalyzeButton() {
     setSavedEvals,
     white.rating,
     black.rating,
+    store,
+    setError,
   ]);
 
   useEffect(() => {
     setEvaluationProgress(0);
   }, [engine, setEvaluationProgress]);
 
-  // Automatically analyze when a new game is loaded and ready to analyze
-  useEffect(() => {
-    if (!gameEval && readyToAnalyse) {
-      handleAnalyze();
-    }
-  }, [gameEval, readyToAnalyse, handleAnalyze]);
+  // Live position analysis is automatic; a full-line analysis is explicit so
+  // exploring a new continuation does not restart a game-wide search each move.
 
   if (evaluationProgress) return null;
 

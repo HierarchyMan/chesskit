@@ -1,4 +1,4 @@
-import { Grid2 as Grid, Typography } from "@mui/material";
+import { Button, Grid2 as Grid, Typography } from "@mui/material";
 import { Icon } from "@iconify/react";
 import {
   DataGrid,
@@ -24,8 +24,6 @@ export default function GameDatabase() {
   const { games, deleteGame } = useGameDatabase(true);
   const router = useRouter();
 
-  console.log(games);
-
   const handleDeleteGameRow = useCallback(
     (id: GridRowId) => async () => {
       if (typeof id !== "number") {
@@ -41,7 +39,9 @@ export default function GameDatabase() {
       if (typeof id !== "number") {
         throw new Error("Unable to copy game");
       }
-      await navigator.clipboard?.writeText?.(games[id - 1].pgn);
+      const game = games.find((game) => game.id === id);
+      if (!game) throw new Error("Game not found");
+      await navigator.clipboard?.writeText?.(game.pgn);
     },
     [games]
   );
@@ -182,6 +182,9 @@ export default function GameDatabase() {
 
       <Grid container justifyContent="center" alignItems="center" size={12}>
         <LoadGameButton />
+        <Button onClick={() => router.push("/analysis")}>
+          Open analysis sessions
+        </Button>
       </Grid>
 
       <Grid container justifyContent="center" alignItems="center" size={12}>

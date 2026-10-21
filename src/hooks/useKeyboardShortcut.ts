@@ -7,7 +7,10 @@ const isTypingTarget = (target: EventTarget | null): boolean => {
     target.isContentEditable ||
     target.tagName === "INPUT" ||
     target.tagName === "TEXTAREA" ||
-    target.tagName === "SELECT"
+    target.tagName === "SELECT" ||
+    !!target.closest(
+      '[role="combobox"], [role="listbox"], [role="menu"], [role="dialog"]'
+    )
   );
 };
 
@@ -30,7 +33,13 @@ export const useKeyboardShortcut = (
     const accepted = keyList.split("|");
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      )
+        return;
       if (isTypingTarget(event.target)) return;
       if (!accepted.includes(event.key)) return;
 

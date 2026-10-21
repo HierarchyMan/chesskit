@@ -173,8 +173,8 @@ export default function ScanPage() {
   }, [outcome]);
 
   const open = (path: string, asPgn = false) => {
-    if (asPgn) setHandoff({ kind: "pgn", pgn: fenToPgn(fen) });
-    else setHandoff({ kind: "fen", fen });
+    if (asPgn) setHandoff({ kind: "pgn", pgn: fenToPgn(fen) }, path);
+    else setHandoff({ kind: "fen", fen }, path);
     router.push(path);
   };
 

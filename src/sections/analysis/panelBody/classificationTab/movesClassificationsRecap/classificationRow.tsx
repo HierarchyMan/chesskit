@@ -2,7 +2,6 @@ import { Color, MoveClassification } from "@/types/enums";
 import { Grid2 as Grid, Typography } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { boardAtom, gameAtom, gameEvalAtom } from "../../../states";
-import { useMemo } from "react";
 import Image from "next/image";
 import { capitalize } from "@/lib/helpers";
 import { useChessActions } from "@/hooks/useChessActions";
@@ -17,22 +16,21 @@ export default function ClassificationRow({ classification }: Props) {
   const board = useAtomValue(boardAtom);
   const game = useAtomValue(gameAtom);
   const { goToMove } = useChessActions(boardAtom);
+  const moves = game.history({ verbose: true });
 
-  const whiteNb = useMemo(() => {
-    if (!gameEval) return 0;
-    return gameEval.positions.filter(
+  const whiteNb =
+    gameEval?.positions.filter(
       (position, idx) =>
-        idx % 2 !== 0 && position.moveClassification === classification
-    ).length;
-  }, [gameEval, classification]);
+        moves[idx - 1]?.color === "w" &&
+        position.moveClassification === classification
+    ).length ?? 0;
 
-  const blackNb = useMemo(() => {
-    if (!gameEval) return 0;
-    return gameEval.positions.filter(
+  const blackNb =
+    gameEval?.positions.filter(
       (position, idx) =>
-        idx % 2 === 0 && position.moveClassification === classification
-    ).length;
-  }, [gameEval, classification]);
+        moves[idx - 1]?.color === "b" &&
+        position.moveClassification === classification
+    ).length ?? 0;
 
   const handleClick = (color: Color) => {
     if (
@@ -43,9 +41,7 @@ export default function ClassificationRow({ classification }: Props) {
       return;
     }
 
-    const filterColor = (idx: number) =>
-      (idx % 2 !== 0 && color === Color.White) ||
-      (idx % 2 === 0 && color === Color.Black);
+    const filterColor = (idx: number) => moves[idx - 1]?.color === color;
     const moveIdx = board.history().length;
 
     const nextPositionIdx = gameEval.positions.findIndex(

@@ -5,7 +5,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useAtomValue } from "jotai";
-import { boardAtom, gameAtom, gameEvalAtom } from "../../states";
+import { boardAtom, gameEvalAtom } from "../../states";
 import PlayersMetric from "./playersMetric";
 import MoveInfo from "./moveInfo";
 import Opening from "./opening";
@@ -13,17 +13,11 @@ import EngineLines from "./engineLines";
 
 export default function AnalysisTab(props: GridProps) {
   const gameEval = useAtomValue(gameEvalAtom);
-  const game = useAtomValue(gameAtom);
   const board = useAtomValue(boardAtom);
 
   const boardHistory = board.history();
-  const gameHistory = game.history();
 
-  const isGameOver =
-    boardHistory.length > 0 &&
-    (board.isCheckmate() ||
-      board.isDraw() ||
-      boardHistory.join() === gameHistory.join());
+  const isGameOver = boardHistory.length > 0 && board.isGameOver();
 
   return (
     <Grid
@@ -47,16 +41,32 @@ export default function AnalysisTab(props: GridProps) {
         {gameEval && (
           <PlayersMetric
             title="Accuracy"
-            whiteValue={`${gameEval.accuracy.white.toFixed(1)} %`}
-            blackValue={`${gameEval.accuracy.black.toFixed(1)} %`}
+            whiteValue={
+              gameEval.accuracy.white === null
+                ? "—"
+                : `${gameEval.accuracy.white.toFixed(1)} %`
+            }
+            blackValue={
+              gameEval.accuracy.black === null
+                ? "—"
+                : `${gameEval.accuracy.black.toFixed(1)} %`
+            }
           />
         )}
 
         {gameEval?.estimatedElo && (
           <PlayersMetric
             title="Game Rating"
-            whiteValue={Math.round(gameEval.estimatedElo.white)}
-            blackValue={Math.round(gameEval.estimatedElo.black)}
+            whiteValue={
+              gameEval.estimatedElo.white === null
+                ? "—"
+                : Math.round(gameEval.estimatedElo.white)
+            }
+            blackValue={
+              gameEval.estimatedElo.black === null
+                ? "—"
+                : Math.round(gameEval.estimatedElo.black)
+            }
           />
         )}
 

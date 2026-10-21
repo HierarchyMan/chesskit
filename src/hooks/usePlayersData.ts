@@ -1,6 +1,5 @@
 import { Chess } from "chess.js";
 import { PrimitiveAtom, useAtomValue } from "jotai";
-import { useGameDatabase } from "./useGameDatabase";
 import { useQuery } from "@tanstack/react-query";
 import { getChessComUserAvatar } from "@/lib/chessCom";
 import { Player } from "@/types/game";
@@ -9,7 +8,6 @@ export const usePlayersData = (
   gameAtom: PrimitiveAtom<Chess>
 ): { white: Player; black: Player } => {
   const game = useAtomValue(gameAtom);
-  const { gameFromUrl } = useGameDatabase();
   const headers = game.getHeaders();
 
   const headersWhiteName =
@@ -17,15 +15,13 @@ export const usePlayersData = (
   const headersBlackName =
     headers.Black && headers.Black !== "?" ? headers.Black : undefined;
 
-  const whiteName = gameFromUrl?.white?.name || headersWhiteName || "White";
-  const blackName = gameFromUrl?.black?.name || headersBlackName || "Black";
+  const whiteName = headersWhiteName || "White";
+  const blackName = headersBlackName || "Black";
 
-  const whiteElo =
-    gameFromUrl?.white?.rating || Number(headers.WhiteElo) || undefined;
-  const blackElo =
-    gameFromUrl?.black?.rating || Number(headers.BlackElo) || undefined;
+  const whiteElo = Number(headers.WhiteElo) || undefined;
+  const blackElo = Number(headers.BlackElo) || undefined;
 
-  const siteHeader = gameFromUrl?.site || headers.Site || "unknown";
+  const siteHeader = headers.Site || "unknown";
   const isChessCom = siteHeader.toLowerCase().includes("chess.com");
 
   const whiteAvatarUrl = usePlayerAvatarUrl(

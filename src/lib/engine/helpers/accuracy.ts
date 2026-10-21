@@ -7,15 +7,29 @@ import {
 import { Accuracy, PositionEval } from "@/types/eval";
 import { getPositionWinPercentage } from "./winPercentage";
 
-export const computeAccuracy = (positions: PositionEval[]): Accuracy => {
+export const computeAccuracy = (
+  positions: PositionEval[],
+  startsWithBlack = false
+): Accuracy => {
   const positionsWinPercentage = positions.map(getPositionWinPercentage);
 
   const weights = getAccuracyWeights(positionsWinPercentage);
 
-  const movesAccuracy = getMovesAccuracy(positionsWinPercentage);
+  const movesAccuracy = getMovesAccuracy(
+    positionsWinPercentage,
+    startsWithBlack
+  );
 
-  const whiteAccuracy = getPlayerAccuracy(movesAccuracy, weights, "white");
-  const blackAccuracy = getPlayerAccuracy(movesAccuracy, weights, "black");
+  const whiteAccuracy = getPlayerAccuracy(
+    movesAccuracy,
+    weights,
+    startsWithBlack ? 1 : 0
+  );
+  const blackAccuracy = getPlayerAccuracy(
+    movesAccuracy,
+    weights,
+    startsWithBlack ? 0 : 1
+  );
 
   return {
     white: whiteAccuracy,
@@ -26,13 +40,13 @@ export const computeAccuracy = (positions: PositionEval[]): Accuracy => {
 const getPlayerAccuracy = (
   movesAccuracy: number[],
   weights: number[],
-  player: "white" | "black"
-): number => {
-  const remainder = player === "white" ? 0 : 1;
+  remainder: number
+): number | null => {
   const playerAccuracies = movesAccuracy.filter(
     (_, index) => index % 2 === remainder
   );
   const playerWeights = weights.filter((_, index) => index % 2 === remainder);
+  if (!playerAccuracies.length) return null;
 
   const weightedMean = getWeightedMean(playerAccuracies, playerWeights);
   const harmonicMean = getHarmonicMean(
@@ -77,10 +91,13 @@ const getAccuracyWeights = (movesWinPercentage: number[]): number[] => {
   return weights;
 };
 
-const getMovesAccuracy = (movesWinPercentage: number[]): number[] =>
+const getMovesAccuracy = (
+  movesWinPercentage: number[],
+  startsWithBlack: boolean
+): number[] =>
   movesWinPercentage.slice(1).map((winPercent, index) => {
     const lastWinPercent = movesWinPercentage[index];
-    const isWhiteMove = index % 2 === 0;
+    const isWhiteMove = index % 2 === (startsWithBlack ? 1 : 0);
     const winDiff = isWhiteMove
       ? Math.max(0, lastWinPercent - winPercent)
       : Math.max(0, winPercent - lastWinPercent);

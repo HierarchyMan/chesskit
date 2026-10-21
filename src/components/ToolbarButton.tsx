@@ -19,13 +19,14 @@ export const ToolbarButton = ({
   const paddingX = `${Math.round(20 - (iconHeight - 24) / 2)}px`;
 
   return (
-    <Tooltip title={tooltip}>
+    <Tooltip title={tooltip} disableInteractive>
       <span>
         <IconButton
           onClick={onClick}
           disabled={disabled}
+          aria-label={tooltip}
           sx={{
-            paddingX,
+            paddingX: { xs: "8px", sm: paddingX },
             borderRadius: "8px",
             width: "auto",
             height: "46px",

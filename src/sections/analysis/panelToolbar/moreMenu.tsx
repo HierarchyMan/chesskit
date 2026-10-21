@@ -25,7 +25,7 @@ export default function MoreMenu() {
 
   const openWithFen = (path: string) => {
     close();
-    setHandoff({ kind: "fen", fen: board.fen() });
+    setHandoff({ kind: "fen", fen: board.fen() }, path);
     router.push(path);
   };
 
@@ -71,11 +71,15 @@ export default function MoreMenu() {
 
   return (
     <>
-      <Tooltip title="More actions">
+      <Tooltip title="More actions" disableInteractive>
         <IconButton
           onClick={(event) => setAnchorEl(event.currentTarget)}
           aria-label="More actions"
-          sx={{ paddingX: "20px", borderRadius: "8px", height: "46px" }}
+          sx={{
+            paddingX: { xs: "8px", sm: "20px" },
+            borderRadius: "8px",
+            height: "46px",
+          }}
         >
           <Icon icon="mdi:dots-horizontal" height={24} />
         </IconButton>

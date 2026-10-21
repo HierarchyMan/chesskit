@@ -51,6 +51,7 @@
     "eslint-plugin-deprecation": "^3.0.0",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-prettier": "^5.2.1",
+    "fake-indexeddb": "^6.2.6",
     "typescript": "^5.7.2"
   }
 }

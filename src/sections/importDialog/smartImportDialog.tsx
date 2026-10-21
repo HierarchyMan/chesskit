@@ -94,17 +94,20 @@ export default function SmartImportDialog() {
   };
 
   const openPgn = (pgn: string, path: string) => {
-    setHandoff({
-      kind: "pgn",
-      pgn,
-      orientation:
-        detected.kind === "lichess" ? detected.orientation : undefined,
-    });
+    setHandoff(
+      {
+        kind: "pgn",
+        pgn,
+        orientation:
+          detected.kind === "lichess" ? detected.orientation : undefined,
+      },
+      path
+    );
     go(path);
   };
 
   const openFen = (fen: string, path: string) => {
-    setHandoff({ kind: "fen", fen });
+    setHandoff({ kind: "fen", fen }, path);
     go(path);
   };
 
@@ -252,7 +255,7 @@ export default function SmartImportDialog() {
                 variant="contained"
                 startIcon={<Icon icon="mdi:image-search-outline" height={20} />}
                 onClick={() => {
-                  setHandoff({ kind: "image", dataUrl: image });
+                  setHandoff({ kind: "image", dataUrl: image }, "/scan");
                   go("/scan");
                 }}
               >

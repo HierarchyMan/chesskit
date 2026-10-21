@@ -4,22 +4,26 @@ import { EstimatedElo, PositionEval } from "@/types/eval";
 export const computeEstimatedElo = (
   positions: PositionEval[],
   whiteElo?: number,
-  blackElo?: number
+  blackElo?: number,
+  startsWithBlack = false
 ): EstimatedElo | undefined => {
   if (positions.length < 2) {
     return undefined;
   }
 
-  const { whiteCpl, blackCpl } = getPlayersAverageCpl(positions);
+  const { whiteCpl, blackCpl } = getPlayersAverageCpl(
+    positions,
+    startsWithBlack
+  );
 
-  const whiteEstimatedElo = getEloFromRatingAndCpl(
-    whiteCpl,
-    whiteElo ?? blackElo
-  );
-  const blackEstimatedElo = getEloFromRatingAndCpl(
-    blackCpl,
-    blackElo ?? whiteElo
-  );
+  const whiteEstimatedElo =
+    whiteCpl === null
+      ? null
+      : getEloFromRatingAndCpl(whiteCpl, whiteElo ?? blackElo);
+  const blackEstimatedElo =
+    blackCpl === null
+      ? null
+      : getEloFromRatingAndCpl(blackCpl, blackElo ?? whiteElo);
 
   return { white: whiteEstimatedElo, black: blackEstimatedElo };
 };
@@ -39,15 +43,16 @@ const getPositionCp = (position: PositionEval): number => {
 };
 
 const getPlayersAverageCpl = (
-  positions: PositionEval[]
-): { whiteCpl: number; blackCpl: number } => {
+  positions: PositionEval[],
+  startsWithBlack: boolean
+): { whiteCpl: number | null; blackCpl: number | null } => {
   let previousCp = getPositionCp(positions[0]);
 
   const { whiteCpl, blackCpl } = positions.slice(1).reduce(
     (acc, position, index) => {
       const cp = getPositionCp(position);
 
-      if (index % 2 === 0) {
+      if (index % 2 === (startsWithBlack ? 1 : 0)) {
         acc.whiteCpl += cp > previousCp ? 0 : Math.min(previousCp - cp, 1000);
       } else {
         acc.blackCpl += cp < previousCp ? 0 : Math.min(cp - previousCp, 1000);
@@ -59,9 +64,13 @@ const getPlayersAverageCpl = (
     { whiteCpl: 0, blackCpl: 0 }
   );
 
+  const firstCount = Math.ceil((positions.length - 1) / 2);
+  const secondCount = Math.floor((positions.length - 1) / 2);
+  const whiteCount = startsWithBlack ? secondCount : firstCount;
+  const blackCount = startsWithBlack ? firstCount : secondCount;
   return {
-    whiteCpl: whiteCpl / Math.ceil((positions.length - 1) / 2),
-    blackCpl: blackCpl / Math.floor((positions.length - 1) / 2),
+    whiteCpl: whiteCount ? whiteCpl / whiteCount : null,
+    blackCpl: blackCount ? blackCpl / blackCount : null,
   };
 };
 

@@ -1,43 +1,66 @@
-import { useChessActions } from "@/hooks/useChessActions";
-import { getGameSignature } from "@/lib/chess";
 import { fenToPgn, loadGameFromText } from "@/lib/pgn";
 import { GameEval } from "@/types/eval";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useCallback, useMemo } from "react";
-import {
-  boardAtom,
-  boardOrientationAtom,
-  gameAtom,
-  gameEvalAtom,
-} from "../states";
+import { useCallback, useRef } from "react";
+import { loadAnalysisGameAtom } from "../sessionAtoms";
+import { useRouter } from "next/router";
+import { boardAtom, boardOrientationAtom, arrangeModeAtom } from "../states";
 
 export const useLoadAnalysisGame = () => {
-  const game = useAtomValue(gameAtom);
+  const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const board = useAtomValue(boardAtom);
   const orientation = useAtomValue(boardOrientationAtom);
-  const { setPgn: setGamePgn } = useChessActions(gameAtom);
-  const { resetToStartingPosition: resetBoard } = useChessActions(boardAtom);
-  const setEval = useSetAtom(gameEvalAtom);
+  const load = useSetAtom(loadAnalysisGameAtom);
+  const setArrange = useSetAtom(arrangeModeAtom);
   const setBoardOrientation = useSetAtom(boardOrientationAtom);
 
-  const currentSignature = useMemo(() => getGameSignature(game), [game]);
+  const commitPgn = useCallback(
+    (
+      pgn: string,
+      newOrientation?: boolean,
+      gameEval?: GameEval,
+      sourceGameId?: number
+    ) => {
+      const gameFromPgn = loadGameFromText(pgn);
+      load({
+        game: gameFromPgn,
+        orientation: newOrientation,
+        evaluation: gameEval,
+        sourceGameId,
+      });
+      setBoardOrientation(newOrientation ?? true);
+      setArrange(false);
+    },
+    [load, setBoardOrientation, setArrange]
+  );
 
   const loadPgn = useCallback(
-    (pgn: string, newOrientation?: boolean, gameEval?: GameEval) => {
-      const gameFromPgn = loadGameFromText(pgn);
-      if (currentSignature === getGameSignature(gameFromPgn)) return;
-
-      resetBoard(pgn);
-      setEval(gameEval);
-      setGamePgn(pgn);
-      setBoardOrientation(newOrientation ?? true);
+    (...params: Parameters<typeof commitPgn>) => {
+      commitPgn(...params);
+      const currentRouter = routerRef.current;
+      if (Object.keys(currentRouter.query).length)
+        void currentRouter.replace(
+          { pathname: currentRouter.pathname, query: {} },
+          undefined,
+          { shallow: true, scroll: false }
+        );
     },
-    [currentSignature, resetBoard, setGamePgn, setEval, setBoardOrientation]
+    [commitPgn]
   );
 
   const loadFen = useCallback(
-    (fen: string) => loadPgn(fenToPgn(fen), orientation),
-    [loadPgn, orientation]
+    (fen: string, goToAnalysis = false) => {
+      commitPgn(fenToPgn(fen), orientation);
+      const pathname = goToAnalysis ? "/analysis" : router.pathname;
+      if (pathname !== router.pathname || Object.keys(router.query).length)
+        void router.replace({ pathname, query: {} }, undefined, {
+          shallow: pathname === router.pathname,
+          scroll: false,
+        });
+    },
+    [commitPgn, orientation, router]
   );
 
   const clearMoves = useCallback(() => loadFen(board.fen()), [loadFen, board]);
