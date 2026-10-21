@@ -28,13 +28,14 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { Arrow, Square } from "react-chessboard/dist/chessboard/types";
 import {
   ARENA_SPEEDS,
   ArenaSide,
+  arenaEditingPlayersAtom,
   arenaFlippedAtom,
   arenaSpeedAtom,
   arenaVarietyAtom,
@@ -49,15 +50,24 @@ export default function ArenaSidePanel({
   arena: Arena;
   onArrows: (arrows: Arrow[]) => void;
 }) {
+  const editingPlayers = useAtomValue(arenaEditingPlayersAtom);
+  // Shown under the card that holds its button: Controls while playing, Result
+  // once the game is over.
+  const playersEditor = arena.started && editingPlayers && (
+    <PlayersEditCard arena={arena} />
+  );
+
   return (
     <Stack spacing={2}>
       {!arena.started && <PlayersCard arena={arena} />}
       {arena.started && <ControlsCard arena={arena} />}
+      {!arena.isOver && playersEditor}
       <AnalysisCard arena={arena} />
       {arena.started && !arena.isOver && (
         <ProposalCard arena={arena} onArrows={onArrows} />
       )}
       {arena.started && arena.isOver && <ResultCard arena={arena} />}
+      {arena.isOver && playersEditor}
       {arena.started && <MovesCard arena={arena} />}
       {arena.started && <PlayersSummary arena={arena} />}
     </Stack>
@@ -191,10 +201,58 @@ function PlayersCard({ arena }: { arena: Arena }) {
   );
 }
 
+function PlayersEditCard({ arena }: { arena: Arena }) {
+  const setEditingPlayers = useSetAtom(arenaEditingPlayersAtom);
+
+  return (
+    <Panel title={<Typography fontWeight={600}>Players</Typography>}>
+      <Stack spacing={2.5}>
+        <SideSetup
+          title="White"
+          side={arena.white}
+          onChange={arena.setWhite}
+          state={arena.whiteEngine}
+        />
+        <SideSetup
+          title="Black"
+          side={arena.black}
+          onChange={arena.setBlack}
+          state={arena.blackEngine}
+        />
+
+        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+          {arena.isOver
+            ? "The finished game is kept. These players are used for the next match."
+            : "The game goes on. Each new setting applies from the current position, so the next move uses it."}
+        </Typography>
+
+        <Stack direction="row" gap={1} flexWrap="wrap">
+          <Button
+            size="small"
+            color="inherit"
+            startIcon={<Icon icon="mdi:swap-horizontal" height={18} />}
+            onClick={arena.swapSides}
+          >
+            Swap sides
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => setEditingPlayers(false)}
+          >
+            Done
+          </Button>
+        </Stack>
+      </Stack>
+    </Panel>
+  );
+}
+
 function ControlsCard({ arena }: { arena: Arena }) {
   const [speed, setSpeed] = useAtom(arenaSpeedAtom);
   const [variety, setVariety] = useAtom(arenaVarietyAtom);
   const [, setFlipped] = useAtom(arenaFlippedAtom);
+  const [editingPlayers, setEditingPlayers] = useAtom(arenaEditingPlayersAtom);
 
   const canAdvance = arena.proposal.status === "ready" && !arena.isOver;
 
@@ -272,13 +330,24 @@ function ControlsCard({ arena }: { arena: Arena }) {
           >
             Restart
           </Button>
+          {!arena.isOver && (
+            <Button
+              size="small"
+              color="inherit"
+              aria-expanded={editingPlayers}
+              startIcon={<Icon icon="mdi:cog-outline" height={18} />}
+              onClick={() => setEditingPlayers(!editingPlayers)}
+            >
+              {editingPlayers ? "Hide players" : "Change players"}
+            </Button>
+          )}
           <Button
             size="small"
             color="inherit"
-            startIcon={<Icon icon="mdi:cog-outline" height={18} />}
+            startIcon={<Icon icon="mdi:plus" height={18} />}
             onClick={arena.stop}
           >
-            Change players
+            New match
           </Button>
         </Stack>
 
@@ -554,6 +623,7 @@ function PlayersSummary({ arena }: { arena: Arena }) {
 function ResultCard({ arena }: { arena: Arena }) {
   const router = useRouter();
   const { addGame } = useGameDatabase();
+  const [editingPlayers, setEditingPlayers] = useAtom(arenaEditingPlayersAtom);
   const { result } = arena;
 
   const headline = result.winner
@@ -563,11 +633,6 @@ function ResultCard({ arena }: { arena: Arena }) {
   const analyze = async () => {
     const id = await addGame(arena.finishedGame());
     router.push({ pathname: "/analysis", query: { gameId: id } });
-  };
-
-  const rematch = () => {
-    arena.swapSides();
-    arena.start();
   };
 
   return (
@@ -586,11 +651,19 @@ function ResultCard({ arena }: { arena: Arena }) {
           <Button variant="contained" onClick={analyze}>
             Analyze game
           </Button>
-          <Button variant="outlined" onClick={rematch}>
+          <Button variant="outlined" onClick={() => arena.rematch()}>
             Rematch, swap colours
           </Button>
+          <Button
+            variant="outlined"
+            color="inherit"
+            aria-expanded={editingPlayers}
+            onClick={() => setEditingPlayers(!editingPlayers)}
+          >
+            {editingPlayers ? "Hide players" : "Change players"}
+          </Button>
           <Button variant="outlined" color="inherit" onClick={arena.stop}>
-            Change players
+            New match
           </Button>
         </Stack>
       </Stack>

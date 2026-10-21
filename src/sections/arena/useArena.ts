@@ -12,6 +12,7 @@ import {
   ArenaSide,
   arenaBlackAtom,
   arenaDataAtom,
+  arenaEditingPlayersAtom,
   arenaGameAtom,
   arenaRunningAtom,
   arenaSpeedAtom,
@@ -20,6 +21,7 @@ import {
   arenaVarietyAtom,
   arenaWhiteAtom,
 } from "./states";
+import { playerChangeEffect, playerChangeNote } from "./playerChanges";
 import { useArenaAnalysis } from "./useArenaAnalysis";
 
 export type Proposal =
@@ -41,14 +43,16 @@ export const sideLabel = (side: ArenaSide): string => {
 export const useArena = () => {
   const game = useAtomValue(arenaGameAtom);
   const setData = useSetAtom(arenaDataAtom);
-  const [white, setWhite] = useAtom(arenaWhiteAtom);
-  const [black, setBlack] = useAtom(arenaBlackAtom);
+  const [white, setWhiteSide] = useAtom(arenaWhiteAtom);
+  const [black, setBlackSide] = useAtom(arenaBlackAtom);
   const [started, setStarted] = useAtom(arenaStartedAtom);
   const [running, setRunning] = useAtom(arenaRunningAtom);
   const [startFen, setStartFen] = useAtom(arenaStartFenAtom);
+  const setEditingPlayers = useSetAtom(arenaEditingPlayersAtom);
   const speed = useAtomValue(arenaSpeedAtom);
   const variety = useAtomValue(arenaVarietyAtom);
-  const { playMove, undoMove, reset } = useChessActions(arenaGameAtom);
+  const { playMove, undoMove, reset, setComment } =
+    useChessActions(arenaGameAtom);
   const analysis = useArenaAnalysis(game, started);
 
   const whiteEngine = useEngineState(white.engine);
@@ -158,52 +162,98 @@ export const useArena = () => {
     return () => clearTimeout(timer);
   }, [running, isOver, proposal, fen, speed, setRunning]);
 
-  const start = useCallback(
-    (fromFen?: string) => {
-      const fenToUse = fromFen ?? startFen;
+  // A player change must never restart the match. Before the first move the
+  // game is rebuilt so its headers name the new players; after it, the change
+  // is noted on the current position. See playerChangeEffect.
+  const notePlayerChange = (nextWhite: ArenaSide, nextBlack: ArenaSide) => {
+    const effect = playerChangeEffect({
+      started,
+      over: game.isGameOver(),
+      moveCount: game.history().length,
+    });
+
+    // With no moves, the current position is the match's own start. The
+    // startFen atom may already point elsewhere, for example after a handoff.
+    if (effect === "rebuild-start") {
       reset({
-        fen: fenToUse,
-        white: { name: sideLabel(white) },
-        black: { name: sideLabel(black) },
+        fen: game.fen(),
+        white: { name: sideLabel(nextWhite) },
+        black: { name: sideLabel(nextBlack) },
       });
-      setStartFen(fenToUse);
+    } else if (effect === "note-position") {
+      setComment(playerChangeNote(sideLabel(nextWhite), sideLabel(nextBlack)));
+    }
+  };
+
+  const setWhite = (side: ArenaSide) => {
+    setWhiteSide(side);
+    notePlayerChange(side, black);
+  };
+
+  const setBlack = (side: ArenaSide) => {
+    setBlackSide(side);
+    notePlayerChange(white, side);
+  };
+
+  const beginMatch = useCallback(
+    (matchWhite: ArenaSide, matchBlack: ArenaSide, fen: string | undefined) => {
+      reset({
+        fen,
+        white: { name: sideLabel(matchWhite) },
+        black: { name: sideLabel(matchBlack) },
+      });
+      setStartFen(fen);
       setRunning(false);
       setStarted(true);
     },
-    [startFen, white, black, reset, setStartFen, setRunning, setStarted]
+    [reset, setStartFen, setRunning, setStarted]
+  );
+
+  const start = useCallback(
+    (fromFen?: string) => beginMatch(white, black, fromFen ?? startFen),
+    [beginMatch, white, black, startFen]
   );
 
   const stop = useCallback(() => {
     setRunning(false);
     setStarted(false);
+    setEditingPlayers(false);
     reset({ fen: startFen, noHeaders: true });
-  }, [startFen, reset, setRunning, setStarted]);
+  }, [startFen, reset, setRunning, setStarted, setEditingPlayers]);
 
   const takeBack = useCallback(() => {
     setRunning(false);
     undoMove();
   }, [setRunning, undoMove]);
 
-  const swapSides = useCallback(() => {
-    const currentWhite = white;
-    setWhite(black);
-    setBlack(currentWhite);
-  }, [white, black, setWhite, setBlack]);
+  const swapSides = () => {
+    setWhiteSide(black);
+    setBlackSide(white);
+    notePlayerChange(black, white);
+  };
+
+  // Passes the swapped players directly. Calling swapSides then start would
+  // name the players from this render's closure, before the swap.
+  const rematch = useCallback(() => {
+    setWhiteSide(black);
+    setBlackSide(white);
+    beginMatch(black, white, startFen);
+  }, [black, white, startFen, beginMatch, setWhiteSide, setBlackSide]);
 
   const result = useMemo(() => getGameResult(game, null), [game]);
 
+  // The game already carries the headers written when its match began, so a
+  // later player change does not rename the saved game.
   const finishedGame = useCallback((): Chess => {
     const copy = new Chess();
     copy.loadPgn(game.pgn());
     setGameHeaders(copy, {
-      white: { name: sideLabel(white) },
-      black: { name: sideLabel(black) },
       ended: result.over
         ? { result: result.result, termination: result.reason }
         : undefined,
     });
     return copy;
-  }, [game, white, black, result]);
+  }, [game, result]);
 
   return {
     game,
@@ -229,6 +279,7 @@ export const useArena = () => {
     stop,
     takeBack,
     swapSides,
+    rematch,
     finishedGame,
     startFen,
     setStartFen,

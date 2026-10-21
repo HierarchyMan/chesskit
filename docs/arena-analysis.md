@@ -35,7 +35,7 @@ takeback/replay, but abandoned branches cannot appear in the move list.
 - Evaluation bar: default on, matching the existing arena; independent evaluation.
 - Move annotations: default off; board badge/highlight, named move-list grades,
   evaluation after each move, selected move summary and existing Visualize dialog.
-- Best-move arrow: default off; previous position's alternative, integrated with
+- Best-move arrow: default on (changed by the follow-up below); previous position's alternative, integrated with
   existing proposal/hover arrows and arrow deduplication.
 - Evaluator loading/error/progress and Retry; no fabricated scores while pending.
 - Catch up existing history if annotations are enabled partway through a game.
@@ -49,7 +49,8 @@ takeback/replay, but abandoned branches cannot appear in the move list.
 | Top-bar engine change | separate useEngineState instance | Cache/session replaced; playing bots are untouched |
 | Current evaluation completes | FEN-matched projection → arenaDataAtom | Shared EvaluationBar and square renderer show this position only |
 | Grade completes | shared classifier → history entry | Move list/summary and Visualize use the same move and evaluations |
-| Takeback/restart/change players | new current history | Old annotations/arrow removed; reusable cached raw scores remain safe |
+| Takeback/restart/new match | new current history | Old annotations/arrow removed; reusable cached raw scores remain safe |
+| Change players mid-match | same history; later moves use the new engine | Nothing is removed; the change is noted as a PGN comment on the current position |
 | All switches off/unmount | dispose evaluator session | No new searches and no late UI writes; bots continue |
 | Evaluator failure | visible error + Retry | Only evaluator restarts; game/proposal/running state preserved |
 
@@ -60,7 +61,7 @@ inspect a historical move's explanation. Enable annotations later to backfill.
 Fast auto-play may outrun analysis; pending moves remain explicitly pending and
 completed evaluations must not be discarded every time another move arrives.
 Pause stops auto-play while analysis can finish. Takeback and alternate moves
-project the new branch. Restart/change players remove previous game summaries.
+project the new branch. Restart and new match remove previous game summaries; changing players keeps them.
 Checkmate and every draw use chess.js' terminal result, including repetition from
 the full game, rather than searching a finished position. Disabling and retrying
 must prevent old engine callbacks from modifying the visible evaluator state.
@@ -304,3 +305,57 @@ map upload is configured. README usage matches the implemented controls.
 The accepted feature scope is complete. The user also requested commit/push to
 the existing branch; repository history and remote tracking provide that
 delivery evidence after this pre-commit feature record.
+
+## Follow-up: shared options, Analysis parity and live card details
+
+Problem: the Analysis page always showed its evaluation bar, and its best-move
+arrow and quality-icon switches sat in Settings under the Engine tab, so the
+page lacked the card the arena has. The arena card showed no accuracy, opening
+name or text naming the better move, though the Analysis page offers all three.
+
+Logic: one definition serves both modes. `createAnalysisOptionAtoms` in
+src/lib/analysisOptions.ts builds the three stored switches from per-mode keys
+and defaults. src/components/analysisOptions/analysisOptionsPanel.tsx renders
+them with per-mode copy; a detail row appears only while its switch is on.
+Storage stays separate: the arena keeps its arena-* keys, and Analysis keeps
+show-arrow-best-move and show-icon-player-move so saved choices survive, with
+show-evaluation-bar added. Defaults: Analysis is all on, which matches its old
+behavior. The arena is evaluation on, annotations off, best-move on. Best-move
+default changed from off to on, as requested; existing saved choices are kept.
+
+One rule decides when a better alternative exists: `getBestMoveHint` in
+src/lib/bestMoveHint.ts. The board arrow and the arena text both use it. It
+hides an alternative equal to the played move, and grades that already mean
+best, book, forced or perfect (the board's existing rule; the played-move check
+is new to the board and only matters when no grade exists).
+
+Analysis page: the card sits in the Analysis tab
+(src/sections/analysis/panelBody/analysisTab/analysisOptionsCard.tsx). The
+evaluation switch only hides the bar; the analysis engine keeps running. The
+annotations switch controls the board's quality icon, not the Moves or Graph
+grades, which remain core analysis. The arrow and icon switches were removed
+from Settings to avoid two controls for one setting.
+
+Arena additions, each derived from data the card already computes:
+- Accuracy per side, shown with annotations on. `getArenaAccuracy` uses the
+  Analysis accuracy function over every position from the start to the current
+  move. Any pending position shows a dash, never a partial score.
+- Opening name, the most recent book position in the current history
+  (`getArenaOpening`). The classifier's opening label only sees a three-position
+  window, so it cannot name an opening reached many moves earlier.
+- "Better alternative" text under the best-move switch, using the same rule as
+  the arrow.
+
+Not added: engine lines (the arena's proposal list already shows the mover's
+candidates, and a second engine's lines would conflict with it), an Elo
+estimate, an evaluation graph and board history navigation. The design keeps the
+live board separate from selected history.
+
+Evidence: npm test 383 passed, 0 failed (367 baseline plus 16 new in
+tests/arenaInsights.test.ts, tests/bestMoveHint.test.ts and
+tests/analysisOptions.test.ts). npm run lint and npm run build exit 0. Static
+build checked in the browser: analysis options default, toggle and persist;
+the best-move arrow draws with the switch on and disappears with it off;
+Settings no longer lists the moved switches; arena defaults hold; accuracy
+reaches numbers (91.3 % and 99.8 % in the final run) and the opening name and
+better-alternative line appear; no page errors.

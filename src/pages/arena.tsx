@@ -4,10 +4,10 @@ import { useBoardLayout } from "@/hooks/useBoardLayout";
 import { useHandoff } from "@/hooks/useHandoff";
 import ArenaSidePanel from "@/sections/arena/sidePanel";
 import {
+  arenaAnalysisOptionAtoms,
   arenaDataAtom,
   arenaFlippedAtom,
   arenaGameAtom,
-  arenaShowAnnotationsAtom,
 } from "@/sections/arena/states";
 import { sideLabel, useArena } from "@/sections/arena/useArena";
 import { Color } from "@/types/enums";
@@ -54,13 +54,8 @@ export default function Arena() {
         currentPositionAtom={arenaDataAtom}
         showEvaluationBar={arena.started && arena.analysis.showEvaluation}
         resetEvaluationWhenPending
-        showPlayerMoveIconAtom={arenaShowAnnotationsAtom}
-        showBestMoveArrow={
-          arena.started &&
-          arena.analysis.showBestMove &&
-          arena.analysis.position.lastEval?.bestMove !==
-            arena.analysis.position.lastMove?.lan
-        }
+        showPlayerMoveIconAtom={arenaAnalysisOptionAtoms.annotations}
+        showBestMoveArrow={arena.started && arena.analysis.showBestMove}
         extraArrows={arrows}
       />
 

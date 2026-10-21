@@ -107,6 +107,15 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
     setGame(newGame);
   }, [copyGame, setGame]);
 
+  const setComment = useCallback(
+    (comment: string) => {
+      const newGame = copyGame();
+      newGame.setComment(comment);
+      setGame(newGame);
+    },
+    [copyGame, setGame]
+  );
+
   const goToMove = useCallback(
     (moveIdx: number, fullGame: Chess) => {
       if (moveIdx < 0) return;
@@ -135,5 +144,6 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
     goToMove,
     resetToStartingPosition,
     addMoves,
+    setComment,
   };
 };

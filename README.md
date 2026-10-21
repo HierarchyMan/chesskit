@@ -24,6 +24,7 @@ Chesskit lets you play, study, analyse and review chess with Stockfish on any de
 **Analyse**
 - One board for analysis and the board editor: arrange any position, then play moves on it.
 - Live engine evaluation with top moves for either side, custom arrows and an evaluation graph.
+- **Analysis options** on the Analysis tab toggle the evaluation bar, move annotations and the best-move arrow. Choices are remembered in this browser.
 - Move classification (Brilliant, Great, Good, Mistake, Blunder, ...).
 - Load games from [chess.com](https://chess.com) and [lichess.org](https://lichess.org), or paste a PGN, a FEN, a Lichess link or a screenshot of a board (`Ctrl+V` on any page).
 - **Scan Image** turns a photo or screenshot of a board into a position, entirely in your browser.
@@ -31,7 +32,7 @@ Chesskit lets you play, study, analyse and review chess with Stockfish on any de
 
 **Engine Arena**
 - Pit two engines, or two strengths of one engine, against each other. Step through with *Next*, nudge a move by clicking a candidate or dragging a piece, or let them auto-play.
-- Use **Analysis options** in the side panel to independently toggle the evaluation bar, move annotations, and a best-move arrow. Choices are remembered in this browser.
+- Use **Analysis options** in the side panel to independently toggle the evaluation bar, move annotations, and a best-move arrow. Choices are remembered in this browser. With annotations on, the panel also shows the opening and each side's accuracy; with the arrow on, it names the better alternative.
 - An independent instance of the top-bar analysis engine checks moves at depth 12. Annotations grade both players' moves on the board and in the move list; select any move for its explanation and **Visualize move**. Enabling annotations mid-game also checks earlier moves. Analysis can catch up during fast auto-play; it does not control the players' moves.
 
 **Learn**

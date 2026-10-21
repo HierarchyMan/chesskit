@@ -1,6 +1,6 @@
 import { CurrentPosition } from "@/types/eval";
 import { MoveClassification } from "@/types/enums";
-import { PrimitiveAtom, atom, useAtomValue } from "jotai";
+import { Atom, PrimitiveAtom, atom, useAtomValue } from "jotai";
 import Image from "next/image";
 import { CSSProperties, forwardRef, memo, useMemo } from "react";
 import {
@@ -10,6 +10,7 @@ import {
 import { CLASSIFICATION_COLORS } from "@/constants";
 import { boardHueAtom } from "./states";
 import { areObjectsEqual, isObject } from "@/lib/object";
+import { CheckedKing } from "@/lib/chess";
 import { useMediaQuery } from "@mui/material";
 
 const moveIconOffAtom = atom(false);
@@ -18,6 +19,7 @@ export interface Props {
   currentPositionAtom: PrimitiveAtom<CurrentPosition>;
   clickedSquaresAtom: PrimitiveAtom<Square[]>;
   playableSquaresAtom: PrimitiveAtom<Square[]>;
+  checkedKingAtom: Atom<CheckedKing | null>;
   showPlayerMoveIconAtom?: PrimitiveAtom<boolean>;
   boardSize: number;
 }
@@ -26,6 +28,7 @@ export function getSquareRenderer({
   currentPositionAtom,
   clickedSquaresAtom,
   playableSquaresAtom,
+  checkedKingAtom,
   showPlayerMoveIconAtom = moveIconOffAtom,
   boardSize,
 }: Props) {
@@ -33,6 +36,17 @@ export function getSquareRenderer({
     forwardRef<HTMLDivElement, CustomSquareProps>((props, ref) => {
       const { children, square, style } = props;
       const boardHue = useAtomValue(boardHueAtom);
+
+      const isCheckedKing = useAtomValue(
+        useMemo(
+          () =>
+            atom((get) => {
+              const checkedKing = get(checkedKingAtom);
+              return checkedKing?.square === square;
+            }),
+          [square]
+        )
+      );
 
       const isClicked = useAtomValue(
         useMemo(
@@ -115,6 +129,7 @@ export function getSquareRenderer({
             filter: boardHue ? `hue-rotate(-${boardHue}deg)` : undefined,
           }}
         >
+          {isCheckedKing && <div style={checkedKingStyle} />}
           {children}
           {highlightSquareStyle && <div style={highlightSquareStyle} />}
           {isPlayable && <div style={playableSquareStyles} />}
@@ -160,6 +175,14 @@ const rightClickSquareStyle: CSSProperties = {
   height: "100%",
   backgroundColor: "#eb6150",
   opacity: "0.8",
+};
+
+const checkedKingStyle: CSSProperties = {
+  position: "absolute",
+  width: "100%",
+  height: "100%",
+  background:
+    "radial-gradient(ellipse at center, rgba(255,0,0,1) 0%, rgba(231,0,0,1) 25%, rgba(169,0,0,0) 89%, rgba(158,0,0,0) 100%)",
 };
 
 const playableSquareStyles: CSSProperties = {

@@ -1,3 +1,4 @@
+import { createAnalysisOptionAtoms } from "@/lib/analysisOptions";
 import { BotStrength } from "@/lib/engine/strength";
 import { storedAtom } from "@/lib/storedAtom";
 import { EngineName } from "@/types/enums";
@@ -57,23 +58,14 @@ export const arenaVarietyAtom = storedAtom<number>(
     typeof value === "number" && value >= 0 && value <= 1
 );
 
-const isBoolean = (value: unknown): value is boolean =>
-  typeof value === "boolean";
-
-export const arenaShowEvaluationAtom = storedAtom(
-  "arena-show-evaluation",
-  true,
-  isBoolean
-);
-export const arenaShowAnnotationsAtom = storedAtom(
-  "arena-show-annotations",
-  false,
-  isBoolean
-);
-export const arenaShowBestMoveAtom = storedAtom(
-  "arena-show-best-move",
-  false,
-  isBoolean
+// Storage keys are the arena's own, so changing Analysis never changes the arena.
+export const arenaAnalysisOptionAtoms = createAnalysisOptionAtoms(
+  {
+    evaluation: "arena-show-evaluation",
+    annotations: "arena-show-annotations",
+    bestMove: "arena-show-best-move",
+  },
+  { evaluation: true, annotations: false, bestMove: true }
 );
 
 export const arenaGameAtom = atom(new Chess());
@@ -81,5 +73,6 @@ export const arenaDataAtom = atom<CurrentPosition>({});
 export const arenaStartedAtom = atom(false);
 export const arenaRunningAtom = atom(false);
 export const arenaFlippedAtom = atom(false);
+export const arenaEditingPlayersAtom = atom(false);
 export const arenaStartFenAtom = atom<string | undefined>(undefined);
 export const arenaSavedGameIdAtom = atom<number | null>(null);

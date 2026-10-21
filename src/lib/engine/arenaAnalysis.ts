@@ -1,5 +1,7 @@
+import { openings } from "@/data/openings";
+import { computeAccuracy } from "@/lib/engine/helpers/accuracy";
 import { getMovesClassification } from "@/lib/engine/helpers/moveClassification";
-import { CurrentPosition, PositionEval } from "@/types/eval";
+import { Accuracy, CurrentPosition, PositionEval } from "@/types/eval";
 import { Chess, Move } from "chess.js";
 
 export const ARENA_ANALYSIS_DEPTH = 12;
@@ -70,6 +72,44 @@ export const projectArenaAnalysis = (
     },
     moves,
   };
+};
+
+/**
+ * Accuracy needs every position from the start to the current move, so a
+ * single pending evaluation yields null instead of a score built on a gap.
+ */
+export const getArenaAccuracy = (
+  moves: ArenaMoveAnalysis[]
+): Accuracy | undefined => {
+  const first = moves[0];
+  if (!first?.before) return undefined;
+
+  const positions = [first.before, ...moves.map((move) => move.after)];
+  if (positions.some((position) => !position)) return undefined;
+
+  return computeAccuracy(positions as PositionEval[], first.move.color === "b");
+};
+
+// The first entry wins, matching Analysis, which looks up the first opening
+// with a given placement.
+const openingNames = new Map<string, string>();
+for (const { name, fen } of openings) {
+  if (!openingNames.has(fen)) openingNames.set(fen, name);
+}
+
+/**
+ * The most recent named book position reached in the current history. The
+ * classifier's opening label only sees a short window, so it cannot answer
+ * this for a game that left its book many moves ago.
+ */
+export const getArenaOpening = (
+  moves: ArenaMoveAnalysis[]
+): string | undefined => {
+  for (const { move } of moves.slice().reverse()) {
+    const name = openingNames.get(move.after.split(" ")[0]);
+    if (name) return name;
+  }
+  return undefined;
 };
 
 interface Target {

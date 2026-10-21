@@ -21,6 +21,8 @@ import { boardHueAtom } from "./states";
 import { useBoardAppearance } from "./appearance";
 import tinycolor from "tinycolor2";
 import { uniqueArrows } from "@/lib/arrows";
+import { getCheckedKing } from "@/lib/chess";
+import { getBestMoveHint } from "@/lib/bestMoveHint";
 
 const noPositionAtom = atom<CurrentPosition>({});
 
@@ -224,18 +226,10 @@ export default function Board({
   );
 
   const customArrows: Arrow[] = useMemo(() => {
-    const bestMove = position?.lastEval?.bestMove;
-    const moveClassification = position?.eval?.moveClassification;
+    const bestMove = showBestMoveArrow ? getBestMoveHint(position) : undefined;
     const arrows: Arrow[] = [...(extraArrows ?? [])];
 
-    if (
-      bestMove &&
-      showBestMoveArrow &&
-      moveClassification !== MoveClassification.Best &&
-      moveClassification !== MoveClassification.Opening &&
-      moveClassification !== MoveClassification.Forced &&
-      moveClassification !== MoveClassification.Perfect
-    ) {
+    if (bestMove) {
       const bestMoveArrow = [
         bestMove.slice(0, 2),
         bestMove.slice(2, 4),
@@ -250,11 +244,17 @@ export default function Board({
     return uniqueArrows(arrows);
   }, [position, showBestMoveArrow, boardHue, extraArrows]);
 
+  const checkedKingAtom = useMemo(
+    () => atom((get) => getCheckedKing(get(gameAtom))),
+    [gameAtom]
+  );
+
   const SquareRenderer: CustomSquareRenderer = useMemo(() => {
     return getSquareRenderer({
       currentPositionAtom: currentPositionAtom,
       clickedSquaresAtom,
       playableSquaresAtom,
+      checkedKingAtom,
       showPlayerMoveIconAtom,
       boardSize: boardSize || 400,
     });
@@ -262,6 +262,7 @@ export default function Board({
     currentPositionAtom,
     clickedSquaresAtom,
     playableSquaresAtom,
+    checkedKingAtom,
     showPlayerMoveIconAtom,
     boardSize,
   ]);

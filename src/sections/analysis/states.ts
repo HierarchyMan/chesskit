@@ -1,4 +1,5 @@
 import { DEFAULT_ENGINE } from "@/constants";
+import { createAnalysisOptionAtoms } from "@/lib/analysisOptions";
 import { getRecommendedWorkersNb } from "@/lib/engine/worker";
 import { storedAtom } from "@/lib/storedAtom";
 import { EngineName } from "@/types/enums";
@@ -41,15 +42,15 @@ const isNumberBetween =
 const isBoolean = (value: unknown): value is boolean =>
   typeof value === "boolean";
 
-export const showBestMoveArrowAtom = storedAtom(
-  "show-arrow-best-move",
-  true,
-  isBoolean
-);
-export const showPlayerMoveIconAtom = storedAtom(
-  "show-icon-player-move",
-  true,
-  isBoolean
+// The annotations and best-move keys predate the shared options, so saved
+// choices keep working. All three default on, matching the page's old behavior.
+export const analysisOptionAtoms = createAnalysisOptionAtoms(
+  {
+    evaluation: "show-evaluation-bar",
+    annotations: "show-icon-player-move",
+    bestMove: "show-arrow-best-move",
+  },
+  { evaluation: true, annotations: true, bestMove: true }
 );
 
 export const engineNameAtom = storedAtom<EngineName>(

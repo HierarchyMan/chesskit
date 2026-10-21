@@ -1,9 +1,13 @@
 import { useEngineState } from "@/hooks/useEngine";
+import { getBestMoveHint } from "@/lib/bestMoveHint";
+import { moveLineUciToSan } from "@/lib/chess";
 import {
   ARENA_ANALYSIS_DEPTH,
   ARENA_ANALYSIS_LINES,
   ArenaAnalysisSession,
   ArenaAnalysisUpdate,
+  getArenaAccuracy,
+  getArenaOpening,
   projectArenaAnalysis,
 } from "@/lib/engine/arenaAnalysis";
 import { engineNameAtom } from "@/sections/analysis/states";
@@ -11,16 +15,12 @@ import { UciEngine } from "@/lib/engine/uciEngine";
 import { Chess } from "chess.js";
 import { useAtomValue } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  arenaShowAnnotationsAtom,
-  arenaShowBestMoveAtom,
-  arenaShowEvaluationAtom,
-} from "./states";
+import { arenaAnalysisOptionAtoms } from "./states";
 
 export function useArenaAnalysis(game: Chess, started: boolean) {
-  const showEvaluation = useAtomValue(arenaShowEvaluationAtom);
-  const showAnnotations = useAtomValue(arenaShowAnnotationsAtom);
-  const showBestMove = useAtomValue(arenaShowBestMoveAtom);
+  const showEvaluation = useAtomValue(arenaAnalysisOptionAtoms.evaluation);
+  const showAnnotations = useAtomValue(arenaAnalysisOptionAtoms.annotations);
+  const showBestMove = useAtomValue(arenaAnalysisOptionAtoms.bestMove);
   const engineName = useAtomValue(engineNameAtom);
   const enabled =
     started && (showEvaluation || showAnnotations || showBestMove);
@@ -74,8 +74,24 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
     [game, update.evaluations, hasCurrentSource, enabled, showAnnotations]
   );
 
+  const { moves, position } = projection;
+
+  const accuracy = useMemo(() => getArenaAccuracy(moves), [moves]);
+  const opening = useMemo(() => getArenaOpening(moves), [moves]);
+
+  // Same rule as the board arrow, so the text never names a move the arrow hides.
+  const betterMove = useMemo(() => {
+    const uci = getBestMoveHint(position);
+    if (!uci || !position.lastMove) return undefined;
+    return moveLineUciToSan(position.lastMove.before)(uci);
+  }, [position]);
+
   return {
-    ...projection,
+    position,
+    moves,
+    accuracy,
+    opening,
+    betterMove,
     enabled,
     showEvaluation,
     showAnnotations,

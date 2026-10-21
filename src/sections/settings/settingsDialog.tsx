@@ -19,8 +19,6 @@ import {
   engineMultiPvAtom,
   engineNameAtom,
   engineWorkersNbAtom,
-  showBestMoveArrowAtom,
-  showPlayerMoveIconAtom,
   useCloudEvalAtom,
 } from "@/sections/analysis/states";
 import {
@@ -116,8 +114,6 @@ function EngineTab() {
   const [multiPv, setMultiPv] = useAtom(engineMultiPvAtom);
   const [workers, setWorkers] = useAtom(engineWorkersNbAtom);
   const [cloud, setCloud] = useAtom(useCloudEvalAtom);
-  const [showArrow, setShowArrow] = useAtom(showBestMoveArrowAtom);
-  const [showIcon, setShowIcon] = useAtom(showPlayerMoveIconAtom);
   const { models, refresh } = useModels();
 
   return (
@@ -196,24 +192,6 @@ function EngineTab() {
               />
             }
             label="Use Lichess cloud evaluations when available"
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showArrow}
-                onChange={(_, value) => setShowArrow(value)}
-              />
-            }
-            label="Show the engine's best move arrow in analysis"
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showIcon}
-                onChange={(_, value) => setShowIcon(value)}
-              />
-            }
-            label="Show the quality icon on played moves"
           />
         </Stack>
       </Grid>

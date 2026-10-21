@@ -1,11 +1,14 @@
 import { moveStoryAtom } from "@/components/moveStoryDialog";
-import Panel from "@/components/panel";
+import AnalysisOptionsPanel, {
+  AnalysisOptionCopy,
+} from "@/components/analysisOptions/analysisOptionsPanel";
 import { ENGINE_LABELS } from "@/constants";
 import {
   CLASSIFICATION_PHRASES,
   WORTH_VISUALIZING,
 } from "@/lib/classificationLabels";
 import { getLineEvalLabel } from "@/lib/chess";
+import { AnalysisOption } from "@/lib/analysisOptions";
 import {
   ARENA_ANALYSIS_DEPTH,
   ArenaMoveAnalysis,
@@ -16,106 +19,98 @@ import {
   Alert,
   Button,
   CircularProgress,
-  FormControlLabel,
   Stack,
-  Switch,
   Typography,
 } from "@mui/material";
-import { useAtom, useSetAtom } from "jotai";
+import { useSetAtom } from "jotai";
 import { useMemo } from "react";
-import {
-  arenaShowAnnotationsAtom,
-  arenaShowBestMoveAtom,
-  arenaShowEvaluationAtom,
-} from "./states";
+import { arenaAnalysisOptionAtoms } from "./states";
 import { Arena } from "./useArena";
 
+const ARENA_OPTION_COPY: Record<AnalysisOption, AnalysisOptionCopy> = {
+  evaluation: { label: "Evaluation bar" },
+  annotations: {
+    label: "Move annotations",
+    help: "Grade each move on the board and in the move list. Select a move to explain or visualize it.",
+  },
+  bestMove: {
+    label: "Best-move arrow",
+    help: "Show the better alternative to the last move, alongside candidate arrows.",
+  },
+};
+
+const formatAccuracy = (value: number | null | undefined) =>
+  value === null || value === undefined ? "—" : `${value.toFixed(1)} %`;
+
 export default function AnalysisCard({ arena }: { arena: Arena }) {
-  const [showEvaluation, setShowEvaluation] = useAtom(arenaShowEvaluationAtom);
-  const [showAnnotations, setShowAnnotations] = useAtom(
-    arenaShowAnnotationsAtom
-  );
-  const [showBestMove, setShowBestMove] = useAtom(arenaShowBestMoveAtom);
   const { analysis } = arena;
   const completed = analysis.moves.filter(
     (entry) => entry.after?.moveClassification
   ).length;
+  const hasMoves = analysis.moves.length > 0;
 
   return (
-    <Panel title="Analysis options">
-      <Stack spacing={0.5}>
-        <FormControlLabel
-          control={
-            <Switch
-              size="small"
-              checked={showEvaluation}
-              onChange={(_, checked) => setShowEvaluation(checked)}
-            />
-          }
-          label="Evaluation bar"
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              size="small"
-              checked={showAnnotations}
-              onChange={(_, checked) => setShowAnnotations(checked)}
-            />
-          }
-          label="Move annotations"
-        />
-        <Typography variant="caption" sx={{ opacity: 0.7, pl: 5 }}>
-          Grade each move on the board and in the move list. Select a move to
-          explain or visualize it.
-        </Typography>
-        <FormControlLabel
-          control={
-            <Switch
-              size="small"
-              checked={showBestMove}
-              onChange={(_, checked) => setShowBestMove(checked)}
-            />
-          }
-          label="Best-move arrow"
-        />
-        <Typography variant="caption" sx={{ opacity: 0.7, pl: 5 }}>
-          Show the better alternative to the last move, alongside candidate
-          arrows.
-        </Typography>
-        <Typography variant="caption" sx={{ opacity: 0.7, pt: 1 }}>
-          {ENGINE_LABELS[analysis.engineName].small} · depth{" "}
-          {ARENA_ANALYSIS_DEPTH}. Uses the analysis engine selected in the top
-          bar. Positive scores favor White. Options are remembered.
-        </Typography>
-        {analysis.error ? (
-          <Alert
-            severity="error"
-            action={
-              <Button color="inherit" size="small" onClick={analysis.retry}>
-                Retry analysis
-              </Button>
-            }
-          >
-            {analysis.error} The match can continue.
-          </Alert>
-        ) : analysis.enabled ? (
-          <Stack direction="row" gap={1} alignItems="center" role="status">
-            {(analysis.busy || analysis.engineState.status !== "ready") && (
-              <CircularProgress size={14} />
-            )}
-            <Typography variant="caption">
-              {analysis.engineState.status !== "ready"
-                ? "Loading analysis engine…"
-                : showAnnotations
-                  ? `${completed}/${analysis.moves.length} moves annotated${analysis.busy ? " · Analyzing…" : ""}`
-                  : analysis.busy
-                    ? "Evaluating position…"
-                    : "Evaluation ready"}
-            </Typography>
-          </Stack>
-        ) : null}
-      </Stack>
-    </Panel>
+    <AnalysisOptionsPanel
+      atoms={arenaAnalysisOptionAtoms}
+      copy={ARENA_OPTION_COPY}
+      details={{
+        annotations:
+          analysis.enabled && hasMoves ? (
+            <Stack spacing={0.25}>
+              {analysis.opening && (
+                <Typography variant="caption">
+                  Opening: {analysis.opening}
+                </Typography>
+              )}
+              <Typography variant="caption">
+                Accuracy · White {formatAccuracy(analysis.accuracy?.white)} ·
+                Black {formatAccuracy(analysis.accuracy?.black)}
+              </Typography>
+            </Stack>
+          ) : undefined,
+        bestMove: analysis.betterMove ? (
+          <Typography variant="caption">
+            Better alternative: {analysis.betterMove}
+          </Typography>
+        ) : undefined,
+      }}
+      footer={
+        <>
+          <Typography variant="caption" sx={{ opacity: 0.7, pt: 1 }}>
+            {ENGINE_LABELS[analysis.engineName].small} · depth{" "}
+            {ARENA_ANALYSIS_DEPTH}. Uses the analysis engine selected in the top
+            bar. Positive scores favor White. Options are remembered.
+          </Typography>
+          {analysis.error ? (
+            <Alert
+              severity="error"
+              action={
+                <Button color="inherit" size="small" onClick={analysis.retry}>
+                  Retry analysis
+                </Button>
+              }
+            >
+              {analysis.error} The match can continue.
+            </Alert>
+          ) : analysis.enabled ? (
+            <Stack direction="row" gap={1} alignItems="center" role="status">
+              {(analysis.busy || analysis.engineState.status !== "ready") && (
+                <CircularProgress size={14} />
+              )}
+              <Typography variant="caption">
+                {analysis.engineState.status !== "ready"
+                  ? "Loading analysis engine…"
+                  : analysis.showAnnotations
+                    ? `${completed}/${analysis.moves.length} moves annotated${analysis.busy ? " · Analyzing…" : ""}`
+                    : analysis.busy
+                      ? "Evaluating position…"
+                      : "Evaluation ready"}
+              </Typography>
+            </Stack>
+          ) : null}
+        </>
+      }
+    />
   );
 }
 

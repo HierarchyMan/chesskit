@@ -298,6 +298,25 @@ export const isCheck = (fen: string): boolean => {
   return game.inCheck();
 };
 
+export interface CheckedKing {
+  square: Square;
+  mated: boolean;
+}
+
+export const getCheckedKing = (game: Chess): CheckedKing | null => {
+  if (!game.inCheck()) return null;
+
+  const color = game.turn();
+  for (const row of game.board()) {
+    for (const piece of row) {
+      if (piece?.type === "k" && piece.color === color) {
+        return { square: piece.square, mated: game.isCheckmate() };
+      }
+    }
+  }
+  return null;
+};
+
 export const getCapturedPieces = (
   fen: string,
   color: Color

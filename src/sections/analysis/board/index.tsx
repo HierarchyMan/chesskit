@@ -1,12 +1,11 @@
 import { useAtomValue } from "jotai";
 import {
+  analysisOptionAtoms,
   boardArrowsAtom,
   boardAtom,
   boardOrientationAtom,
   currentPositionAtom,
   gameAtom,
-  showBestMoveArrowAtom,
-  showPlayerMoveIconAtom,
 } from "../states";
 import { Color } from "@/types/enums";
 import Board from "@/components/board";
@@ -16,7 +15,8 @@ import { useAnalysisBoardSize } from "../hooks/useAnalysisBoardSize";
 export default function BoardContainer() {
   const boardSize = useAnalysisBoardSize();
   const boardOrientation = useAtomValue(boardOrientationAtom);
-  const showBestMoveArrow = useAtomValue(showBestMoveArrowAtom);
+  const showBestMoveArrow = useAtomValue(analysisOptionAtoms.bestMove);
+  const showEvaluationBar = useAtomValue(analysisOptionAtoms.evaluation);
   const extraArrows = useAtomValue(boardArrowsAtom);
   const { white, black } = usePlayersData(gameAtom);
 
@@ -31,8 +31,8 @@ export default function BoardContainer() {
       boardOrientation={boardOrientation ? Color.White : Color.Black}
       currentPositionAtom={currentPositionAtom}
       showBestMoveArrow={showBestMoveArrow}
-      showPlayerMoveIconAtom={showPlayerMoveIconAtom}
-      showEvaluationBar={true}
+      showPlayerMoveIconAtom={analysisOptionAtoms.annotations}
+      showEvaluationBar={showEvaluationBar}
       resetEvaluationWhenPending
       extraArrows={extraArrows}
     />
