@@ -61,6 +61,7 @@ export interface CurrentPosition {
 export interface EvaluateGameParams {
   fens: string[];
   uciMoves: string[];
+  terminalPositions?: Record<number, PositionEval>;
   depth?: number;
   multiPv?: number;
   setEvaluationProgress?: (value: number) => void;

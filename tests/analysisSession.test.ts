@@ -18,6 +18,9 @@ import {
   loadAnalysisGameAtom,
   restoreAnalysisSessionAtom,
   storeAnalysisBranchesAtom,
+  navigateAnalysisAtom,
+  analysisReplayStateAtom,
+  displayedAnalysisGameAtom,
 } from "@/sections/analysis/sessionAtoms";
 
 const game = (...moves: string[]) => {
@@ -73,26 +76,118 @@ describe("analysis branch persistence option", () => {
     assert.equal(store.get(gameAtom).history()[1], "c5");
   });
 
-  it("disabling hides/selects no stored alternative and stops writes without erasing prior branches", () => {
+  it("disabling preserves the selected branch and stops new recording without erasing anything", () => {
     const store = createStore();
     store.set(loadAnalysisGameAtom, { game: game("e4", "e5") });
     store.set(storeAnalysisBranchesAtom, true);
     store.set(boardAtom, game("e4", "c5"));
     const branch = store.get(analysisSessionAtom)!.branches[0];
     store.set(storeAnalysisBranchesAtom, false);
-    assert.equal(store.get(gameAtom).history().join(), "e4,e5");
-    assert.equal(store.get(analysisSessionAtom)!.selectedLineId, "main");
+    assert.equal(store.get(gameAtom).history().join(), "e4,c5");
+    assert.equal(store.get(boardAtom).history().join(), "e4,c5");
+    assert.equal(store.get(analysisSessionAtom)!.selectedLineId, branch.id);
     store.set(boardAtom, game("e4", "c6"));
     assert.deepEqual(store.get(analysisSessionAtom)!.branches, [branch]);
     const saved = store.get(analysisSessionAtom)!;
-    // Reopening an archived selected branch cannot leak it into off-mode.
+    // Reopening and backups keep the selected remembered line even while off.
     store.set(restoreAnalysisSessionAtom, {
       ...saved,
       selectedLineId: branch.id,
       cursorPly: 2,
     });
-    assert.equal(store.get(boardAtom).history().length, 0);
-    assert.equal(store.get(gameAtom).history().join(), "e4,e5");
+    assert.equal(store.get(boardAtom).history().join(), "e4,c5");
+    assert.equal(store.get(gameAtom).history().join(), "e4,c5");
+  });
+
+  it("remembers an invented game and navigates sequential actions without a render between them", () => {
+    const store = createStore();
+    store.set(loadAnalysisGameAtom, { game: game() });
+    store.set(storeAnalysisBranchesAtom, true);
+    for (const moves of [
+      ["a3"],
+      ["a3", "h6"],
+      ["a3", "h6", "b3"],
+      ["a3", "h6", "b3", "g6"],
+    ])
+      store.set(boardAtom, game(...moves));
+    const remembered = store.get(gameAtom).pgn();
+    store.set(navigateAnalysisAtom, "previous");
+    store.set(navigateAnalysisAtom, "previous");
+    assert.deepEqual(store.get(boardAtom).history(), ["a3", "h6"]);
+    store.set(navigateAnalysisAtom, "next");
+    store.set(navigateAnalysisAtom, "next");
+    assert.equal(store.get(boardAtom).pgn(), remembered);
+    store.set(navigateAnalysisAtom, "start");
+    assert.equal(store.get(analysisReplayStateAtom).canGoNext, true);
+    store.set(navigateAnalysisAtom, "end");
+    assert.equal(store.get(boardAtom).pgn(), remembered);
+    const restored = parseAnalysisSessionBackup(
+      analysisSessionBackup(store.get(analysisSessionAtom)!)
+    );
+    store.set(storeAnalysisBranchesAtom, false);
+    store.set(restoreAnalysisSessionAtom, restored);
+    assert.equal(store.get(boardAtom).pgn(), remembered);
+  });
+
+  it("off stops appending to both the main game and a saved branch, then on resumes", () => {
+    const store = createStore();
+    store.set(loadAnalysisGameAtom, { game: game() });
+    store.set(boardAtom, game("e4"));
+    assert.equal(store.get(gameAtom).history().length, 0);
+    assert.deepEqual(store.get(displayedAnalysisGameAtom).history(), ["e4"]);
+    store.set(storeAnalysisBranchesAtom, true);
+    store.set(boardAtom, game("d4", "d5"));
+    store.set(storeAnalysisBranchesAtom, false);
+    store.set(boardAtom, game("d4", "d5", "c4"));
+    assert.deepEqual(store.get(gameAtom).history(), ["d4", "d5"]);
+    store.set(storeAnalysisBranchesAtom, true);
+    store.set(boardAtom, game("d4", "Nf6"));
+    const branch = store.get(analysisSessionAtom)!.branches[0];
+    store.set(storeAnalysisBranchesAtom, false);
+    store.set(boardAtom, game("d4", "Nf6", "c4"));
+    assert.equal(store.get(analysisSessionAtom)!.branches[0].pgn, branch.pgn);
+    store.set(storeAnalysisBranchesAtom, true);
+    store.set(boardAtom, game("d4", "Nf6", "c4", "g6"));
+    assert.deepEqual(store.get(gameAtom).history(), ["d4", "Nf6", "c4", "g6"]);
+    assert.equal(store.get(analysisSessionAtom)!.branches.length, 1);
+  });
+
+  it("keeps a selected nested branch through a common prefix and toggling off at the root", () => {
+    const store = createStore();
+    store.set(loadAnalysisGameAtom, { game: game("e4", "e5", "Nf3") });
+    store.set(storeAnalysisBranchesAtom, true);
+    store.set(boardAtom, game("e4", "c5", "Nf3"));
+    store.set(boardAtom, game("e4", "c5", "Nc3"));
+    const id = store.get(analysisSessionAtom)!.selectedLineId;
+    store.set(navigateAnalysisAtom, "start");
+    store.set(storeAnalysisBranchesAtom, false);
+    store.set(navigateAnalysisAtom, "next");
+    store.set(navigateAnalysisAtom, "next");
+    store.set(navigateAnalysisAtom, "next");
+    assert.equal(store.get(analysisSessionAtom)!.selectedLineId, id);
+    assert.deepEqual(store.get(boardAtom).history(), ["e4", "c5", "Nc3"]);
+    assert.equal(store.get(analysisSessionAtom)!.branches.length, 2);
+  });
+
+  it("persists comment edits on an unchanged path without losing future comments or moves", () => {
+    const store = createStore();
+    const original = game("e4", "e5", "Nf3");
+    original.setComment("Future comment");
+    original.setHeader("Custom", "kept");
+    store.set(loadAnalysisGameAtom, { game: original });
+    store.set(storeAnalysisBranchesAtom, true);
+    const prefix = replayAnalysis(store.get(analysisSessionAtom)!.main, 1);
+    prefix.setComment("New idea");
+    store.set(boardAtom, prefix);
+    assert.equal(store.get(gameAtom).getHeaders().Custom, "kept");
+    assert.deepEqual(store.get(gameAtom).history(), original.history());
+    const full = replayAnalysis(store.get(analysisSessionAtom)!.main);
+    assert.deepEqual(
+      full.getComments().map((entry) => entry.comment),
+      ["New idea", "Future comment"]
+    );
+    store.set(navigateAnalysisAtom, "end");
+    assert.equal(store.get(boardAtom).getComment(), "Future comment");
   });
 
   it("clear removes only alternatives and enables recording fresh alternatives afterwards", () => {

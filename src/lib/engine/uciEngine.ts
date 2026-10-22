@@ -348,6 +348,7 @@ export class UciEngine {
   public async evaluateGame({
     fens,
     uciMoves,
+    terminalPositions,
     depth = 16,
     multiPv = this.multiPv,
     setEvaluationProgress,
@@ -375,6 +376,12 @@ export class UciEngine {
 
     await Promise.all(
       fens.map(async (fen, i) => {
+        // The caller retains full-history outcomes such as repetition, which
+        // cannot be reconstructed by evaluating isolated FEN strings.
+        if (terminalPositions?.[i]) {
+          updateEval(i, terminalPositions[i]);
+          return;
+        }
         const whoIsCheckmated = getWhoIsCheckmated(fen);
         if (whoIsCheckmated) {
           updateEval(i, {

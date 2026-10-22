@@ -3,7 +3,8 @@ import { loadGameFromText } from "@/lib/pgn";
 import { playIllegalMoveSound, playSoundFromMove } from "@/lib/sounds";
 import { Player } from "@/types/game";
 import { Chess, Move, DEFAULT_POSITION } from "chess.js";
-import { PrimitiveAtom, useAtom } from "jotai";
+import { PrimitiveAtom, useAtom, useStore } from "jotai";
+import { chessPathKey, replayChess } from "@/lib/chessHistory";
 import { useCallback } from "react";
 
 export interface resetGameParams {
@@ -14,7 +15,8 @@ export interface resetGameParams {
 }
 
 export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
-  const [game, setGame] = useAtom(chessAtom);
+  const [, setGame] = useAtom(chessAtom);
+  const store = useStore();
 
   const setPgn = useCallback(
     (pgn: string) => {
@@ -33,6 +35,7 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
   );
 
   const copyGame = useCallback(() => {
+    const game = store.get(chessAtom);
     const newGame = new Chess();
 
     if (game.history().length === 0) {
@@ -48,7 +51,7 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
     }
 
     return loadGameFromText(game.pgn());
-  }, [game]);
+  }, [store, chessAtom]);
 
   const resetToStartingPosition = useCallback(
     (pgn?: string) => {
@@ -62,13 +65,18 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
   );
 
   const playMove = useCallback(
-    (params: {
-      from: string;
-      to: string;
-      promotion?: string;
-      comment?: string;
-    }): Move | null => {
+    (
+      params: {
+        from: string;
+        to: string;
+        promotion?: string;
+        comment?: string;
+      },
+      expectedGame?: Chess
+    ): Move | null => {
       const newGame = copyGame();
+      if (expectedGame && chessPathKey(newGame) !== chessPathKey(expectedGame))
+        return null;
 
       try {
         const { comment, ...move } = params;
@@ -87,15 +95,20 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
   );
 
   const addMoves = useCallback(
-    (moves: string[]) => {
+    (moves: string[], expectedGame?: Chess) => {
       const newGame = copyGame();
+      if (expectedGame && chessPathKey(newGame) !== chessPathKey(expectedGame))
+        return;
 
-      let lastMove: Move | null = null;
-      for (const move of moves) {
-        lastMove = newGame.move(move);
+      try {
+        let lastMove: Move | null = null;
+        for (const move of moves) lastMove = newGame.move(move);
+        setGame(newGame);
+        if (lastMove) playSoundFromMove(lastMove);
+      } catch {
+        // A stale/invalid engine line must not partly mutate the board or crash.
+        playIllegalMoveSound();
       }
-      setGame(newGame);
-      if (lastMove) playSoundFromMove(lastMove);
     },
     [copyGame, setGame]
   );
@@ -118,20 +131,15 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
 
   const goToMove = useCallback(
     (moveIdx: number, fullGame: Chess) => {
-      if (moveIdx < 0) return;
-
-      const newGame = loadGameFromText(fullGame.pgn());
-
       const movesNb = fullGame.history().length;
-      if (moveIdx > movesNb) return;
-
-      let lastMove: Move | null = {} as Move;
-      for (let i = movesNb; i > moveIdx; i--) {
-        lastMove = newGame.undo();
-      }
-
+      if (!Number.isInteger(moveIdx) || moveIdx < 0 || moveIdx > movesNb)
+        return;
+      const newGame = replayChess(fullGame, moveIdx);
       setGame(newGame);
-      playSoundFromMove(lastMove);
+      const audibleMove =
+        newGame.history({ verbose: true }).at(-1) ??
+        fullGame.history({ verbose: true })[0];
+      if (audibleMove) playSoundFromMove(audibleMove);
     },
     [setGame]
   );

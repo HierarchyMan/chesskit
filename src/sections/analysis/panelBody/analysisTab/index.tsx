@@ -16,9 +16,7 @@ export default function AnalysisTab(props: GridProps) {
   const gameEval = useAtomValue(gameEvalAtom);
   const board = useAtomValue(boardAtom);
 
-  const boardHistory = board.history();
-
-  const isGameOver = boardHistory.length > 0 && board.isGameOver();
+  const isGameOver = board.isGameOver();
 
   return (
     <Grid

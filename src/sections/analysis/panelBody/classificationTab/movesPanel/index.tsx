@@ -9,9 +9,11 @@ import {
 } from "../../../states";
 import { useChessActions } from "@/hooks/useChessActions";
 import MovesList from "@/components/movesList";
+import { displayedAnalysisGameAtom } from "../../../sessionAtoms";
 
 function MovesPanel({ visible }: { visible: boolean }) {
-  const game = useVisibleAtomValue(gameAtom, visible);
+  const savedGame = useVisibleAtomValue(gameAtom, visible);
+  const game = useVisibleAtomValue(displayedAnalysisGameAtom, visible);
   const evaluation = useVisibleAtomValue(gameEvalAtom, visible);
   const position = useVisibleAtomValue(currentPositionAtom, visible);
   const { goToMove } = useChessActions(boardAtom);
@@ -23,11 +25,13 @@ function MovesPanel({ visible }: { visible: boolean }) {
         moves={history.map((move) => move.san)}
         startsWithBlack={history[0].color === "b"}
         firstMoveNumber={Number(history[0].before.split(" ")[5])}
-        currentPly={position.currentMoveIdx}
+        currentPly={
+          game === savedGame ? position.currentMoveIdx : history.length
+        }
         onSelect={(ply) => goToMove(ply, game)}
         maxHeight="22rem"
         annotations={
-          evaluation
+          evaluation && game === savedGame
             ? history.map((_, index) => ({
                 classification:
                   evaluation.positions[index + 1]?.moveClassification,

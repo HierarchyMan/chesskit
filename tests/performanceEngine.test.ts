@@ -6,6 +6,7 @@ import { UciEngine } from "@/lib/engine/uciEngine";
 import { EvaluationParser, parseEvaluationResults } from "@/lib/engine/helpers/parseResults";
 import { openings } from "@/data/openings";
 import { openingForPlacement } from "@/lib/openingIndex";
+import { getEvaluateGameParams } from "@/lib/chess";
 
 const instances: FakeWorker[] = [];
 let handshake = true;
@@ -32,6 +33,20 @@ before(() => { Object.defineProperty(globalThis, "window", { configurable: true,
 after(() => { Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow }); globalThis.fetch = originalFetch; });
 
 describe("performance engine scheduling", () => {
+  it("keeps history-dependent terminal draws in full analysis without a FEN search", async () => {
+    const game = new Chess();
+    for (const move of ["Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8"]) game.move(move);
+    const params = getEvaluateGameParams(game);
+    const engine = await UciEngine.create(EngineName.Stockfish11, "/fake");
+    try {
+      const result = await engine.evaluateGame({
+        fens: [game.fen()], uciMoves: [],
+        terminalPositions: {0: params.terminalPositions![8]},
+      });
+      assert.equal(result.positions[0].lines[0].cp, 0);
+      assert.equal(instances.at(-1)!.commands.some(command => command.startsWith("go ")), false);
+    } finally { engine.shutdown(); }
+  });
   it("starts local search before cloud misses, buffers partials, then publishes final", async () => {
     let resolveCloud!: (response: Response) => void;
     globalThis.fetch = () => new Promise((resolve) => { resolveCloud = resolve; });

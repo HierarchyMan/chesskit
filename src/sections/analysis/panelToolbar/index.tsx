@@ -1,7 +1,7 @@
 import { Stack } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { boardAtom } from "../states";
-import { useChessActions } from "@/hooks/useChessActions";
+import { useAnalysisNavigation } from "../hooks/useAnalysisNavigation";
 import FlipBoardButton from "./flipBoardButton";
 import NextMoveButton from "./nextMoveButton";
 import GoToLastPositionButton from "./goToLastPositionButton";
@@ -16,8 +16,9 @@ import { CopyPgnButton } from "./copyPgnButton";
 
 export default function PanelToolBar() {
   const board = useAtomValue(boardAtom);
-  const { resetToStartingPosition: resetBoard, undoMove: undoBoardMove } =
-    useChessActions(boardAtom);
+  const navigate = useAnalysisNavigation();
+  const resetBoard = () => navigate("start");
+  const undoBoardMove = () => navigate("previous");
 
   const boardHistory = board.history();
 

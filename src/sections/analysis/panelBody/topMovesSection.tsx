@@ -63,7 +63,7 @@ function TopMovesBody({ onClose }: { onClose: () => void }) {
         onArrows={setArrows}
         onPlay={
           side === "mover"
-            ? (move) => playMove(uciMoveParams(move.uci))
+            ? (move) => playMove(uciMoveParams(move.uci), board)
             : undefined
         }
         playLabel="Play on board"

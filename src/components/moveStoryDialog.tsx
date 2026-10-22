@@ -71,9 +71,9 @@ export default function MoveStoryDialog() {
           <Alert severity="error">{state.error}</Alert>
         )}
 
-        {story && !state.loading && (
+        {state.open && story && !state.loading && (
           <StoryBody
-            key={story.fenBefore + story.playedSan}
+            key={JSON.stringify(story)}
             story={story}
             compact={isSmall}
           />
@@ -185,6 +185,10 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
     setStep(Math.max(0, Math.min(visibleEnd, index)));
     setPlaying(false);
   };
+  const moveBy = (delta: number) => {
+    setStep((value) => Math.max(0, Math.min(visibleEnd, value + delta)));
+    setPlaying(false);
+  };
 
   useEffect(() => {
     if (!playing) return;
@@ -194,17 +198,16 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
       return;
     }
 
-    const timer = setTimeout(() => setStep((value) => value + 1), STEP_MS);
+    const timer = setTimeout(
+      () => setStep((value) => Math.min(visibleEnd, value + 1)),
+      STEP_MS
+    );
     return () => clearTimeout(timer);
   }, [playing, step, visibleEnd]);
 
-  const goToRef = useRef(goTo);
+  const moveByRef = useRef(moveBy);
   useEffect(() => {
-    goToRef.current = goTo;
-  });
-  const stepRef = useRef(step);
-  useEffect(() => {
-    stepRef.current = step;
+    moveByRef.current = moveBy;
   });
 
   useEffect(() => {
@@ -213,7 +216,7 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
 
       event.stopImmediatePropagation();
       event.preventDefault();
-      goToRef.current(stepRef.current + (event.key === "ArrowRight" ? 1 : -1));
+      moveByRef.current(event.key === "ArrowRight" ? 1 : -1);
     };
 
     window.addEventListener("keydown", onKeyDown, true);
@@ -277,7 +280,7 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
           <Tooltip title="Previous move (←)">
             <span>
               <IconButton
-                onClick={() => goTo(step - 1)}
+                onClick={() => moveBy(-1)}
                 disabled={step === 0}
                 aria-label="Previous move"
               >
@@ -305,7 +308,7 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
           <Tooltip title="Next move (→)">
             <span>
               <IconButton
-                onClick={() => goTo(step + 1)}
+                onClick={() => moveBy(1)}
                 disabled={reachedEnd}
                 aria-label="Next move"
               >

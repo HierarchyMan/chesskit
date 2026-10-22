@@ -3,6 +3,8 @@ import { computeAccuracy } from "@/lib/engine/helpers/accuracy";
 import { getMovesClassification } from "@/lib/engine/helpers/moveClassification";
 import { Accuracy, CurrentPosition, PositionEval } from "@/types/eval";
 import { Chess, Move } from "chess.js";
+import { chessPath } from "@/lib/chessHistory";
+import { terminalEvaluation } from "./terminalEvaluation";
 
 export const ARENA_ANALYSIS_DEPTH = 12;
 export const ARENA_ANALYSIS_LINES = 3;
@@ -14,25 +16,9 @@ export interface ArenaMoveAnalysis {
   after?: PositionEval;
 }
 
-export const arenaMoveKey = (move: Move, index: number) =>
-  `${index}:${move.before}:${move.lan}`;
-
 // Use the full game here: repetition cannot be detected from a FEN alone.
-export const arenaTerminalEval = (game: Chess): PositionEval | undefined => {
-  if (!game.isGameOver()) return undefined;
-  return {
-    lines: [
-      {
-        pv: [],
-        depth: ARENA_ANALYSIS_DEPTH,
-        multiPv: 1,
-        ...(game.isCheckmate()
-          ? { mate: game.turn() === "w" ? -1 : 1 }
-          : { cp: 0 }),
-      },
-    ],
-  };
-};
+export const arenaTerminalEval = (game: Chess) =>
+  terminalEvaluation(game, ARENA_ANALYSIS_DEPTH);
 
 export const projectArenaAnalysis = (
   game: Chess,
@@ -42,7 +28,10 @@ export const projectArenaAnalysis = (
   const history = game.history({ verbose: true });
   const terminal = arenaTerminalEval(game);
   const current = terminal ?? evaluations.get(game.fen());
+  const path = chessPath(game);
+  let moveKey = path.root;
   const moves = history.map((move, index): ArenaMoveAnalysis => {
+    moveKey += `:${move.lan}`;
     const before = evaluations.get(move.before);
     const after =
       index === history.length - 1 ? current : evaluations.get(move.after);
@@ -60,7 +49,7 @@ export const projectArenaAnalysis = (
       classified = getMovesClassification(positions, uciMoves, fens).at(-1);
     }
 
-    return { key: arenaMoveKey(move, index), move, before, after: classified };
+    return { key: moveKey, move, before, after: classified };
   });
 
   const last = moves.at(-1);

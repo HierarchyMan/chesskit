@@ -1,9 +1,9 @@
 import { useAtomValue } from "jotai";
-import { gameAtom } from "../states";
+import { displayedAnalysisGameAtom } from "../sessionAtoms";
 import { ToolbarButton } from "@/components/ToolbarButton";
 
 export const CopyPgnButton = () => {
-  const game = useAtomValue(gameAtom);
+  const game = useAtomValue(displayedAnalysisGameAtom);
 
   return (
     <ToolbarButton

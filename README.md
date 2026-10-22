@@ -54,16 +54,17 @@ arrangements. Use **Sessions & options** to rename or reopen a session. The save
 status confirms when storage has finished; failures offer Retry and Save as new
 session. Conflicting edits from another tab cannot silently replace a session.
 
-**Store analysis branches** is off by default. Enable it in Sessions & options
-to preserve alternatives you play while analyzing. Choose a saved line and use
-the existing move navigation or autoplay to replay it. Clear branches keeps the
-main game, with an immediate Undo available. Disabling storage hides branches
-and stops recording new alternatives; previously saved branches remain available
-when re-enabled. Play and Arena do not record analysis branches.
+Turn on **Remember** beside the Analysis session name to record every new move,
+including a game you invent and alternative lines. It is off by default. Choose
+a saved line and use previous/next, start/final, keyboard arrows or autoplay to
+replay it. Turning Remember off only stops new recording: your board, saved lines
+and replay stay available. Clear branches keeps the main game and offers Undo.
+Play and Arena keep their existing live-game histories; Arena's Analyze game
+opens the same Analysis workspace with Remember available.
 
 Download a session backup for preservation beyond this browser/device, then use
-Restore session backup to import it as a separate session. Branches are included
-only when branch storage is enabled. Clearing browser data removes local games
+Restore session backup to import it as a separate session. All saved lines are
+included even while Remember is off. Clearing browser data removes local games
 and sessions. Analyze from here commits the editor's current FEN, including a
 typed FEN that has not been submitted with Enter.
 

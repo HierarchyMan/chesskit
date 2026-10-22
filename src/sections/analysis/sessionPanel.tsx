@@ -111,11 +111,8 @@ export default function SessionPanel() {
   };
 
   const download = () => {
-    const exported = branches
-      ? session
-      : { ...session, branches: [], selectedLineId: "main", cursorPly: 0 };
     const url = URL.createObjectURL(
-      new Blob([analysisSessionBackup(exported)], { type: "application/json" })
+      new Blob([analysisSessionBackup(session)], { type: "application/json" })
     );
     const link = document.createElement("a");
     link.href = url;
@@ -130,6 +127,7 @@ export default function SessionPanel() {
         direction="row"
         alignItems="center"
         justifyContent="space-between"
+        flexWrap="wrap"
         gap={1}
       >
         <Box sx={{ minWidth: 0 }}>
@@ -150,6 +148,23 @@ export default function SessionPanel() {
           Sessions & options
         </Button>
       </Stack>
+      {!arranging && (
+        <>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={branches}
+                onChange={(_, checked) => setBranches(checked)}
+              />
+            }
+            label="Remember"
+          />
+          <Typography variant="caption" display="block">
+            Record new moves for back and forward replay. Turning this off keeps
+            all remembered moves.
+          </Typography>
+        </>
+      )}
       {state.error && (
         <Alert
           severity="error"
@@ -178,7 +193,7 @@ export default function SessionPanel() {
           {sourceError} Your current session has been kept.
         </Alert>
       )}
-      {branches && !arranging && (
+      {(branches || session.branches.length > 0) && !arranging && (
         <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center">
           <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
             <InputLabel id="analysis-variation-label">
@@ -218,7 +233,7 @@ export default function SessionPanel() {
           )}
         </Stack>
       )}
-      {branches && cleared?.id === session.id && (
+      {cleared?.id === session.id && (
         <Button
           size="small"
           onClick={() => {
@@ -254,7 +269,9 @@ export default function SessionPanel() {
               onChange={(event) =>
                 setSession({
                   ...session,
-                  title: event.target.value || "Analysis session",
+                  title: event.target.value.trim()
+                    ? event.target.value
+                    : "Analysis session",
                   updatedAt: new Date().toISOString(),
                 })
               }
@@ -266,13 +283,13 @@ export default function SessionPanel() {
                   onChange={(_, checked) => setBranches(checked)}
                 />
               }
-              label="Store analysis branches"
+              label="Remember"
             />
             <Typography variant="body2">
-              Off by default. Enable to save alternatives you play while
-              analyzing and replay them later. Turning it off hides saved
-              branches and stops recording new ones; Clear branches removes
-              them.
+              Off by default. Enable to remember every new move, including
+              alternatives, for replay. Turning it off only stops recording.
+              Saved lines stay available. Clear branches removes alternatives
+              and offers Undo.
             </Typography>
             <Stack direction="row" gap={1} flexWrap="wrap">
               <Button
@@ -283,11 +300,7 @@ export default function SessionPanel() {
               >
                 New session
               </Button>
-              <Button onClick={download}>
-                {branches
-                  ? "Download session backup"
-                  : "Download main game backup"}
-              </Button>
+              <Button onClick={download}>Download session backup</Button>
               <Button onClick={() => file.current?.click()}>
                 Restore session backup
               </Button>
@@ -305,11 +318,6 @@ export default function SessionPanel() {
                       await selected.text()
                     );
                     const next = copyAnalysisSession(imported);
-                    if (!branches) {
-                      next.branches = [];
-                      next.selectedLineId = "main";
-                      next.cursorPly = 0;
-                    }
                     await changeSession(next);
                   } catch (reason) {
                     setError(
@@ -323,8 +331,8 @@ export default function SessionPanel() {
             </Stack>
             <Typography variant="caption">
               Sessions are stored in this browser on this device. Download
-              backups to preserve them if browser data is cleared. Branches are
-              included in backups only when branch storage is enabled.
+              backups to preserve them if browser data is cleared. Backups
+              include every saved line, whether Remember is on or off.
             </Typography>
             {error && <Alert severity="error">{error}</Alert>}
             <Typography fontWeight={600}>Reopen a session</Typography>
@@ -343,7 +351,7 @@ export default function SessionPanel() {
                 }}
               >
                 {saved.title} · {new Date(saved.updatedAt).toLocaleString()}
-                {branches ? ` · ${saved.branchCount} branches` : ""}
+                {` · ${saved.branchCount} branches`}
               </Button>
             ))}
             <Button onClick={() => setOpen(false)}>Close</Button>

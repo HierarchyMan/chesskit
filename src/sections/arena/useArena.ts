@@ -135,12 +135,12 @@ export const useArena = () => {
 
   const acceptProposal = useCallback(() => {
     if (proposal.status !== "ready" || proposal.fen !== fen) return;
-    playMove(uciMoveParams(proposal.choice.uci));
-  }, [proposal, fen, playMove]);
+    playMove(uciMoveParams(proposal.choice.uci), game);
+  }, [proposal, fen, playMove, game]);
 
   const playCandidate = useCallback(
-    (uci: string) => playMove(uciMoveParams(uci)),
-    [playMove]
+    (uci: string) => playMove(uciMoveParams(uci), game),
+    [playMove, game]
   );
 
   const acceptRef = useRef(acceptProposal);

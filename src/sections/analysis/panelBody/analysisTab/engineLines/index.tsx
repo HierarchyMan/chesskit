@@ -21,7 +21,7 @@ export default function EngineLines(props: GridProps) {
     ? position.eval.lines
     : linesSkeleton;
 
-  if (board.isCheckmate()) return null;
+  if (board.isGameOver()) return null;
 
   return (
     <Grid container justifyContent="center" alignItems="center" {...props}>

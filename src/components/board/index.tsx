@@ -85,7 +85,11 @@ export default function Board({
 
   useEffect(() => {
     setClickedSquares([]);
-  }, [gameFen, setClickedSquares]);
+    setMoveClickFrom(null);
+    setMoveClickTo(null);
+    setShowPromotionDialog(false);
+    setPlayableSquares([]);
+  }, [gameFen, setClickedSquares, setPlayableSquares]);
 
   const isPiecePlayable = useCallback(
     ({ piece }: { piece: string }): boolean => {
@@ -100,15 +104,18 @@ export default function Board({
     (source: Square, target: Square, piece: string): boolean => {
       if (!isPiecePlayable({ piece })) return false;
 
-      const result = playMove({
-        from: source,
-        to: target,
-        promotion: piece[1]?.toLowerCase() ?? "q",
-      });
+      const result = playMove(
+        {
+          from: source,
+          to: target,
+          promotion: piece[1]?.toLowerCase() ?? "q",
+        },
+        game
+      );
 
       return !!result;
     },
-    [isPiecePlayable, playMove]
+    [isPiecePlayable, playMove, game]
   );
 
   const resetMoveClick = useCallback(
@@ -155,10 +162,13 @@ export default function Board({
         return;
       }
 
-      const result = playMove({
-        from: moveClickFrom,
-        to: square,
-      });
+      const result = playMove(
+        {
+          from: moveClickFrom,
+          to: square,
+        },
+        game
+      );
 
       resetMoveClick(result ? undefined : square);
     },
@@ -200,21 +210,27 @@ export default function Board({
       const promotionPiece = piece[1]?.toLowerCase() ?? "q";
 
       if (moveClickFrom && moveClickTo) {
-        const result = playMove({
-          from: moveClickFrom,
-          to: moveClickTo,
-          promotion: promotionPiece,
-        });
+        const result = playMove(
+          {
+            from: moveClickFrom,
+            to: moveClickTo,
+            promotion: promotionPiece,
+          },
+          game
+        );
         resetMoveClick();
         return !!result;
       }
 
       if (from && to) {
-        const result = playMove({
-          from,
-          to,
-          promotion: promotionPiece,
-        });
+        const result = playMove(
+          {
+            from,
+            to,
+            promotion: promotionPiece,
+          },
+          game
+        );
         resetMoveClick();
         return !!result;
       }
@@ -222,7 +238,7 @@ export default function Board({
       resetMoveClick(moveClickFrom);
       return false;
     },
-    [moveClickFrom, moveClickTo, playMove, resetMoveClick]
+    [moveClickFrom, moveClickTo, playMove, resetMoveClick, game]
   );
 
   const customArrows: Arrow[] = useMemo(() => {

@@ -11,17 +11,16 @@ import {
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/router";
 import { useState } from "react";
-import { boardAtom, gameAtom } from "../states";
+import { boardAtom } from "../states";
+import { displayedAnalysisGameAtom } from "../sessionAtoms";
 
 export default function MoreMenu() {
-  const game = useAtomValue(gameAtom);
+  const sourceGame = useAtomValue(displayedAnalysisGameAtom);
   const board = useAtomValue(boardAtom);
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   const close = () => setAnchorEl(null);
-
-  const sourceGame = game.history().length ? game : board;
 
   const openWithFen = (path: string) => {
     close();

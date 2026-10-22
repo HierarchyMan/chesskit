@@ -78,7 +78,7 @@ export default function LineEvaluation({ line }: Props) {
                 additionalText={i < line.pv.length - 1 ? "," : ""}
                 boxProps={{
                   onClick: () => {
-                    addMoves(line.pv.slice(0, i + 1));
+                    addMoves(line.pv.slice(0, i + 1), board);
                   },
                   sx: {
                     cursor: "pointer",

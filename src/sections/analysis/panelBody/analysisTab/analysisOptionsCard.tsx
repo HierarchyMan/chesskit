@@ -3,6 +3,10 @@ import AnalysisOptionsPanel, {
 } from "@/components/analysisOptions/analysisOptionsPanel";
 import { AnalysisOption } from "@/lib/analysisOptions";
 import { analysisOptionAtoms } from "../../states";
+import { analysisPositionErrorAtom } from "../../sessionAtoms";
+import { useAtomValue } from "jotai";
+import { Alert, Button } from "@mui/material";
+import { useAnalysisEngine } from "../../engineContext";
 
 const ANALYSIS_OPTION_COPY: Record<AnalysisOption, AnalysisOptionCopy> = {
   evaluation: {
@@ -20,10 +24,22 @@ const ANALYSIS_OPTION_COPY: Record<AnalysisOption, AnalysisOptionCopy> = {
 };
 
 export default function AnalysisOptionsCard() {
+  const error = useAtomValue(analysisPositionErrorAtom);
+  const engine = useAnalysisEngine();
   return (
     <AnalysisOptionsPanel
       atoms={analysisOptionAtoms}
       copy={ANALYSIS_OPTION_COPY}
+      footer={
+        error ? (
+          <Alert
+            severity="error"
+            action={<Button onClick={engine.retry}>Retry analysis</Button>}
+          >
+            {error}
+          </Alert>
+        ) : undefined
+      }
     />
   );
 }

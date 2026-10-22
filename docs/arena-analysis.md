@@ -27,7 +27,10 @@ instance of the engine selected in the top bar owns evaluation, at depth 12 and
 three lines, without cloud lookups or Elo limiting. Cached results use complete
 FENs. Annotations derive from adjacent positions and the actual UCI move using
 the existing classifier. Scores are already normalized to White by parseResults.
-Only current-history entries are projected to the UI; cache hits may survive
+Only current-history entries are projected to the UI. Historical selection keys
+now include the complete root/UCI path, so transposed move orders cannot reuse a
+different history's selected explanation (2026-10-22 audit; see
+analysis-remember-review.md). Cache hits may survive
 takeback/replay, but abandoned branches cannot appear in the move list.
 
 ### Feature inventory (M3)

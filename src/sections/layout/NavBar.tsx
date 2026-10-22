@@ -75,11 +75,31 @@ export default function NavBar({
           </>
         )}
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            ml: 1,
+            minWidth: 0,
+          }}
+        >
           {current && (
-            <Icon icon={current.icon} height={22} color={current.accent} />
+            <Icon
+              icon={current.icon}
+              height={22}
+              color={current.accent}
+              style={{ flexShrink: 0 }}
+            />
           )}
-          <Typography variant="h6" fontSize="1.05rem" fontWeight={600} noWrap>
+          <Typography
+            variant="h6"
+            fontSize="1.05rem"
+            fontWeight={600}
+            noWrap
+            sx={{ minWidth: 0 }}
+            title={current?.label ?? "Chesskit"}
+          >
             {current?.label ?? "Chesskit"}
           </Typography>
         </Box>

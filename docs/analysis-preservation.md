@@ -1,15 +1,18 @@
 # Analysis preservation — current plan and evidence
 
-2026-10-21. User reports lost analysis work/branches and arranged positions that
+Initial work 2026-10-21; current Remember policy updated 2026-10-22. User reports lost analysis work/branches and arranged positions that
 do not become the analyzed board, and authorizes adjacent fixes in this category.
-Clarification: interactive branching already works. Branch **storage** must be
-explicitly enabled in options, fully inactive when off, and off by default.
+Current contract: **Remember** explicitly enables recording and is off by default.
+Turning it off only stops new recording, including mainline appends; stored lines,
+selected board/cursor, replay and complete backups stay available. This supersedes
+the original hide/switch/export policy described in historical evidence below.
+See analysis-remember-review.md for the current audit and proof.
 
 ## Intended behavior and models
 
 1. **Intent.** Durable, reopenable analysis sessions retain the loaded game,
    replay position and analysis. Existing interactive exploration stays usable.
-   Stored alternatives are opt-in; disabling hides them and stops recording,
+   New moves and alternatives are opt-in; disabling only stops recording,
    without implicitly deleting prior saved work. Clear is a separate action.
 2. **Data.** Keep existing `games` records and IDs intact. Add an IndexedDB store
    for analysis sessions, each with original/main PGN, optional recorded lines,
@@ -24,9 +27,11 @@ explicitly enabled in options, fully inactive when off, and off by default.
 4. **Network.** Every analysis board write → active session capture → serialized
    IndexedDB commit → status/library. Board exploration off the mainline while
    storage is off remains transient and is never included in the autosave.
-   Enable → subsequent analysis alternatives are captured; choose a saved line →
+   Enable Remember → subsequent analysis moves are captured; choose a saved line →
    existing previous/next/start/end/autoplay replay it; clear → stored alternatives
-   removed, main game retained. New/load/arrange → new session preserves the old.
+   removed, main game retained. Off → same board and saved-line access. Complete
+   backups preserve every stored line regardless of the toggle. New/load/arrange
+   → new session preserves the old.
 5. **Mechanisms.** Analysis-only writable board atom captures actual legal paths;
    other boards are unchanged. Shared database open promise migrates additively.
    A single mounted persistence controller hydrates before saving, serializes
@@ -38,12 +43,13 @@ explicitly enabled in options, fully inactive when off, and off by default.
    same FEN explicitly requested after exploring; stale source URL; late engine
    result; failed/quota storage and Retry; download/restore malformed backup.
 7. **UX.** A compact session strip outside arrange/play panels owns name, saved
-   status, library/backup and options. Branch controls appear only when enabled.
+   status, library/backup and options. Remember is directly visible in Play moves.
+   Saved branch controls remain available while recording is off.
    Existing board/navigation remain the replay controls. Storage failure stays
    visible with pending work and Retry. Explain browser-local storage and backup.
-8. **Specification.** Branch option defaults false and has its own validated
-   stored preference. Off does not read branches into the board, show branch
-   controls, or record transient alternatives. Sessions still preserve the main
+8. **Specification.** Remember defaults false and retains the existing validated
+   stored preference. Off preserves selection and replay, and does not record new
+   moves. Transient explorations remain visible/copyable. Sessions preserve the main
    game. Clear cannot remove the main game. Editor analysis commits the effective
    FEN draft, not an earlier React state or URL game. Restore validates before any
    write and imports as a new session, never overwriting a colliding record.
@@ -58,7 +64,7 @@ explicitly enabled in options, fully inactive when off, and off by default.
     Export/restore comparisons prove archival fidelity; visual captures prove
     controls/fit, not durability. Lint/types/build and existing tests remain gates.
 
-## Investigation and design review
+## Historical investigation and design review (2026-10-21)
 
 - [x] I1 Clean branch `expansion/hub-and-modes`; inspect actual state/database/
   loader/editor/toolbar/evaluation consumers before selecting the mechanism.
@@ -93,7 +99,7 @@ explicitly enabled in options, fully inactive when off, and off by default.
 - [x] G1 Design gate: accepted edges have owners/proof routes; no implementation
   has been treated as evidence. Proceed with connected session/storage slice.
 
-## Live implementation and proof
+## Historical implementation and proof (2026-10-21)
 
 Each item targets its numbered model above; rival is an absent/stale/incorrectly
 gated persistence edge. Prerequisites precede execution. Results and corrections
@@ -118,7 +124,7 @@ are recorded below with actual source/test/browser observations.
 - [x] C1 Tests/lint/build, reconcile usage/evidence, commit and push current branch
   under the user's continuing delivery instruction (R3).
 
-## Findings and evidence
+## Historical findings and evidence (2026-10-21)
 
 Baseline source confirms: in-memory Chess atoms are not durable; saved-game Save
 is disabled; `getGameToSave` selects original PGN over an explored board;

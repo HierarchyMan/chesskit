@@ -1,21 +1,16 @@
 import { useAtomValue } from "jotai";
-import { boardAtom, gameAtom } from "../states";
-import { useChessActions } from "@/hooks/useChessActions";
+import { analysisReplayStateAtom } from "../sessionAtoms";
+import { useAnalysisNavigation } from "../hooks/useAnalysisNavigation";
 import { ToolbarButton } from "@/components/ToolbarButton";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 export default function GoToLastPositionButton() {
-  const { setPgn: setBoardPgn } = useChessActions(boardAtom);
-  const game = useAtomValue(gameAtom);
-  const board = useAtomValue(boardAtom);
-
-  const isButtonDisabled =
-    game.history().length === 0 ||
-    board.history().join() === game.history().join();
+  const { atEnd: isButtonDisabled } = useAtomValue(analysisReplayStateAtom);
+  const navigate = useAnalysisNavigation();
 
   const goToLastPosition = () => {
     if (isButtonDisabled) return;
-    setBoardPgn(game.pgn());
+    navigate("end");
   };
 
   useKeyboardShortcut("ArrowUp", goToLastPosition);

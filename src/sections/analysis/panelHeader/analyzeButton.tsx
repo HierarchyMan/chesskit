@@ -50,6 +50,8 @@ export default function AnalyzeButton() {
     engine?.getIsReady() && game.history().length > 0 && !evaluationProgress;
 
   const handleAnalyze = useCallback(async () => {
+    if (store.get(analysisFullRequestAtom)) return;
+    if (!game.history().length) return;
     const params = getEvaluateGameParams(game);
     if (
       !engine?.getIsReady() ||
@@ -65,7 +67,13 @@ export default function AnalyzeButton() {
     store.set(analysisFullRequestAtom, {
       id: requestId,
       target: analysisTargetKey(store.get(analysisSessionAtom), game),
+      engine,
     });
+    const isCurrentRequest = () =>
+      store.get(analysisFullRequestAtom)?.id === requestId &&
+      store.get(analysisSessionAtom)?.id === sessionId &&
+      getGameSignature(store.get(gameAtom)) === signature &&
+      store.get(engineNameAtom) === engineName;
     setError(null);
     try {
       const newGameEval = await engine.evaluateGame({
@@ -73,11 +81,7 @@ export default function AnalyzeButton() {
         depth: engineDepth,
         multiPv: engineMultiPv,
         setEvaluationProgress: (value) => {
-          if (
-            store.get(analysisSessionAtom)?.id === sessionId &&
-            getGameSignature(store.get(gameAtom)) === signature
-          )
-            setEvaluationProgress(value);
+          if (isCurrentRequest()) setEvaluationProgress(value);
         },
         playersRatings: {
           white: white?.rating,
@@ -86,12 +90,7 @@ export default function AnalyzeButton() {
         workersNb: engineWorkersNb,
       });
 
-      if (
-        store.get(analysisSessionAtom)?.id !== sessionId ||
-        getGameSignature(store.get(gameAtom)) !== signature ||
-        store.get(engineNameAtom) !== engineName
-      )
-        return;
+      if (!isCurrentRequest()) return;
       setEval(newGameEval);
       setEvaluationProgress(0);
 
@@ -101,6 +100,7 @@ export default function AnalyzeButton() {
       ) {
         await setGameEval(gameFromUrl.id, newGameEval, gameFromUrl.pgn);
       }
+      if (!isCurrentRequest()) return;
 
       const gameSavedEvals: SavedEvals = params.fens.reduce((acc, fen, idx) => {
         acc[fen] = { ...newGameEval.positions[idx], engine: engineName };
@@ -118,15 +118,15 @@ export default function AnalyzeButton() {
         nbPositions: params.fens.length,
       });
     } catch (error) {
-      if (store.get(analysisSessionAtom)?.id === sessionId)
+      if (isCurrentRequest())
         setError(
           error instanceof Error ? error.message : "Game analysis failed."
         );
     } finally {
-      if (store.get(analysisFullRequestAtom)?.id === requestId)
+      if (store.get(analysisFullRequestAtom)?.id === requestId) {
         store.set(analysisFullRequestAtom, null);
-      if (store.get(analysisSessionAtom)?.id === sessionId)
         setEvaluationProgress(0);
+      }
     }
   }, [
     engine,

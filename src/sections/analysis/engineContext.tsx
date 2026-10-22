@@ -34,14 +34,31 @@ export function AnalysisEngineProvider({ children }: PropsWithChildren) {
   const retry = engineState.retry;
 
   useEffect(() => {
-    if (request && request.target !== target) {
+    if (
+      request &&
+      (request.target !== target ||
+        request.engine !== engineState.engine ||
+        request.engine.name !== engineName)
+    ) {
       setRequest(null);
       setProgress(0);
       // A game-wide search marks its instance busy. Replace that instance when
       // its target changes, so the new board can immediately start analysis.
-      retry();
+      if (
+        request.engine === engineState.engine &&
+        request.engine.name === engineName
+      )
+        retry();
     }
-  }, [request, target, retry, setRequest, setProgress]);
+  }, [
+    request,
+    target,
+    engineState.engine,
+    engineName,
+    retry,
+    setRequest,
+    setProgress,
+  ]);
   useEffect(
     () => () => {
       setRequest(null);
@@ -50,7 +67,7 @@ export function AnalysisEngineProvider({ children }: PropsWithChildren) {
     [setRequest, setProgress]
   );
 
-  useCurrentPosition(engineState.engine, !arranging);
+  useCurrentPosition(engineState.engine, !arranging && !request);
 
   return (
     <AnalysisEngineContext.Provider value={engineState}>

@@ -6,7 +6,8 @@ import {
 } from "@/lib/editorPosition";
 import { EngineName, MoveClassification } from "@/types/enums";
 import { GameEval } from "@/types/eval";
-import { Chess, DEFAULT_POSITION } from "chess.js";
+import { Chess } from "chess.js";
+import { chessPath, isChessPrefix } from "@/lib/chessHistory";
 
 export interface AnalysisLine {
   id: string;
@@ -64,14 +65,7 @@ interface AnalysisPath {
 }
 const linePaths = new Map<string, AnalysisPath>();
 let cachedCharacters = 0;
-const gamePath = (game: Chess): AnalysisPath => {
-  const history = game.history({ verbose: true });
-  return {
-    root: game.getHeaders().FEN ?? DEFAULT_POSITION,
-    moves: history.map((move) => move.lan),
-    sans: history.map((move) => move.san),
-  };
-};
+const gamePath = chessPath;
 export const analysisLinePath = (line: AnalysisLine): AnalysisPath => {
   const cached = linePaths.get(line.pgn);
   if (cached) return cached;
@@ -89,13 +83,11 @@ const pathIsPrefix = (a: AnalysisPath, b: AnalysisPath) =>
   a.root === b.root &&
   a.moves.length <= b.moves.length &&
   a.moves.every((move, index) => move === b.moves[index]);
-export const isAnalysisPrefix = (prefix: Chess, full: Chess): boolean =>
-  pathIsPrefix(gamePath(prefix), gamePath(full));
+export const isAnalysisPrefix = isChessPrefix;
 
-export const sessionLine = (session: AnalysisSession, storeBranches: boolean) =>
-  (storeBranches
-    ? session.branches.find((line) => line.id === session.selectedLineId)
-    : undefined) ?? session.main;
+export const sessionLine = (session: AnalysisSession) =>
+  session.branches.find((line) => line.id === session.selectedLineId) ??
+  session.main;
 
 export const replayAnalysis = (line: AnalysisLine, ply?: number): Chess => {
   const game = loadGameFromText(line.pgn);
@@ -109,28 +101,58 @@ export const replayAnalysis = (line: AnalysisLine, ply?: number): Chess => {
   return game;
 };
 
-/** Off means no explored alternative, cursor, or evaluation is persisted. */
+/** Recording policy is independent of selection and access to remembered lines. */
 export const captureAnalysisBoard = (
   session: AnalysisSession,
   board: Chess,
   storeBranches: boolean
 ): AnalysisSession => {
-  const selected = sessionLine(session, storeBranches);
-  const lines = storeBranches
-    ? [selected, session.main, ...session.branches]
-    : [session.main];
+  const selected = sessionLine(session);
+  const lines = [selected, session.main, ...session.branches];
   const boardPath = gamePath(board);
-  const prefix = lines.find((line) =>
+  const prefix = (storeBranches ? lines : [selected]).find((line) =>
     pathIsPrefix(boardPath, analysisLinePath(line))
   );
   if (prefix) {
+    // A comment edit has the same move path as navigation. Merge into the full
+    // line without losing its future moves or comments beyond the cursor.
+    const full = replayAnalysis(prefix);
+    const savedComments = new Map(
+      full.getComments().map(({ fen, comment }) => [fen, comment])
+    );
+    const changedComments = board
+      .getComments()
+      .some(({ fen, comment }) => savedComments.get(fen) !== comment);
+    if (storeBranches && changedComments) {
+      const comments = new Map(
+        [...full.getComments(), ...board.getComments()].map(
+          ({ fen, comment }) => [fen, comment]
+        )
+      );
+      const moves = full.history({ verbose: true });
+      while (full.undo()) {
+        /* Keep headers and rebuild comments on the complete path. */
+      }
+      if (comments.has(full.fen())) full.setComment(comments.get(full.fen())!);
+      for (const move of moves) {
+        full.move(move);
+        if (comments.has(full.fen()))
+          full.setComment(comments.get(full.fen())!);
+      }
+    }
+    const updated = { ...prefix, pgn: full.pgn() };
     return {
       ...session,
+      main: prefix.id === "main" ? updated : session.main,
+      branches: session.branches.map((line) =>
+        line.id === prefix.id ? updated : line
+      ),
       selectedLineId: prefix.id,
       cursorPly: board.history().length,
       updatedAt: new Date().toISOString(),
     };
   }
+  if (!storeBranches) return session;
   const extension = lines.find((line) =>
     pathIsPrefix(analysisLinePath(line), boardPath)
   );
@@ -147,7 +169,6 @@ export const captureAnalysisBoard = (
       updatedAt: new Date().toISOString(),
     };
   }
-  if (!storeBranches) return session;
   // An unrelated root is a new session, never a variation of this game.
   if (analysisLinePath(session.main).root !== boardPath.root) return session;
   const branch = { id: crypto.randomUUID(), pgn: board.pgn() };
@@ -270,7 +291,7 @@ export const validateAnalysisSession = (session: AnalysisSession): void => {
   }
   if (!ids.has(session.selectedLineId))
     throw new Error("Unknown selected analysis line.");
-  replayAnalysis(sessionLine(session, true), session.cursorPly);
+  replayAnalysis(sessionLine(session), session.cursorPly);
   if (session.draft) {
     const draft = session.draft;
     if (

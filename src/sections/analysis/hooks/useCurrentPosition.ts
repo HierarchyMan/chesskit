@@ -9,13 +9,15 @@ import {
   useCloudEvalAtom,
 } from "@/sections/analysis/states";
 import { CurrentPosition, PositionEval } from "@/types/eval";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useEffect } from "react";
 import { getEvaluateGameParams } from "@/lib/chess";
 import { getMovesClassification } from "@/lib/engine/helpers/moveClassification";
 import { openingForPlacement } from "@/lib/openingIndex";
 import { UciEngine } from "@/lib/engine/uciEngine";
 import { isAnalysisPrefix } from "@/lib/analysisSession";
+import { terminalEvaluation } from "@/lib/engine/terminalEvaluation";
+import { analysisPositionErrorAtom } from "../sessionAtoms";
 
 export const useCurrentPosition = (
   engine: UciEngine | null,
@@ -29,9 +31,11 @@ export const useCurrentPosition = (
   const multiPv = useAtomValue(engineMultiPvAtom);
   const [savedEvals, setSavedEvals] = useAtom(savedEvalsAtom);
   const useCloudEval = useAtomValue(useCloudEvalAtom);
+  const setError = useSetAtom(analysisPositionErrorAtom);
 
   useEffect(() => {
     let isCurrent = true;
+    setError(null);
     const boardHistory = board.history({ verbose: true });
     const position: CurrentPosition = {
       lastMove: boardHistory.at(-1),
@@ -65,6 +69,9 @@ export const useCurrentPosition = (
       }
     }
 
+    const terminal = terminalEvaluation(board, depth);
+    if (terminal) position.eval = { ...position.eval, ...terminal };
+
     if (!position.eval?.opening) {
       for (const move of boardHistory.slice().reverse()) {
         const moveFen = move.after.split(" ")[0];
@@ -80,11 +87,10 @@ export const useCurrentPosition = (
 
     if (
       enabled &&
-      !position.eval &&
+      (!position.eval ||
+        (terminal && boardHistory.length > 0 && !position.lastEval)) &&
       engine?.getIsReady() &&
-      engine.name &&
-      !board.isCheckmate() &&
-      !board.isStalemate()
+      engine.name
     ) {
       const getFenEngineEval = async (
         fen: string,
@@ -116,7 +122,9 @@ export const useCurrentPosition = (
           useCloudEval,
         });
 
-        if (!isCurrent) return rawPositionEval;
+        if (!isCurrent || !engine.getIsReady()) return rawPositionEval;
+        if (!rawPositionEval.lines.length)
+          throw new Error("The analysis engine returned no evaluation.");
         setSavedEvals((prev) => ({
           ...prev,
           [fen]: { ...rawPositionEval, engine: engine.name },
@@ -130,12 +138,10 @@ export const useCurrentPosition = (
           if (!isCurrent) return;
           setCurrentPosition({ ...position, eval: positionEval });
         };
-        const rawPositionEval = await getFenEngineEval(
-          board.fen(),
-          setPartialEval
-        );
+        const rawPositionEval =
+          terminal ?? (await getFenEngineEval(board.fen(), setPartialEval));
 
-        if (!isCurrent) return;
+        if (!isCurrent || !engine.getIsReady()) return;
         if (boardHistory.length === 0) {
           setCurrentPosition({ ...position, eval: rawPositionEval });
           return;
@@ -177,7 +183,12 @@ export const useCurrentPosition = (
       };
 
       void getPositionEval().catch((error) => {
-        if (isCurrent) console.error("Position analysis failed", error);
+        if (isCurrent && engine.getIsReady()) {
+          setError(
+            error instanceof Error ? error.message : "Position analysis failed."
+          );
+          console.error("Position analysis failed", error);
+        }
       });
     }
 

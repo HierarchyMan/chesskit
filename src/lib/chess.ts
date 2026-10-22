@@ -5,24 +5,30 @@ import { getPositionWinPercentage } from "./engine/helpers/winPercentage";
 import { Color } from "@/types/enums";
 import { Piece } from "react-chessboard/dist/chessboard/types";
 import { loadGameFromText } from "./pgn";
+import { chessPathKey } from "./chessHistory";
+import { terminalEvaluation } from "./engine/terminalEvaluation";
 
 export const getEvaluateGameParams = (game: Chess): EvaluateGameParams => {
   const history = game.history({ verbose: true });
 
   const fens = history.map((move) => move.before);
-  fens.push(history[history.length - 1].after);
+  fens.push(history.at(-1)?.after ?? game.fen());
 
   const uciMoves = history.map(
     (move) => move.from + move.to + (move.promotion || "")
   );
 
-  return { fens, uciMoves };
+  const terminal = terminalEvaluation(game);
+  return {
+    fens,
+    uciMoves,
+    ...(terminal ? { terminalPositions: { [history.length]: terminal } } : {}),
+  };
 };
 
 export const getGameFromPgn = (pgn: string): Chess => loadGameFromText(pgn);
 
-export const getGameSignature = (game: Chess): string =>
-  `${game.getHeaders().FEN ?? ""}|${game.history().join(",")}`;
+export const getGameSignature = chessPathKey;
 
 export const formatGameToDatabase = (game: Chess): Omit<Game, "id"> => {
   const headers: Record<string, string | undefined> = game.getHeaders();
