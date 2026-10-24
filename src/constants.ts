@@ -113,6 +113,7 @@ export const PIECE_SETS = [
   "merida",
   "monarchy",
   "mpchess",
+  "neo",
   "oslo",
   "pirouetti",
   "pixel",
