@@ -105,6 +105,7 @@ export const PIECE_SETS = [
   "horsey",
   "icpieces",
   "iowa",
+  "kaneo",
   "kiwen-suwi",
   "kosal",
   "leipzig",
