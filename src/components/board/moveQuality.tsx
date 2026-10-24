@@ -60,6 +60,7 @@ export default function QualityIcon({
     top: `calc(${(y - 0.5) * 12.5}% - ${size} / 2)`,
     zIndex: 20,
     pointerEvents: "none" as const,
+    userSelect: "none" as const,
   };
 
   if (!mark.classification) {

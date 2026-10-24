@@ -49,6 +49,7 @@ const layerStyle = (size?: number): CSSProperties => ({
   width: size ?? "100%",
   height: size ?? "100%",
   pointerEvents: "none",
+  userSelect: "none",
   zIndex: 10,
 });
 

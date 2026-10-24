@@ -108,6 +108,8 @@ export function getSquareRenderer({
             ...style,
             position: "relative",
             filter: boardHue ? `hue-rotate(-${boardHue}deg)` : undefined,
+            // The square's marks and notation are chrome, not text to copy.
+            userSelect: "none",
           }}
         >
           {isCheckedKing && <div style={checkedKingStyle} />}
