@@ -46,9 +46,9 @@ export const FORMAL_CAPABILITIES: ArrowCapabilities = {
 export const ARROW_DEFAULTS: Record<ArrowMode, ArrowPrefs> = {
   analysis: {
     enabled: true,
-    moves: 1,
-    ahead: 0,
-    missed: true,
+    moves: 2,
+    ahead: 1,
+    missed: false,
     threats: false,
   },
   play: { enabled: true, moves: 0, ahead: 0, missed: true, threats: false },

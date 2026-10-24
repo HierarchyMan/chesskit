@@ -1,7 +1,6 @@
 import { DEFAULT_ENGINE } from "@/constants";
 import { createAnalysisOptionAtoms } from "@/lib/analysisOptions";
 import { createArrowPrefsAtom } from "@/lib/arrows/prefsAtom";
-import { getRecommendedWorkersNb } from "@/lib/engine/worker";
 import { storedAtom } from "@/lib/storedAtom";
 import { EngineName } from "@/types/enums";
 import { SavedEvals } from "@/types/eval";
@@ -69,10 +68,7 @@ export const engineMultiPvAtom = storedAtom(
   3,
   isNumberBetween(2, 6)
 );
-export const useCloudEvalAtom = storedAtom("use-cloud-eval", true, isBoolean);
-export const engineWorkersNbAtom = atomWithStorage(
-  "engineWorkersNb",
-  getRecommendedWorkersNb()
-);
+export const useCloudEvalAtom = storedAtom("use-cloud-eval", false, isBoolean);
+export const engineWorkersNbAtom = atomWithStorage("engineWorkersNb", 8);
 
 export const savedEvalsAtom = atom<SavedEvals>({});

@@ -4,7 +4,7 @@ import { atomWithStorage } from "jotai/utils";
 
 export const pieceSetAtom = atomWithStorage<(typeof PIECE_SETS)[number]>(
   "pieceSet",
-  "maestro"
+  "neo"
 );
 export const boardHueAtom = atomWithStorage("boardHue", 0);
 
@@ -21,7 +21,7 @@ export type BoardThemeName = keyof typeof BOARD_THEMES;
 
 export const boardThemeAtom = storedAtom<BoardThemeName>(
   "boardTheme",
-  "classic",
+  "green",
   (value): value is BoardThemeName =>
     typeof value === "string" && value in BOARD_THEMES
 );

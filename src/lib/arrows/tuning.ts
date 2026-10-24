@@ -29,7 +29,7 @@ export interface ArrowTuning {
 // measured by the scripts described in docs/engine-arrows.md.
 export const ARROW_TUNING_DEFAULTS: ArrowTuning = {
   settleDepth: 9,
-  threatSensitivity: "balanced",
+  threatSensitivity: "cautious",
   threatsShown: 2,
   threatDepth: 12,
   missedFrom: "inaccuracy",
