@@ -1,7 +1,6 @@
 import { useAtomValue } from "jotai";
 import {
   analysisOptionAtoms,
-  boardArrowsAtom,
   boardAtom,
   boardOrientationAtom,
   currentPositionAtom,
@@ -11,14 +10,23 @@ import { Color } from "@/types/enums";
 import Board from "@/components/board";
 import { usePlayersData } from "@/hooks/usePlayersData";
 import { useAnalysisBoardSize } from "../hooks/useAnalysisBoardSize";
+import { AnalysisOverlay } from "../hooks/useAnalysisOverlay";
+import BoardNavigation from "../panelToolbar/boardNavigation";
+import AnalysisOverlayPanel from "../overlayPanel";
 
-export default function BoardContainer() {
+interface Props {
+  overlay: AnalysisOverlay;
+  /** Beside the board the overlay is in the side panel; stacked, it sits above the board. */
+  overlayInspector: boolean;
+}
+
+export default function BoardContainer({ overlay, overlayInspector }: Props) {
   const boardSize = useAnalysisBoardSize();
   const boardOrientation = useAtomValue(boardOrientationAtom);
-  const showBestMoveArrow = useAtomValue(analysisOptionAtoms.bestMove);
   const showEvaluationBar = useAtomValue(analysisOptionAtoms.evaluation);
-  const extraArrows = useAtomValue(boardArrowsAtom);
   const { white, black } = usePlayersData(gameAtom);
+
+  const viewpoint = boardOrientation ? Color.White : Color.Black;
 
   return (
     <Board
@@ -28,13 +36,18 @@ export default function BoardContainer() {
       gameAtom={boardAtom}
       whitePlayer={white}
       blackPlayer={black}
-      boardOrientation={boardOrientation ? Color.White : Color.Black}
+      boardOrientation={viewpoint}
       currentPositionAtom={currentPositionAtom}
-      showBestMoveArrow={showBestMoveArrow}
       showPlayerMoveIconAtom={analysisOptionAtoms.annotations}
       showEvaluationBar={showEvaluationBar}
       resetEvaluationWhenPending
-      extraArrows={extraArrows}
+      arrows={overlay.arrows}
+      header={
+        overlayInspector ? undefined : (
+          <AnalysisOverlayPanel overlay={overlay} view="compact" />
+        )
+      }
+      footer={<BoardNavigation />}
     />
   );
 }

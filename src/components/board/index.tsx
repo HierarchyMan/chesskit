@@ -2,29 +2,42 @@ import { Grid2 as Grid } from "@mui/material";
 import { Chessboard } from "react-chessboard";
 import { Atom, PrimitiveAtom, atom, useAtomValue, useSetAtom } from "jotai";
 import {
-  Arrow,
   CustomSquareRenderer,
   PromotionPieceOption,
   Square,
 } from "react-chessboard/dist/chessboard/types";
 import { useChessActions } from "@/hooks/useChessActions";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Color, MoveClassification } from "@/types/enums";
+import {
+  ReactNode,
+  RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Color } from "@/types/enums";
 import { Chess } from "chess.js";
 import { getSquareRenderer } from "./squareRenderer";
 import { CurrentPosition } from "@/types/eval";
 import EvaluationBar from "./evaluationBar";
-import { CLASSIFICATION_COLORS } from "@/constants";
 import { Player } from "@/types/game";
 import PlayerHeader from "./playerHeader";
-import { boardHueAtom } from "./states";
 import { useBoardAppearance } from "./appearance";
-import tinycolor from "tinycolor2";
-import { uniqueArrows } from "@/lib/arrows";
+import ArrowLayer, { useMaskSettling } from "./arrowLayer";
+import { useInkArrows } from "./useInkArrows";
+import { BoardArrow } from "@/lib/arrows/types";
+import { chessPathKey } from "@/lib/chessHistory";
 import { getCheckedKing } from "@/lib/chess";
-import { getBestMoveHint } from "@/lib/bestMoveHint";
+import QualityIcon, { useQualityMark } from "./moveQuality";
 
 const noPositionAtom = atom<CurrentPosition>({});
+const NO_ARROWS: readonly BoardArrow[] = [];
+
+/** How long a move takes to slide, in milliseconds. */
+export const MOVE_ANIMATION_MS = 200;
+/** Masks wait this much longer than a slide, so they are cut only on settled pieces. */
+const MASK_SETTLE_MS = MOVE_ANIMATION_MS + 30;
 
 export interface Props {
   id: string;
@@ -35,13 +48,31 @@ export interface Props {
   blackPlayer: Player;
   boardOrientation?: Color;
   currentPositionAtom?: PrimitiveAtom<CurrentPosition>;
-  showBestMoveArrow?: boolean;
   showPlayerMoveIconAtom?: PrimitiveAtom<boolean>;
   showEvaluationBar?: boolean;
   resetEvaluationWhenPending?: boolean;
-  extraArrows?: Arrow[];
+  arrows?: readonly BoardArrow[];
+  /** Controls that sit above the board, such as a compact overlay entry. */
+  header?: ReactNode;
+  /** Controls that belong with the board, shown beneath it. */
+  footer?: ReactNode;
   clocksAtom?: Atom<{ w: number; b: number } | null>;
 }
+
+/** The board's width in pixels, measured as it changes. */
+const useBoardPixels = (ref: RefObject<HTMLDivElement | null>) => {
+  const [pixels, setPixels] = useState<number>();
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      setPixels(Math.round(entry.contentRect.width));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+  return pixels;
+};
 
 export default function Board({
   id: boardId,
@@ -52,21 +83,26 @@ export default function Board({
   blackPlayer,
   boardOrientation = Color.White,
   currentPositionAtom = noPositionAtom,
-  showBestMoveArrow = false,
   showPlayerMoveIconAtom,
   showEvaluationBar = false,
   resetEvaluationWhenPending = false,
-  extraArrows,
+  arrows,
+  header,
+  footer,
   clocksAtom,
 }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
+  const pixels = useBoardPixels(boardRef);
   const game = useAtomValue(gameAtom);
+  const qualityMark = useQualityMark(
+    currentPositionAtom,
+    showPlayerMoveIconAtom
+  );
   const { playMove } = useChessActions(gameAtom);
   const clickedSquaresAtom = useMemo(() => atom<Square[]>([]), []);
   const setClickedSquares = useSetAtom(clickedSquaresAtom);
   const playableSquaresAtom = useMemo(() => atom<Square[]>([]), []);
   const setPlayableSquares = useSetAtom(playableSquaresAtom);
-  const position = useAtomValue(currentPositionAtom);
   const [showPromotionDialog, setShowPromotionDialog] = useState(false);
   const [moveClickFrom, setMoveClickFrom] = useState<Square | null>(null);
   const [moveClickTo, setMoveClickTo] = useState<Square | null>(null);
@@ -79,9 +115,20 @@ export default function Board({
     () => (clocksAtom ? atom((get) => get(clocksAtom)?.b) : undefined),
     [clocksAtom]
   );
-  const boardHue = useAtomValue(boardHueAtom);
 
   const gameFen = game.fen();
+  const turn = game.turn();
+  const orientation = boardOrientation === Color.White ? "white" : "black";
+  const positionKey = useMemo(() => chessPathKey(game), [game]);
+  const { ink, draft, clearInk, handlers } = useInkArrows(
+    positionKey,
+    orientation
+  );
+
+  // A piece that is held is not where its square says, so arrows are not cut
+  // around it while a drag is under way.
+  const [dragging, setDragging] = useState(false);
+  const settled = useMaskSettling(gameFen, MASK_SETTLE_MS);
 
   useEffect(() => {
     setClickedSquares([]);
@@ -136,6 +183,7 @@ export default function Board({
   const handleSquareLeftClick = useCallback(
     (square: Square, piece?: string) => {
       setClickedSquares([]);
+      clearInk();
 
       if (!moveClickFrom) {
         if (piece && !isPiecePlayable({ piece })) return;
@@ -179,6 +227,7 @@ export default function Board({
       playMove,
       resetMoveClick,
       setClickedSquares,
+      clearInk,
     ]
   );
 
@@ -195,12 +244,14 @@ export default function Board({
 
   const handlePieceDragBegin = useCallback(
     (_: string, square: Square) => {
+      setDragging(true);
       resetMoveClick(square);
     },
     [resetMoveClick]
   );
 
   const handlePieceDragEnd = useCallback(() => {
+    setDragging(false);
     resetMoveClick();
   }, [resetMoveClick]);
 
@@ -241,25 +292,6 @@ export default function Board({
     [moveClickFrom, moveClickTo, playMove, resetMoveClick, game]
   );
 
-  const customArrows: Arrow[] = useMemo(() => {
-    const bestMove = showBestMoveArrow ? getBestMoveHint(position) : undefined;
-    const arrows: Arrow[] = [...(extraArrows ?? [])];
-
-    if (bestMove) {
-      const bestMoveArrow = [
-        bestMove.slice(0, 2),
-        bestMove.slice(2, 4),
-        tinycolor(CLASSIFICATION_COLORS[MoveClassification.Best])
-          .spin(-boardHue)
-          .toHexString(),
-      ] as Arrow;
-
-      arrows.push(bestMoveArrow);
-    }
-
-    return uniqueArrows(arrows);
-  }, [position, showBestMoveArrow, boardHue, extraArrows]);
-
   const checkedKingAtom = useMemo(
     () => atom((get) => getCheckedKing(get(gameAtom))),
     [gameAtom]
@@ -271,14 +303,12 @@ export default function Board({
       clickedSquaresAtom,
       playableSquaresAtom,
       checkedKingAtom,
-      showPlayerMoveIconAtom,
     });
   }, [
     currentPositionAtom,
     clickedSquaresAtom,
     playableSquaresAtom,
     checkedKingAtom,
-    showPlayerMoveIconAtom,
   ]);
 
   return (
@@ -296,6 +326,7 @@ export default function Board({
           boardOrientation={boardOrientation}
           currentPositionAtom={currentPositionAtom}
           resetWhenPending={resetEvaluationWhenPending}
+          fen={gameFen}
         />
       )}
 
@@ -307,6 +338,8 @@ export default function Board({
         paddingLeft={{ xs: 0.5, sm: showEvaluationBar ? 2 : 0 }}
         size="grow"
       >
+        {header}
+
         <PlayerHeader
           color={boardOrientation === Color.White ? Color.Black : Color.White}
           gameAtom={gameAtom}
@@ -321,8 +354,9 @@ export default function Board({
           justifyContent="center"
           alignItems="center"
           ref={boardRef}
-          sx={{ aspectRatio: "1 / 1", width: "100%" }}
+          sx={{ aspectRatio: "1 / 1", width: "100%", position: "relative" }}
           size={12}
+          {...handlers}
         >
           <Chessboard
             id={`${boardId}-${canPlay}`}
@@ -335,7 +369,7 @@ export default function Board({
             customDarkSquareStyle={appearance.customDarkSquareStyle}
             customLightSquareStyle={appearance.customLightSquareStyle}
             showBoardNotation={appearance.showBoardNotation}
-            customArrows={customArrows}
+            areArrowsAllowed={false}
             isDraggablePiece={isPiecePlayable}
             customSquare={SquareRenderer}
             onSquareClick={handleSquareLeftClick}
@@ -345,9 +379,23 @@ export default function Board({
             onPromotionPieceSelect={onPromotionPieceSelect}
             showPromotionDialog={showPromotionDialog}
             promotionToSquare={moveClickTo}
-            animationDuration={200}
+            animationDuration={MOVE_ANIMATION_MS}
             customPieces={appearance.customPieces}
           />
+          <ArrowLayer
+            arrows={arrows ?? NO_ARROWS}
+            ink={ink}
+            draft={draft}
+            orientation={orientation}
+            turn={turn}
+            fen={gameFen}
+            size={pixels}
+            masking={settled && !dragging}
+            qualityMarkedSquare={qualityMark?.square}
+          />
+          {qualityMark && (
+            <QualityIcon mark={qualityMark} orientation={orientation} />
+          )}
         </Grid>
 
         <PlayerHeader
@@ -358,6 +406,8 @@ export default function Board({
             boardOrientation === Color.White ? whiteClockAtom : blackClockAtom
           }
         />
+
+        {footer}
       </Grid>
     </Grid>
   );

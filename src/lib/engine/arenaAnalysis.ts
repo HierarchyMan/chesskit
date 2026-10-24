@@ -55,6 +55,7 @@ export const projectArenaAnalysis = (
   const last = moves.at(-1);
   return {
     position: {
+      fen: game.fen(),
       lastMove: last?.move,
       eval: last?.after ?? current,
       lastEval: last?.before,

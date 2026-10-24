@@ -3,11 +3,15 @@ import TopMovesPanel from "@/components/topMovesPanel";
 import { useChessActions } from "@/hooks/useChessActions";
 import { useEngineState } from "@/hooks/useEngine";
 import { uciMoveParams } from "@/lib/chess";
+import { effectiveMoveSide } from "@/lib/engine/topMoves";
+import { useCallback } from "react";
+import { BoardArrow } from "@/lib/arrows/types";
 import { Icon } from "@iconify/react";
 import { IconButton, Tooltip, Typography } from "@mui/material";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   boardArrowsAtom,
+  analysisBoardKeyAtom,
   boardAtom,
   engineDepthAtom,
   engineMultiPvAtom,
@@ -29,8 +33,15 @@ function TopMovesBody({ onClose }: { onClose: () => void }) {
   const engineName = useAtomValue(engineNameAtom);
   const depth = useAtomValue(engineDepthAtom);
   const count = useAtomValue(engineMultiPvAtom);
-  const [side, setSide] = useAtom(topMovesSideAtom);
+  const [sideChoice, setSideChoice] = useAtom(topMovesSideAtom);
+  const fen = board.fen();
+  const positionKey = useAtomValue(analysisBoardKeyAtom);
+  const side = effectiveMoveSide(sideChoice, fen, positionKey);
   const setArrows = useSetAtom(boardArrowsAtom);
+  const publishArrows = useCallback(
+    (arrows: BoardArrow[]) => setArrows({ positionKey, arrows }),
+    [setArrows, positionKey]
+  );
   const { playMove } = useChessActions(boardAtom);
   const engine = useEngineState(engineName);
 
@@ -51,16 +62,20 @@ function TopMovesBody({ onClose }: { onClose: () => void }) {
       }
     >
       <TopMovesPanel
-        fen={board.fen()}
+        fen={fen}
+        positionKey={positionKey}
         engine={engine.engine}
         engineStatus={engine.status}
         engineError={engine.error}
         onRetryEngine={engine.retry}
         side={side}
-        onSideChange={setSide}
+        onSideChange={(value) => {
+          setArrows([]);
+          setSideChoice({ side: value, fen, positionKey });
+        }}
         count={count}
         depth={depth}
-        onArrows={setArrows}
+        onArrows={publishArrows}
         onPlay={
           side === "mover"
             ? (move) => playMove(uciMoveParams(move.uci), board)

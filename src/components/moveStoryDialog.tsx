@@ -30,7 +30,8 @@ import {
 import { useAtom } from "jotai";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Arrow, Square } from "react-chessboard/dist/chessboard/types";
+import { arrowFromUci } from "@/lib/arrows/uci";
+import { BoardArrow } from "@/lib/arrows/types";
 
 import { moveStoryAtom, MoveStoryDialogState } from "@/lib/moveStoryState";
 export { moveStoryAtom } from "@/lib/moveStoryState";
@@ -162,17 +163,11 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
     ? { from: current.uci.slice(0, 2), to: current.uci.slice(2, 4) }
     : undefined;
 
-  const arrows = useMemo<Arrow[]>(() => {
+  const arrows = useMemo<BoardArrow[]>(() => {
     const upcoming = line.steps[step + 1];
     if (!upcoming?.uci || step >= visibleEnd) return [];
 
-    return [
-      [
-        upcoming.uci.slice(0, 2) as Square,
-        upcoming.uci.slice(2, 4) as Square,
-        "rgba(59, 154, 198, 0.75)",
-      ],
-    ];
+    return [arrowFromUci(upcoming.uci, { kind: "best", side: upcoming.color })];
   }, [line, step, visibleEnd]);
 
   const switchLine = (key: LineKey) => {

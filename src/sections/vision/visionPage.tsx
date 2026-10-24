@@ -2,7 +2,8 @@ import { useBoardAppearance } from "@/components/board/appearance";
 import Panel from "@/components/panel";
 import { useBoardLayout } from "@/hooks/useBoardLayout";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
-import { uniqueArrows } from "@/lib/arrows";
+import ArrowLayer from "@/components/board/arrowLayer";
+import { BoardArrow } from "@/lib/arrows/types";
 import { FILES, RANKS } from "@/lib/vision";
 import { Icon } from "@iconify/react";
 import {
@@ -20,7 +21,6 @@ import {
 import { useMemo } from "react";
 import { Chessboard } from "react-chessboard";
 import {
-  Arrow,
   CustomSquareStyles,
   Square,
 } from "react-chessboard/dist/chessboard/types";
@@ -77,7 +77,7 @@ const ringStyle = (color: string): Record<string, string> => ({
 
 const buildBoard = (trainer: VisionTrainer) => {
   const styles: CustomSquareStyles = {};
-  const arrows: Arrow[] = [];
+  const arrows: BoardArrow[] = [];
   let position: string | Record<string, string> = "8/8/8/8/8/8/8/8";
 
   if (
@@ -98,20 +98,22 @@ const buildBoard = (trainer: VisionTrainer) => {
     styles[trainer.route.to as Square] = ringStyle(CORRECT);
 
     for (let i = 1; i < trainer.path.length; i++) {
-      arrows.push([
-        trainer.path[i - 1] as Square,
-        trainer.path[i] as Square,
-        "rgba(59, 154, 198, 0.85)",
-      ]);
+      arrows.push({
+        from: trainer.path[i - 1] as Square,
+        to: trainer.path[i] as Square,
+        kind: "content",
+        color: "rgba(59, 154, 198, 0.85)",
+      });
     }
 
     if (trainer.showSolution) {
       for (let i = 1; i < trainer.solution.length; i++) {
-        arrows.push([
-          trainer.solution[i - 1] as Square,
-          trainer.solution[i] as Square,
-          "rgba(255, 170, 0, 0.8)",
-        ]);
+        arrows.push({
+          from: trainer.solution[i - 1] as Square,
+          to: trainer.solution[i] as Square,
+          kind: "content",
+          color: "rgba(255, 170, 0, 0.8)",
+        });
       }
     }
   }
@@ -120,7 +122,7 @@ const buildBoard = (trainer: VisionTrainer) => {
     styles[square as Square] = squareStyle(correct ? CORRECT : WRONG);
   }
 
-  return { styles, arrows: uniqueArrows(arrows), position };
+  return { styles, arrows, position };
 };
 
 export default function VisionPage() {
@@ -165,7 +167,7 @@ export default function VisionPage() {
         gap: 4,
       }}
     >
-      <Box sx={{ width: boardSize, maxWidth: "100%" }}>
+      <Box sx={{ width: boardSize, maxWidth: "100%", position: "relative" }}>
         <Chessboard
           id="VisionBoard"
           boardWidth={boardSize}
@@ -176,12 +178,17 @@ export default function VisionPage() {
           animationDuration={150}
           onSquareClick={(square) => trainer.clickSquare(square)}
           customSquareStyles={styles}
-          customArrows={arrows}
           customBoardStyle={appearance.customBoardStyle}
           customDarkSquareStyle={appearance.customDarkSquareStyle}
           customLightSquareStyle={appearance.customLightSquareStyle}
           customPieces={appearance.customPieces}
           showBoardNotation={labelsAllowed && trainer.showLabels}
+        />
+        <ArrowLayer
+          arrows={arrows}
+          orientation={trainer.orientation}
+          turn="w"
+          size={boardSize}
         />
       </Box>
 

@@ -52,6 +52,9 @@ import {
   SettingsTab,
 } from "../layout/states";
 import ModelsTab from "./modelsTab";
+import ArrowsTab from "./arrowsTab";
+import FeatureEngineSelect from "./featureEngineSelect";
+import { ENGINE_FEATURES } from "@/lib/engine/featureEngines";
 
 const PREVIEW_FEN =
   "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
@@ -82,6 +85,12 @@ export default function SettingsDialog() {
           iconPosition="start"
         />
         <Tab
+          value="arrows"
+          label="Arrows"
+          icon={<Icon icon="mdi:arrow-top-right" height={20} />}
+          iconPosition="start"
+        />
+        <Tab
           value="board"
           label="Board"
           icon={<Icon icon="mdi:chess-pawn" height={20} />}
@@ -96,6 +105,7 @@ export default function SettingsDialog() {
       </Tabs>
       <DialogContent sx={{ pt: 3, minHeight: 420 }}>
         {tab === "engine" && <EngineTab />}
+        {tab === "arrows" && <ArrowsTab />}
         {tab === "board" && <BoardTab />}
         {tab === "models" && <ModelsTab />}
       </DialogContent>
@@ -143,10 +153,22 @@ function EngineTab() {
           </Select>
         </FormControl>
         <Typography variant="caption" sx={{ opacity: 0.7 }}>
-          Used for analysis, hints, the editor and the coach. Bots in Play and
-          the Arena have their own engine pickers. Download engines and check
-          Reckless in the Models tab.
+          Used for analysis and the editor, and by every feature below unless
+          you give it an engine of its own. Bots in Play and the Arena have
+          their own engine pickers. Download engines and check Reckless in the
+          Models tab.
         </Typography>
+      </Grid>
+
+      <Grid size={12}>
+        <Stack spacing={2}>
+          <Typography variant="subtitle2">
+            Engines for other features
+          </Typography>
+          {ENGINE_FEATURES.map((feature) => (
+            <FeatureEngineSelect key={feature.id} feature={feature} />
+          ))}
+        </Stack>
       </Grid>
 
       <Slider
@@ -158,7 +180,7 @@ function EngineTab() {
         marksFilter={2}
       />
       <Slider
-        label="Number of lines"
+        label="Engine lines listed"
         value={multiPv}
         setValue={setMultiPv}
         min={2}

@@ -1,6 +1,5 @@
 import { useEngineState } from "@/hooks/useEngine";
-import { getBestMoveHint } from "@/lib/bestMoveHint";
-import { moveLineUciToSan } from "@/lib/chess";
+import { getBestMoveSuggestion } from "@/lib/bestMoveHint";
 import {
   ARENA_ANALYSIS_DEPTH,
   ARENA_ANALYSIS_LINES,
@@ -10,20 +9,25 @@ import {
   getArenaOpening,
   projectArenaAnalysis,
 } from "@/lib/engine/arenaAnalysis";
-import { engineNameAtom } from "@/sections/analysis/states";
+import { useFeatureEngineName } from "@/hooks/useFeatureEngineName";
 import { UciEngine } from "@/lib/engine/uciEngine";
 import { Chess } from "chess.js";
 import { useAtomValue } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { arenaAnalysisOptionAtoms } from "./states";
+import { ARROW_CAPABILITIES, effectivePrefs } from "@/lib/arrows/prefs";
+import { arenaAnalysisOptionAtoms, arenaArrowPrefsAtom } from "./states";
 
 export function useArenaAnalysis(game: Chess, started: boolean) {
   const showEvaluation = useAtomValue(arenaAnalysisOptionAtoms.evaluation);
   const showAnnotations = useAtomValue(arenaAnalysisOptionAtoms.annotations);
-  const showBestMove = useAtomValue(arenaAnalysisOptionAtoms.bestMove);
-  const engineName = useAtomValue(engineNameAtom);
-  const enabled =
-    started && (showEvaluation || showAnnotations || showBestMove);
+  const arrowPrefs = useAtomValue(arenaArrowPrefsAtom);
+  const { enabled: arrowsOn, moves: arrowMoves } = effectivePrefs(
+    arrowPrefs,
+    ARROW_CAPABILITIES.arena
+  );
+  const showArrows = arrowsOn && arrowMoves > 0;
+  const engineName = useFeatureEngineName("evaluator");
+  const enabled = started && (showEvaluation || showAnnotations || showArrows);
   const engineState = useEngineState(enabled ? engineName : undefined);
   const [update, setUpdate] = useState<
     ArenaAnalysisUpdate & { source?: UciEngine }
@@ -58,8 +62,8 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
   }, [engine, engineName, enabled]);
 
   useEffect(() => {
-    if (enabled) session.current?.update(game, showAnnotations, showBestMove);
-  }, [game, enabled, engine, engineName, showAnnotations, showBestMove]);
+    if (enabled) session.current?.update(game, showAnnotations, showArrows);
+  }, [game, enabled, engine, engineName, showAnnotations, showArrows]);
 
   const hasCurrentSource =
     enabled && update.source === engine && engine?.name === engineName;
@@ -80,22 +84,18 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
   const opening = useMemo(() => getArenaOpening(moves), [moves]);
 
   // Same rule as the board arrow, so the text never names a move the arrow hides.
-  const betterMove = useMemo(() => {
-    const uci = getBestMoveHint(position);
-    if (!uci || !position.lastMove) return undefined;
-    return moveLineUciToSan(position.lastMove.before)(uci);
-  }, [position]);
+  const bestMove = useMemo(() => getBestMoveSuggestion(position), [position]);
 
   return {
     position,
     moves,
     accuracy,
     opening,
-    betterMove,
+    bestMove,
     enabled,
     showEvaluation,
     showAnnotations,
-    showBestMove,
+    showArrows,
     engineName,
     engineState,
     busy: hasCurrentSource && update.busy,

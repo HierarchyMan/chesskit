@@ -28,6 +28,7 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
@@ -47,6 +48,9 @@ import {
   boardOrientationAtom,
   editablePositionAtom,
 } from "./states";
+
+const REMEMBER_HELP =
+  "Record new moves for back and forward replay. Turning this off keeps all remembered moves.";
 
 export default function SessionPanel() {
   const [session, setSession] = useAtom(analysisSessionAtom);
@@ -144,27 +148,26 @@ export default function SessionPanel() {
                   : "Opening session…"}
           </Typography>
         </Box>
-        <Button size="small" onClick={() => setOpen(true)}>
-          Sessions & options
-        </Button>
-      </Stack>
-      {!arranging && (
-        <>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={branches}
-                onChange={(_, checked) => setBranches(checked)}
+        <Stack direction="row" alignItems="center" gap={1}>
+          {!arranging && (
+            <Tooltip title={REMEMBER_HELP}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={branches}
+                    onChange={(_, checked) => setBranches(checked)}
+                  />
+                }
+                label={<Typography variant="body2">Remember</Typography>}
               />
-            }
-            label="Remember"
-          />
-          <Typography variant="caption" display="block">
-            Record new moves for back and forward replay. Turning this off keeps
-            all remembered moves.
-          </Typography>
-        </>
-      )}
+            </Tooltip>
+          )}
+          <Button size="small" onClick={() => setOpen(true)}>
+            Sessions & options
+          </Button>
+        </Stack>
+      </Stack>
       {state.error && (
         <Alert
           severity="error"

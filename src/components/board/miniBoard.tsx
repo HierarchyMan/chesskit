@@ -1,16 +1,16 @@
+import { BoardArrow } from "@/lib/arrows/types";
 import { Color } from "@/types/enums";
 import { Box } from "@mui/material";
 import { CSSProperties, useId, useMemo } from "react";
 import { Chessboard } from "react-chessboard";
-import { Arrow } from "react-chessboard/dist/chessboard/types";
-import { uniqueArrows } from "@/lib/arrows";
+import ArrowLayer, { useMaskSettling } from "./arrowLayer";
 import { useBoardAppearance } from "./appearance";
 
 interface Props {
   fen: string;
   size: number;
   orientation?: Color;
-  arrows?: Arrow[];
+  arrows?: BoardArrow[];
   lastMove?: { from: string; to: string };
   squareStyles?: Record<string, CSSProperties>;
   animationDuration?: number;
@@ -33,10 +33,7 @@ export default function MiniBoard({
 }: Props) {
   const appearance = useBoardAppearance();
   const id = useId();
-  const uniqueMiniArrows = useMemo(
-    () => (arrows ? uniqueArrows(arrows) : arrows),
-    [arrows]
-  );
+  const masking = useMaskSettling(fen, animationDuration + 30);
 
   const squareStyles = useMemo(
     () => ({
@@ -49,7 +46,9 @@ export default function MiniBoard({
   );
 
   return (
-    <Box sx={{ width: size, height: size, flexShrink: 0 }}>
+    <Box
+      sx={{ width: size, height: size, flexShrink: 0, position: "relative" }}
+    >
       <Chessboard
         id={`mini-${id}`}
         position={fen}
@@ -57,7 +56,6 @@ export default function MiniBoard({
         arePiecesDraggable={false}
         areArrowsAllowed={false}
         boardOrientation={orientation === Color.White ? "white" : "black"}
-        customArrows={uniqueMiniArrows}
         customSquareStyles={squareStyles}
         customBoardStyle={appearance.customBoardStyle}
         customDarkSquareStyle={appearance.customDarkSquareStyle}
@@ -66,6 +64,16 @@ export default function MiniBoard({
         showBoardNotation={showCoordinates ?? appearance.showBoardNotation}
         animationDuration={animationDuration}
       />
+      {arrows && arrows.length > 0 && (
+        <ArrowLayer
+          arrows={arrows}
+          orientation={orientation === Color.White ? "white" : "black"}
+          turn={fen.split(" ")[1] === "b" ? "b" : "w"}
+          fen={fen}
+          size={size}
+          masking={masking}
+        />
+      )}
     </Box>
   );
 }

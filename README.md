@@ -18,13 +18,14 @@ Chesskit lets you play, study, analyse and review chess with Stockfish on any de
 
 **Play**
 - Play against Stockfish at any Elo from 400 to 3200, at a fixed depth, or at full strength.
-- Casual games offer hints, takebacks and an optional coach. Formal games have none.
+- Casual games offer hints, takebacks and an optional coach. Formal games give no advice before a move; the coach can still grade a move after you make it.
+- **Arrows** under the board show what the engine suggests while you play (off by default), a dashed arrow for the better move after one of yours, and the opponent's threats. See *Engine arrows* below.
 - Odds, clocks, resign and draw offers.
 
 **Analyse**
 - One board for analysis and the board editor: arrange any position, then play moves on it.
-- Live engine evaluation with top moves for either side, custom arrows and an evaluation graph.
-- **Analysis options** on the Analysis tab toggle the evaluation bar, move annotations and the best-move arrow. Choices are remembered in this browser.
+- Live engine evaluation with top moves for either side, your own arrows and an evaluation graph.
+- **Analysis options** on the Analysis tab toggle the evaluation bar and move annotations. Engine arrows have their own controls under the board (see *Engine arrows*). Choices are remembered in this browser.
 - Move classification (Brilliant, Great, Good, Mistake, Blunder, ...).
 - Load games from [chess.com](https://chess.com) and [lichess.org](https://lichess.org), or paste a PGN, a FEN, a Lichess link or a screenshot of a board (`Ctrl+V` on any page).
 - **Scan Image** turns a photo or screenshot of a board into a position, entirely in your browser.
@@ -32,8 +33,15 @@ Chesskit lets you play, study, analyse and review chess with Stockfish on any de
 
 **Engine Arena**
 - Pit two engines, or two strengths of one engine, against each other. Step through with *Next*, nudge a move by clicking a candidate or dragging a piece, or let them auto-play.
-- Use **Analysis options** in the side panel to independently toggle the evaluation bar, move annotations, and a best-move arrow. Choices are remembered in this browser. With annotations on, the panel also shows the opening and each side's accuracy; with the arrow on, it names the better alternative.
-- An independent instance of the top-bar analysis engine checks moves at depth 12. Annotations grade both players' moves on the board and in the move list; select any move for its explanation and **Visualize move**. Enabling annotations mid-game also checks earlier moves. Analysis can catch up during fast auto-play; it does not control the players' moves.
+- Use **Analysis options** in the side panel to independently toggle the evaluation bar and move annotations, and the bar under the board for the engine's moves. Choices are remembered in this browser. With annotations on, the panel also shows the opening, each side's accuracy and explicitly labeled previous-move feedback. The arrow and its recommendation describe the side to move on the current board.
+- An independent instance of the Arena evaluation engine (the analysis engine unless you choose another in Settings) checks moves at depth 12. Annotations grade both players' moves on the board and in the move list; select any move for its explanation and **Visualize move**. Enabling annotations mid-game also checks earlier moves. Analysis can catch up during fast auto-play; it does not control the players' moves.
+
+**Engine arrows**
+- A bar under the Analysis, Play and Arena boards: a master switch (`A`), **Moves** (how many of the engine's best moves to draw, `1`–`5`), **Ahead** (how many further moves of the engine's line to number), **Missed** (the better move after one of yours) and **Threats** (`X`). The bar lists only the kinds of arrow on the board; pointing at an entry puts the others in the background.
+- The hue says who moves (blue for the side at the bottom, or you in Play; vermilion for the other), the line style says when (dashed for a move not made, numbered for a later one), and the width says how strong. A threat is marked with "!".
+- **Threats** are what the opponent would do if it were their move, kept only when it would gain them enough over the position as it stands, so a defended piece or a developing move is not drawn. Passing the turn is not possible in check, so there are none then.
+- Draw your own arrows by dragging with the right mouse button: green, red with Shift or Ctrl, blue with Alt, yellow with both. A left click clears them. They stay with their position.
+- **Settings → Arrows** sets how the engine arrows decide: the search depth to wait for, which grade of move earns a better-move arrow, how sensitive threats are, how many are shown and how deep their search goes. **Settings → Engine** lets threats, Play suggestions, the Play coach and the Arena evaluation each run on their own engine; each follows the analysis engine until you choose otherwise.
 
 **Learn**
 - **Puzzles**: Lichess puzzles, the daily puzzle, an offline set, and puzzles built from your own mistakes.
@@ -58,7 +66,10 @@ Turn on **Remember** beside the Analysis session name to record every new move,
 including a game you invent and alternative lines. It is off by default. Choose
 a saved line and use previous/next, start/final, keyboard arrows or autoplay to
 replay it. Turning Remember off only stops new recording: your board, saved lines
-and replay stay available. Clear branches keeps the main game and offers Undo.
+and replay stay available. Continuing past a saved main game's end creates a
+branch and preserves the main game and its completed evaluation. Evaluated
+branches are preserved the same way; an unevaluated continuation grows as you
+play. Clear branches keeps the main game and offers Undo.
 Play and Arena keep their existing live-game histories; Arena's Analyze game
 opens the same Analysis workspace with Remember available.
 
@@ -124,7 +135,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 
-Chesskit was created by [Guillaume Sanchez-Dumont](https://github.com/GuillaumeSD) and is maintained with its contributors. The Stockfish builds in `public/engines` are the work of the Stockfish team and are distributed under their own licences. Puzzles come from the [Lichess](https://lichess.org) API.
+Chesskit was created by [Guillaume Sanchez-Dumont](https://github.com/GuillaumeSD) and is maintained with its contributors. The Stockfish builds in `public/engines` are the work of the Stockfish team and are distributed under their own licences. Puzzles come from the [Lichess](https://lichess.org) API. The Kaneo piece set in `public/piece/kaneo` is by [Kadagaden](https://github.com/Kadagaden/chess-pieces), inspired by chess.com's Neo pieces, and is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ## License
 

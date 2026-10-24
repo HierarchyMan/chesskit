@@ -153,9 +153,22 @@ export const captureAnalysisBoard = (
     };
   }
   if (!storeBranches) return session;
-  const extension = lines.find((line) =>
-    pathIsPrefix(analysisLinePath(line), boardPath)
-  );
+  const extension = lines
+    .filter((line) => {
+      const path = analysisLinePath(line);
+      // Preserve the imported/main game and every evaluated variation. A
+      // continuation gets its own editable branch rather than deleting the
+      // complete line's evaluation. Only a pristine empty main can be seeded.
+      const editable =
+        !line.evaluation &&
+        (line.id !== "main" ||
+          (path.moves.length === 0 && session.branches.length === 0));
+      return editable && pathIsPrefix(path, boardPath);
+    })
+    .sort(
+      (a, b) =>
+        analysisLinePath(b).moves.length - analysisLinePath(a).moves.length
+    )[0];
   if (extension) {
     const updated = { ...extension, pgn: board.pgn(), evaluation: undefined };
     return {

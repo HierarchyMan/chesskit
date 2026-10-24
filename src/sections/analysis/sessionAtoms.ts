@@ -8,7 +8,16 @@ import {
   isAnalysisPrefix,
 } from "@/lib/analysisSession";
 import { getGameSignature } from "@/lib/chess";
-import { navigateChess, ReplayAction, replayState } from "@/lib/chessHistory";
+import {
+  chessPathKey,
+  navigateChess,
+  ReplayAction,
+  replayState,
+} from "@/lib/chessHistory";
+import {
+  createPositionArrowsAtom,
+  MoveSideChoice,
+} from "@/lib/engine/topMoves";
 import { storedAtom } from "@/lib/storedAtom";
 import { CurrentPosition, GameEval } from "@/types/eval";
 import { Chess } from "chess.js";
@@ -18,7 +27,6 @@ import {
   START_FEN,
 } from "@/lib/editorPosition";
 import { atom } from "jotai";
-import { Arrow } from "react-chessboard/dist/chessboard/types";
 import type { UciEngine } from "@/lib/engine/uciEngine";
 
 export const analysisSessionAtom = atom<AnalysisSession | null>(null);
@@ -59,7 +67,15 @@ const evaluationValueAtom = atom<GameEval | undefined>(undefined);
 export const currentPositionAtom = atom<CurrentPosition>({});
 export const evaluationProgressAtom = atom(0);
 export const autoPlayAtom = atom(false);
-export const boardArrowsAtom = atom<Arrow[]>([]);
+export const analysisBoardKeyAtom = atom(
+  (get) =>
+    `${get(analysisSessionAtom)?.id ?? ""}|${chessPathKey(get(boardValueAtom))}`
+);
+export const boardArrowsAtom = createPositionArrowsAtom(analysisBoardKeyAtom);
+export const topMovesSideAtom = atom<MoveSideChoice>({
+  side: "mover",
+  fen: null,
+});
 
 export const restoreAnalysisSessionAtom = atom(
   null,
@@ -76,6 +92,7 @@ export const restoreAnalysisSessionAtom = atom(
     set(evaluationProgressAtom, 0);
     set(autoPlayAtom, false);
     set(boardArrowsAtom, []);
+    set(topMovesSideAtom, { side: "mover", fen: null });
     set(boardOrientationAtom, session.orientation);
     set(arrangeModeAtom, !!session.draft);
     set(arrangeFenDraftAtom, session.draftInput ?? null);
@@ -95,9 +112,14 @@ export const rememberAnalysisAtom = storeAnalysisBranchesAtom;
 export const boardAtom = atom(
   (get) => get(boardValueAtom),
   (get, set, update: Chess | ((previous: Chess) => Chess)) => {
+    const previousKey = get(analysisBoardKeyAtom);
     const board =
       typeof update === "function" ? update(get(boardValueAtom)) : update;
     set(boardValueAtom, board);
+    if (get(analysisBoardKeyAtom) !== previousKey) {
+      set(topMovesSideAtom, { side: "mover", fen: null });
+      set(boardArrowsAtom, []);
+    }
     const session = get(analysisSessionAtom);
     if (!session) return;
     const captured = captureAnalysisBoard(

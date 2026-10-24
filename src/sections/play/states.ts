@@ -9,11 +9,13 @@ import { ChallengeStatus } from "@/lib/endgames";
 import { GameEnd } from "@/lib/gameResult";
 import { Odds } from "@/lib/odds";
 import { storedAtom } from "@/lib/storedAtom";
+import { chessPathKey } from "@/lib/chessHistory";
+import { createArrowPrefsAtom } from "@/lib/arrows/prefsAtom";
+import { createPositionArrowsAtom } from "@/lib/engine/topMoves";
 import { Color, EngineName } from "@/types/enums";
 import { CurrentPosition } from "@/types/eval";
 import { Chess } from "chess.js";
 import { atom } from "jotai";
-import { Arrow } from "react-chessboard/dist/chessboard/types";
 
 export type GameMode = "casual" | "formal";
 export type ColorChoice = Color | "random";
@@ -35,7 +37,11 @@ export const clocksAtom = atom<{ w: number; b: number } | null>(null);
 export const savedGameIdAtom = atom<number | null>(null);
 export const startingPositionAtom = atom("");
 export const boardFlippedAtom = atom(false);
-export const hintArrowsAtom = atom<Arrow[]>([]);
+export const hintPositionKeyAtom = atom(
+  (get) => `${get(gameIdAtom)}|${chessPathKey(get(gameAtom))}`
+);
+export const hintArrowsAtom = createPositionArrowsAtom(hintPositionKeyAtom);
+export const playArrowPrefsAtom = createArrowPrefsAtom("play");
 export const botThinkingAtom = atom(false);
 export const challengeIdAtom = atom<string | null>(null);
 export const challengeStatusAtom = atom<ChallengeStatus>("active");

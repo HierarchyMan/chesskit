@@ -6,7 +6,11 @@ Current contract: **Remember** explicitly enables recording and is off by defaul
 Turning it off only stops new recording, including mainline appends; stored lines,
 selected board/cursor, replay and complete backups stay available. This supersedes
 the original hide/switch/export policy described in historical evidence below.
-See analysis-remember-review.md for the current audit and proof.
+Continuing past a nonempty main line or an evaluated branch creates a separate
+continuation and keeps the source line and evaluation. Unevaluated continuations
+can grow. A pristine empty main can seed an invented game. See
+wrong-side-followup.md for the latest extension audit and proof, and
+analysis-remember-review.md for the earlier full Analysis audit.
 
 ## Intended behavior and models
 

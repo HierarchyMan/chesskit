@@ -3,11 +3,11 @@ import { getIsStalemate, getWhoIsCheckmated } from "@/lib/chess";
 import { getMovesClassification } from "@/lib/engine/helpers/moveClassification";
 import { UciEngine } from "@/lib/engine/uciEngine";
 import { MoveStory, buildMoveStory } from "@/lib/visualize/moveStory";
-import { engineNameAtom } from "@/sections/analysis/states";
+import { useFeatureEngineName } from "@/hooks/useFeatureEngineName";
 import { Color, MoveClassification } from "@/types/enums";
 import { PositionEval } from "@/types/eval";
 import { Move } from "chess.js";
-import { useAtomValue } from "jotai";
+import { atom, useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gameAtom, playerColorAtom } from "./states";
 
@@ -19,9 +19,15 @@ export interface CoachFeedback {
   plyIndex: number;
   status: "evaluating" | "done" | "error";
   playedSan: string;
+  /** The move that was graded, and the evaluation of the position it was made in. */
+  move: Move;
+  before?: PositionEval;
   classification?: MoveClassification;
   story?: MoveStory;
 }
+
+/** The coach's verdict on the player's latest move, for the board to draw. */
+export const coachFeedbackAtom = atom<CoachFeedback | undefined>(undefined);
 
 const evaluate = async (
   engine: UciEngine,
@@ -56,7 +62,7 @@ const evaluate = async (
 export const useMoveCoach = (enabled: boolean) => {
   const game = useAtomValue(gameAtom);
   const playerColor = useAtomValue(playerColorAtom);
-  const engineName = useAtomValue(engineNameAtom);
+  const engineName = useFeatureEngineName("coach");
   const engineState = useEngineState(enabled ? engineName : undefined);
   const [feedbackByKey, setFeedbackByKey] = useState<
     Record<string, CoachFeedback>
@@ -92,7 +98,7 @@ export const useMoveCoach = (enabled: boolean) => {
     const update = (feedback: CoachFeedback) =>
       setFeedbackByKey((current) => ({ ...current, [feedback.key]: feedback }));
 
-    update({ key, plyIndex, status: "evaluating", playedSan: move.san });
+    update({ key, plyIndex, status: "evaluating", playedSan: move.san, move });
 
     queueRef.current = queueRef.current.then(async () => {
       try {
@@ -111,6 +117,8 @@ export const useMoveCoach = (enabled: boolean) => {
           plyIndex,
           status: "done",
           playedSan: move.san,
+          move,
+          before,
           classification,
           story: buildMoveStory({
             fenBefore: move.before,
@@ -122,12 +130,18 @@ export const useMoveCoach = (enabled: boolean) => {
       } catch (error) {
         console.error(error);
         startedRef.current.delete(key);
-        update({ key, plyIndex, status: "error", playedSan: move.san });
+        update({ key, plyIndex, status: "error", playedSan: move.san, move });
       }
     });
   }, [enabled, engine, lastPlayerMove, lastPlayerIndex, key]);
 
   const feedback = key ? feedbackByKey[key] : undefined;
+
+  const publish = useSetAtom(coachFeedbackAtom);
+  useEffect(() => {
+    publish(feedback);
+    return () => publish(undefined);
+  }, [feedback, publish]);
 
   return {
     feedback,

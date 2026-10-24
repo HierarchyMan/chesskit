@@ -357,8 +357,14 @@ export class UciEngine {
   }: EvaluateGameParams): Promise<GameEval> {
     this.throwErrorIfNotReady();
     this.isReady = false;
+    this.positionGeneration++;
     setEvaluationProgress?.(1);
 
+    // A live request may still be configuring this worker or searching it.
+    // Invalidate it first, finish its setup, then drain the stopped bestmove;
+    // "readyok" alone does not mean a previous UCI search has finished.
+    await this.positionSetup.catch(() => undefined);
+    await this.stopCurrentJobs();
     await this.setMultiPv(multiPv);
     await this.setElo(undefined);
     await this.sendCommandsToEachWorker(["ucinewgame", "isready"], "readyok");

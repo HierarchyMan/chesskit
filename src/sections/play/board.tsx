@@ -1,4 +1,13 @@
 import Board from "@/components/board";
+import ArrowOverlay from "@/components/board/arrowOverlay";
+import { useEngineArrows } from "@/components/board/useEngineArrows";
+import { usePositionEval } from "@/hooks/usePositionEval";
+import { playerNamer } from "@/lib/arrows/legend";
+import {
+  ARROW_CAPABILITIES,
+  FORMAL_CAPABILITIES,
+  effectivePrefs,
+} from "@/lib/arrows/prefs";
 import { useChessActions } from "@/hooks/useChessActions";
 import { useGameData } from "@/hooks/useGameData";
 import { usePlayersData } from "@/hooks/usePlayersData";
@@ -9,8 +18,10 @@ import { UciEngine } from "@/lib/engine/uciEngine";
 import { sleep } from "@/lib/helpers";
 import { Color } from "@/types/enums";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { coachFeedbackAtom } from "./useMoveCoach";
 import {
+  activeGameModeAtom,
   boardFlippedAtom,
   botStrengthAtom,
   botThinkingAtom,
@@ -20,6 +31,7 @@ import {
   gameDataAtom,
   hintArrowsAtom,
   isGameInProgressAtom,
+  playArrowPrefsAtom,
   playerColorAtom,
 } from "./states";
 
@@ -42,6 +54,49 @@ export default function BoardContainer({ engine, boardSize }: Props) {
   const gameFen = game.fen();
   const isGameFinished = game.isGameOver();
   const isBotTurn = game.turn() !== playerColor;
+
+  // A formal game gives no advice before a move, only feedback after it.
+  const activeMode = useAtomValue(activeGameModeAtom);
+  const capabilities =
+    activeMode === "formal" ? FORMAL_CAPABILITIES : ARROW_CAPABILITIES.play;
+  const wanted = effectivePrefs(useAtomValue(playArrowPrefsAtom), capabilities);
+  // The engine stays loaded while the user wants suggestions or threats, and
+  // searches only when it is their move: that is the one worth advising on.
+  const advice = usePositionEval({
+    feature: "advice",
+    fen: gameFen,
+    enabled:
+      isGameInProgress &&
+      wanted.enabled &&
+      (wanted.moves > 0 || wanted.threats),
+    active: !isBotTurn && !isGameFinished,
+    lines: Math.max(2, wanted.moves),
+  });
+
+  // The coach grades the player's move; its better move stays on the board
+  // through the bot's reply, which is when the player is deciding again.
+  const coach = useAtomValue(coachFeedbackAtom);
+  const feedback = useMemo(() => {
+    if (coach?.status !== "done" || !coach.before || !coach.classification) {
+      return undefined;
+    }
+    const movesSince = game.history().length - 1 - coach.plyIndex;
+    if (movesSince !== 0 && movesSince !== 1) return undefined;
+    return {
+      move: coach.move,
+      before: coach.before,
+      classification: coach.classification,
+    };
+  }, [coach, game]);
+
+  const engineArrows = useEngineArrows({
+    position: advice,
+    fen: gameFen,
+    prefsAtom: playArrowPrefsAtom,
+    capabilities,
+    extra: hintArrows,
+    feedback,
+  });
 
   useEffect(() => {
     if (!engine || !isGameInProgress || isGameFinished || !isBotTurn) return;
@@ -89,6 +144,7 @@ export default function BoardContainer({ engine, boardSize }: Props) {
       ? Color.Black
       : Color.White
     : playerColor;
+  const nameOf = useMemo(() => playerNamer(playerColor), [playerColor]);
 
   return (
     <Board
@@ -100,8 +156,22 @@ export default function BoardContainer({ engine, boardSize }: Props) {
       blackPlayer={black}
       boardOrientation={orientation}
       currentPositionAtom={gameDataAtom}
-      extraArrows={hintArrows}
+      arrows={engineArrows.arrows}
       clocksAtom={clocksAtom}
+      header={
+        isGameInProgress && (
+          <ArrowOverlay
+            view="compact"
+            prefs={engineArrows.prefs}
+            capabilities={capabilities}
+            onChange={engineArrows.update}
+            arrows={engineArrows.arrows}
+            nameOf={nameOf}
+            turn={game.turn()}
+            onFocus={engineArrows.setFocus}
+          />
+        )
+      }
     />
   );
 }

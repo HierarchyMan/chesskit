@@ -1,5 +1,11 @@
 # Arena analysis: live plan and behavior
 
+Current rule (2026-10-22): the best-move arrow and its recommendation use a legal
+move for the current board's side to move. Historical alternatives remain in
+previous-move feedback with explicit player/move context. This supersedes the
+retrospective-arrow policy in the original implementation record below. See
+wrong-side-followup.md for the latest review and verification.
+
 Request: optional side toggles for an evaluation bar and visible analysis on each
 move, integrated with Engine Arena's existing features. Work started 2026-10-21.
 Baseline checkout was clean. The existing 297 tests and lint/typecheck pass.

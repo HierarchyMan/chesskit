@@ -5,20 +5,14 @@ import { Color } from "@/types/enums";
 import { Box } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { useMemo } from "react";
-import { Arrow, Square } from "react-chessboard/dist/chessboard/types";
+import { arrowFromUci } from "@/lib/arrows/uci";
+import { BoardArrow } from "@/lib/arrows/types";
 import PuzzlePanel from "./puzzlePanel";
 import { puzzleGameAtom } from "./states";
 import { usePuzzleTrainer } from "./usePuzzleTrainer";
 
 const SIDE_PANEL_WIDTH = 420;
 const LAST_MOVE_COLOR = "rgba(255, 170, 0, 0.55)";
-const HINT_COLOR = "#22ac38";
-
-const toArrow = (uci: string, color: string): Arrow => [
-  uci.slice(0, 2) as Square,
-  uci.slice(2, 4) as Square,
-  color,
-];
 
 export default function PuzzlesPage() {
   const trainer = usePuzzleTrainer();
@@ -33,13 +27,20 @@ export default function PuzzlesPage() {
   const solved = phase === "solved";
 
   const arrows = useMemo(() => {
-    const list: Arrow[] = [];
+    const list: BoardArrow[] = [];
     if (puzzle?.lastMove && atStart) {
-      list.push(toArrow(puzzle.lastMove, LAST_MOVE_COLOR));
+      list.push(
+        arrowFromUci(puzzle.lastMove, {
+          kind: "content",
+          color: LAST_MOVE_COLOR,
+        })
+      );
     }
-    if (arrowMove) list.push(toArrow(arrowMove, HINT_COLOR));
+    if (arrowMove) {
+      list.push(arrowFromUci(arrowMove, { kind: "best", side: solver }));
+    }
     return list;
-  }, [puzzle, atStart, arrowMove]);
+  }, [puzzle, atStart, arrowMove, solver]);
 
   useKeyboardShortcut("h", trainer.askHint, phase === "solving");
   useKeyboardShortcut(["n", "ArrowRight"], trainer.next, solved);
@@ -62,7 +63,7 @@ export default function PuzzlesPage() {
         whitePlayer={{ name: solver === "w" ? "You" : "Opponent" }}
         blackPlayer={{ name: solver === "b" ? "You" : "Opponent" }}
         boardOrientation={solver === "w" ? Color.White : Color.Black}
-        extraArrows={arrows}
+        arrows={arrows}
       />
 
       <Box

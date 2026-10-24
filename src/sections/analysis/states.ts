@@ -1,11 +1,11 @@
 import { DEFAULT_ENGINE } from "@/constants";
 import { createAnalysisOptionAtoms } from "@/lib/analysisOptions";
+import { createArrowPrefsAtom } from "@/lib/arrows/prefsAtom";
 import { getRecommendedWorkersNb } from "@/lib/engine/worker";
 import { storedAtom } from "@/lib/storedAtom";
 import { EngineName } from "@/types/enums";
 import { SavedEvals } from "@/types/eval";
 import { PieceCode } from "@/lib/editorPosition";
-import { MoveSide } from "@/lib/engine/topMoves";
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 
@@ -16,6 +16,8 @@ export {
   currentPositionAtom,
   autoPlayAtom,
   boardArrowsAtom,
+  analysisBoardKeyAtom,
+  topMovesSideAtom,
   evaluationProgressAtom,
   arrangeModeAtom,
   editablePositionAtom,
@@ -24,7 +26,6 @@ export {
 } from "./sessionAtoms";
 
 export const topMovesOpenAtom = atom(false);
-export const topMovesSideAtom = atom<MoveSide>("mover");
 
 export type ArrangeBrush = "hand" | "erase" | PieceCode;
 
@@ -42,16 +43,16 @@ const isNumberBetween =
 const isBoolean = (value: unknown): value is boolean =>
   typeof value === "boolean";
 
-// The annotations and best-move keys predate the shared options, so saved
-// choices keep working. All three default on, matching the page's old behavior.
+// The annotations key predates the shared options, so saved choices keep working.
 export const analysisOptionAtoms = createAnalysisOptionAtoms(
   {
     evaluation: "show-evaluation-bar",
     annotations: "show-icon-player-move",
-    bestMove: "show-arrow-best-move",
   },
-  { evaluation: true, annotations: true, bestMove: true }
+  { evaluation: true, annotations: true }
 );
+
+export const analysisArrowPrefsAtom = createArrowPrefsAtom("analysis");
 
 export const engineNameAtom = storedAtom<EngineName>(
   "engine-name",

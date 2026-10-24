@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { Move } from "chess.js";
-import { getBestMoveHint } from "@/lib/bestMoveHint";
+import { Chess } from "chess.js";
+import { getPreviousBestMoveHint } from "@/lib/bestMoveHint";
 import { MoveClassification } from "@/types/enums";
 import { CurrentPosition } from "@/types/eval";
 
-const played = { lan: "f2f3", before: "fen" } as Move;
+const played = new Chess().move("f3");
 
 const position = (
   overrides: Partial<CurrentPosition> & { bestMove?: string } = {}
@@ -18,17 +18,23 @@ const position = (
   };
 };
 
-describe("best-move hint", () => {
+describe("previous-move alternative", () => {
   it("offers the engine's alternative when the played move differs", () => {
-    assert.equal(getBestMoveHint(position()), "e2e4");
+    assert.equal(getPreviousBestMoveHint(position()), "e2e4");
   });
 
   it("offers an alternative before the played move has been graded", () => {
-    assert.equal(getBestMoveHint(position({ eval: { lines: [] } })), "e2e4");
+    assert.equal(
+      getPreviousBestMoveHint(position({ eval: { lines: [] } })),
+      "e2e4"
+    );
   });
 
   it("is hidden when the played move was the engine's choice", () => {
-    assert.equal(getBestMoveHint(position({ bestMove: "f2f3" })), undefined);
+    assert.equal(
+      getPreviousBestMoveHint(position({ bestMove: "f2f3" })),
+      undefined
+    );
   });
 
   it("is hidden for moves graded as best, book, forced or perfect", () => {
@@ -39,7 +45,9 @@ describe("best-move hint", () => {
       MoveClassification.Perfect,
     ]) {
       assert.equal(
-        getBestMoveHint(position({ eval: { lines: [], moveClassification } })),
+        getPreviousBestMoveHint(
+          position({ eval: { lines: [], moveClassification } })
+        ),
         undefined,
         moveClassification
       );
@@ -53,7 +61,9 @@ describe("best-move hint", () => {
       MoveClassification.Blunder,
     ]) {
       assert.equal(
-        getBestMoveHint(position({ eval: { lines: [], moveClassification } })),
+        getPreviousBestMoveHint(
+          position({ eval: { lines: [], moveClassification } })
+        ),
         "e2e4",
         moveClassification
       );
@@ -61,10 +71,10 @@ describe("best-move hint", () => {
   });
 
   it("needs both a played move and an evaluated previous position", () => {
-    assert.equal(getBestMoveHint({}), undefined);
-    assert.equal(getBestMoveHint({ lastMove: played }), undefined);
+    assert.equal(getPreviousBestMoveHint({}), undefined);
+    assert.equal(getPreviousBestMoveHint({ lastMove: played }), undefined);
     assert.equal(
-      getBestMoveHint({ lastEval: { lines: [], bestMove: "e2e4" } }),
+      getPreviousBestMoveHint({ lastEval: { lines: [], bestMove: "e2e4" } }),
       undefined
     );
   });

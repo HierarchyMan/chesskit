@@ -16,19 +16,13 @@ import {
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
-import { Arrow, Square } from "react-chessboard/dist/chessboard/types";
-
-export const TOP_MOVE_COLORS = [
-  "#22ac38",
-  "#3894eb",
-  "#e69f00",
-  "#a06bd6",
-  "#df5353",
-  "#74b038",
-];
+import { BoardArrow } from "@/lib/arrows/types";
+import { arrowFromUci } from "@/lib/arrows/uci";
+import { colorWithOpacity, ownerColor, rankedStyle } from "@/lib/arrows/style";
 
 interface Props {
   fen: string;
+  positionKey?: string;
   engine: UciEngine | null;
   engineStatus?: EngineStatus;
   engineError?: string;
@@ -37,7 +31,7 @@ interface Props {
   onSideChange?: (side: MoveSide) => void;
   count?: number;
   depth?: number;
-  onArrows?: (arrows: Arrow[]) => void;
+  onArrows?: (arrows: BoardArrow[]) => void;
   onPlay?: (move: TopMove) => void;
   playLabel?: string;
 }
@@ -50,6 +44,7 @@ const sideName = (fen: string, side: MoveSide): string => {
 
 export default function TopMovesPanel({
   fen,
+  positionKey,
   engine,
   engineStatus,
   engineError,
@@ -62,36 +57,50 @@ export default function TopMovesPanel({
   onPlay,
   playLabel = "Play",
 }: Props) {
-  const { status, moves, queryFen, message, request } = useTopMoves({
+  const { status, moves, queryFen, message } = useTopMoves({
     engine,
+    fen,
+    side,
+    positionKey,
     depth,
     count,
   });
-  const [hovered, setHovered] = useState<number | null>(null);
-
-  useEffect(() => {
-    request(fen, side);
-  }, [request, fen, side]);
+  const hoverKey = `${positionKey ?? ""}|${fen}|${side}`;
+  const [hoverChoice, setHoverChoice] = useState<{
+    key: string;
+    rank: number;
+  } | null>(null);
+  const hovered = hoverChoice?.key === hoverKey ? hoverChoice.rank : null;
 
   useEffect(() => {
     if (!onArrows) return;
 
-    const arrows = moves
-      .filter((move) => hovered === null || move.rank - 1 === hovered)
-      .map(
-        (move) =>
-          [
-            move.uci.slice(0, 2) as Square,
-            move.uci.slice(2, 4) as Square,
-            TOP_MOVE_COLORS[(move.rank - 1) % TOP_MOVE_COLORS.length],
-          ] as Arrow
-      );
-    onArrows(arrows);
-  }, [moves, hovered, onArrows]);
+    const mover = queryFen?.split(" ")[1] === "b" ? "b" : "w";
+    onArrows(
+      moves.map((move) =>
+        arrowFromUci(move.uci, {
+          kind: move.rank === 1 ? "best" : "candidate",
+          rank: move.rank,
+          side: mover,
+          dimmed: hovered !== null && move.rank - 1 !== hovered,
+        })
+      )
+    );
+  }, [moves, hovered, onArrows, queryFen]);
 
   useEffect(() => () => onArrows?.([]), [onArrows]);
 
+  // Whose moves these are, and whose move it is on the board: the same rule as
+  // the arrows, so a row's mark is the colour its arrow is drawn in.
   const turnColor = queryFen?.split(" ")[1] === "b" ? "b" : "w";
+  const displayedTurn = fen.split(" ")[1] === "b" ? "b" : "w";
+  const rowMark = (rank: number) => {
+    const style = rankedStyle(rank, ownerColor(turnColor, displayedTurn));
+    return {
+      color: colorWithOpacity(style.color, Math.min(1, style.opacity + 0.2)),
+      width: Math.max(2, Math.round(style.width * 20)),
+    };
+  };
   const isLoading = status === "loading";
   const engineFailed = engineStatus === "error";
 
@@ -174,16 +183,20 @@ export default function TopMovesPanel({
           direction="row"
           alignItems="center"
           gap={1}
-          onMouseEnter={() => setHovered(move.rank - 1)}
-          onMouseLeave={() => setHovered(null)}
+          tabIndex={0}
+          onMouseEnter={() =>
+            setHoverChoice({ key: hoverKey, rank: move.rank - 1 })
+          }
+          onMouseLeave={() => setHoverChoice(null)}
+          onFocus={() => setHoverChoice({ key: hoverKey, rank: move.rank - 1 })}
+          onBlur={() => setHoverChoice(null)}
           sx={{
             p: 0.75,
             borderRadius: 2,
             border: 1,
             borderColor: "divider",
-            borderLeft: "4px solid",
-            borderLeftColor:
-              TOP_MOVE_COLORS[(move.rank - 1) % TOP_MOVE_COLORS.length],
+            borderLeft: `${rowMark(move.rank).width}px solid`,
+            borderLeftColor: rowMark(move.rank).color,
           }}
         >
           <Box sx={{ minWidth: 0, flexGrow: 1 }}>

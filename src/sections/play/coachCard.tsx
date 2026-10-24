@@ -160,8 +160,8 @@ export default function CoachCard() {
 
         <Box>
           <Typography variant="caption" sx={{ opacity: 0.6 }}>
-            Coach checks each of your moves with the analysis engine from the
-            top bar.
+            Coach checks each of your moves with the engine chosen for the coach
+            in Settings, which is the analysis engine unless you change it.
           </Typography>
         </Box>
       </Stack>

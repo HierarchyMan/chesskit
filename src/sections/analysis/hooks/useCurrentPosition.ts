@@ -1,4 +1,5 @@
 import {
+  analysisArrowPrefsAtom,
   boardAtom,
   currentPositionAtom,
   engineDepthAtom,
@@ -16,6 +17,7 @@ import { getMovesClassification } from "@/lib/engine/helpers/moveClassification"
 import { openingForPlacement } from "@/lib/openingIndex";
 import { UciEngine } from "@/lib/engine/uciEngine";
 import { isAnalysisPrefix } from "@/lib/analysisSession";
+import { ARROW_CAPABILITIES, effectivePrefs } from "@/lib/arrows/prefs";
 import { terminalEvaluation } from "@/lib/engine/terminalEvaluation";
 import { analysisPositionErrorAtom } from "../sessionAtoms";
 
@@ -28,7 +30,16 @@ export const useCurrentPosition = (
   const game = useAtomValue(gameAtom);
   const board = useAtomValue(boardAtom);
   const depth = useAtomValue(engineDepthAtom);
-  const multiPv = useAtomValue(engineMultiPvAtom);
+  const listLines = useAtomValue(engineMultiPvAtom);
+  const arrowPrefs = useAtomValue(analysisArrowPrefsAtom);
+  // The search covers the longer of the engine list and the arrows drawn, and
+  // never fewer than two lines: with one, every move would be graded as forced.
+  const arrowMoves = effectivePrefs(arrowPrefs, ARROW_CAPABILITIES.analysis);
+  const multiPv = Math.max(
+    2,
+    listLines,
+    arrowMoves.enabled ? arrowMoves.moves : 0
+  );
   const [savedEvals, setSavedEvals] = useAtom(savedEvalsAtom);
   const useCloudEval = useAtomValue(useCloudEvalAtom);
   const setError = useSetAtom(analysisPositionErrorAtom);
@@ -38,6 +49,7 @@ export const useCurrentPosition = (
     setError(null);
     const boardHistory = board.history({ verbose: true });
     const position: CurrentPosition = {
+      fen: board.fen(),
       lastMove: boardHistory.at(-1),
     };
 
@@ -72,6 +84,13 @@ export const useCurrentPosition = (
     const terminal = terminalEvaluation(board, depth);
     if (terminal) position.eval = { ...position.eval, ...terminal };
 
+    // A game-wide analysis keeps only the lines it was run with, so asking for
+    // more arrows than that searches this position again.
+    const lacksLines =
+      !!position.eval &&
+      !terminal &&
+      position.eval.lines.length < Math.min(multiPv, board.moves().length);
+
     if (!position.eval?.opening) {
       for (const move of boardHistory.slice().reverse()) {
         const moveFen = move.after.split(" ")[0];
@@ -88,6 +107,7 @@ export const useCurrentPosition = (
     if (
       enabled &&
       (!position.eval ||
+        lacksLines ||
         (terminal && boardHistory.length > 0 && !position.lastEval)) &&
       engine?.getIsReady() &&
       engine.name

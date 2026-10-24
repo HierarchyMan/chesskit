@@ -191,7 +191,7 @@ const isVulnerable = (
   };
 };
 
-const vulnerablePieces = (game: Chess, owner: Color): Set<Square> => {
+export const vulnerablePieces = (game: Chess, owner: Color): Set<Square> => {
   const result = new Set<Square>();
 
   for (const row of game.board()) {

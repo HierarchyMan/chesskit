@@ -1,6 +1,8 @@
 import Board from "@/sections/analysis/board";
 import PanelHeader from "@/sections/analysis/panelHeader";
 import PanelToolBar from "@/sections/analysis/panelToolbar";
+import AnalysisOverlayPanel from "@/sections/analysis/overlayPanel";
+import { useAnalysisOverlay } from "@/sections/analysis/hooks/useAnalysisOverlay";
 import AnalysisTab from "@/sections/analysis/panelBody/analysisTab";
 import ClassificationTab from "@/sections/analysis/panelBody/classificationTab";
 import {
@@ -25,7 +27,6 @@ import {
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
-import { ChessboardDnDProvider } from "react-chessboard";
 import TopMovesSection from "@/sections/analysis/panelBody/topMovesSection";
 import dynamic from "next/dynamic";
 const GraphTab = dynamic(
@@ -73,9 +74,7 @@ export default function AnalysisPage(props: Props) {
   }
   return (
     <AnalysisEngineProvider>
-      <ChessboardDnDProvider>
-        <AnalysisPageBody {...props} />
-      </ChessboardDnDProvider>
+      <AnalysisPageBody {...props} />
     </AnalysisEngineProvider>
   );
 }
@@ -90,6 +89,8 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
   const game = useAtomValue(gameAtom);
   const board = useAtomValue(boardAtom);
   const { enterArrange } = useArrangeMode();
+  // One composition for the page: the board draws it and the overlay lists it.
+  const overlay = useAnalysisOverlay();
 
   const showMovesTab = game.history().length > 0 || board.history().length > 0;
 
@@ -123,7 +124,11 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
     <Grid container gap={4} justifyContent="space-evenly" alignItems="start">
       <PageTitle title={title} />
 
-      {arrange ? <ArrangeBoard /> : <Board />}
+      {arrange ? (
+        <ArrangeBoard />
+      ) : (
+        <Board overlay={overlay} overlayInspector={isLgOrGreater} />
+      )}
 
       <Grid
         container
@@ -143,10 +148,6 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
           maxWidth: "1200px",
         }}
         rowGap={2}
-        height={{
-          xs: tab === 1 && !arrange ? "40rem" : "auto",
-          lg: "auto",
-        }}
         minHeight={{ lg: "calc(95vh - 60px)" }}
         display="flex"
         flexDirection="column"
@@ -167,115 +168,101 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
           </Box>
         ) : (
           <>
-            {isLgOrGreater ? (
-              <Box width="100%">
-                <PanelHeader key="analysis-panel-header" />
-                <Divider sx={{ marginX: "5%", marginTop: 2.5 }} />
-              </Box>
-            ) : (
-              <PanelToolBar key="review-panel-toolbar" />
-            )}
-
-            {!isLgOrGreater && !gameEval && <Divider sx={{ marginX: "5%" }} />}
-            {!isLgOrGreater && !gameEval && (
-              <PanelHeader key="analysis-panel-header" />
-            )}
-
-            {!isLgOrGreater && (
-              <Box
-                width="95%"
-                sx={{
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  marginX: { sm: "5%", xs: undefined },
-                }}
-              >
-                <Tabs
-                  value={tab}
-                  onChange={(_, newValue) => setTab(newValue)}
-                  aria-label="basic tabs example"
-                  variant="fullWidth"
-                  sx={{ minHeight: 0 }}
-                >
-                  <Tab
-                    label="Analysis"
-                    id="tab0"
-                    icon={<Icon icon="mdi:magnify" height={15} />}
-                    iconPosition="start"
-                    sx={{
-                      textTransform: "none",
-                      minHeight: 15,
-                      padding: "5px 0em 12px",
-                    }}
-                    disableFocusRipple
-                  />
-
-                  <Tab
-                    label="Moves"
-                    id="tab1"
-                    icon={<Icon icon="mdi:format-list-bulleted" height={15} />}
-                    iconPosition="start"
-                    sx={{
-                      textTransform: "none",
-                      minHeight: 15,
-                      display: showMovesTab ? undefined : "none",
-                      padding: "5px 0em 12px",
-                    }}
-                    disableFocusRipple
-                  />
-
-                  <Tab
-                    label="Graph"
-                    id="tab2"
-                    icon={<Icon icon="mdi:chart-line" height={15} />}
-                    iconPosition="start"
-                    sx={{
-                      textTransform: "none",
-                      minHeight: 15,
-                      display: gameEval ? undefined : "none",
-                      padding: "5px 0em 12px",
-                    }}
-                    disableFocusRipple
-                  />
-                </Tabs>
-              </Box>
-            )}
-
-            {gameEval && (
-              <GraphTab
-                role="tabpanel"
-                hidden={tab !== 2 && !isLgOrGreater}
-                id="tabContent2"
-              />
-            )}
-
-            <AnalysisTab
-              role="tabpanel"
-              hidden={tab !== 0 && !isLgOrGreater}
-              id="tabContent0"
-            />
-
-            <ClassificationTab
-              role="tabpanel"
-              hidden={tab !== 1 && !isLgOrGreater}
-              id="tabContent1"
-            />
-
-            <TopMovesSection />
-
             {isLgOrGreater && (
               <Box width="100%">
-                <Divider sx={{ marginX: "5%", marginBottom: 1.5 }} />
-                <PanelToolBar key="review-panel-toolbar" />
+                <AnalysisOverlayPanel overlay={overlay} view="inspector" />
+                <Divider sx={{ marginX: "5%", marginTop: 2.5 }} />
               </Box>
             )}
 
-            {!isLgOrGreater && gameEval && (
-              <Box width="100%">
-                <Divider sx={{ marginX: "5%", marginBottom: 2.5 }} />
-                <PanelHeader key="analysis-panel-header" />
-              </Box>
-            )}
+            <Box width="100%">
+              <PanelHeader key="analysis-panel-header" />
+            </Box>
+
+            <Box
+              width="95%"
+              sx={{
+                borderBottom: 1,
+                borderColor: "divider",
+                marginX: { sm: "5%", xs: undefined },
+              }}
+            >
+              <Tabs
+                value={tab}
+                onChange={(_, newValue) => setTab(newValue)}
+                aria-label="Analysis views"
+                variant="fullWidth"
+                sx={{ minHeight: 0 }}
+              >
+                <Tab
+                  label="Analysis"
+                  id="tab0"
+                  icon={<Icon icon="mdi:magnify" height={15} />}
+                  iconPosition="start"
+                  sx={{
+                    textTransform: "none",
+                    minHeight: 15,
+                    padding: "5px 0em 12px",
+                  }}
+                  disableFocusRipple
+                />
+
+                <Tab
+                  label="Moves"
+                  id="tab1"
+                  icon={<Icon icon="mdi:format-list-bulleted" height={15} />}
+                  iconPosition="start"
+                  sx={{
+                    textTransform: "none",
+                    minHeight: 15,
+                    display: showMovesTab ? undefined : "none",
+                    padding: "5px 0em 12px",
+                  }}
+                  disableFocusRipple
+                />
+
+                <Tab
+                  label="Graph"
+                  id="tab2"
+                  icon={<Icon icon="mdi:chart-line" height={15} />}
+                  iconPosition="start"
+                  sx={{
+                    textTransform: "none",
+                    minHeight: 15,
+                    display: gameEval ? undefined : "none",
+                    padding: "5px 0em 12px",
+                  }}
+                  disableFocusRipple
+                />
+              </Tabs>
+            </Box>
+
+            {/* The one content area: it scrolls on its own, so the board stays put. */}
+            <Box
+              role="tabpanel"
+              aria-labelledby={`tab${tab}`}
+              width="100%"
+              sx={{
+                minHeight: 0,
+                overflowY: "auto",
+                maxHeight: { lg: "max(20rem, calc(100vh - 330px))" },
+                paddingX: { xs: 0, sm: "5%" },
+              }}
+            >
+              {tab === 0 && (
+                <>
+                  <AnalysisTab />
+                  <TopMovesSection />
+                </>
+              )}
+              {tab === 1 && <ClassificationTab />}
+              {tab === 2 && gameEval && <GraphTab id="tabContent2" />}
+            </Box>
+
+            <Box width="100%">
+              <Divider sx={{ marginX: "5%", marginBottom: 1.5 }} />
+              <PanelToolBar key="review-panel-toolbar" />
+            </Box>
           </>
         )}
       </Grid>

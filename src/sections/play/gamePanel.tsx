@@ -6,9 +6,13 @@ import { EngineState, useEngineState } from "@/hooks/useEngine";
 import { useChessActions } from "@/hooks/useChessActions";
 import { getEndgame } from "@/lib/endgames";
 import { CHALLENGE_STRENGTH, scoreFromLine } from "@/lib/engine/strength";
-import { MoveSide } from "@/lib/engine/topMoves";
+import {
+  effectiveMoveSide,
+  MoveSideChoice,
+  resetMoveSideChoice,
+} from "@/lib/engine/topMoves";
 import { getGameResult, getOutcomeFor } from "@/lib/gameResult";
-import { engineNameAtom } from "@/sections/analysis/states";
+import { useFeatureEngineName } from "@/hooks/useFeatureEngineName";
 import { Icon } from "@iconify/react";
 import {
   Alert,
@@ -28,7 +32,8 @@ import {
 } from "@mui/material";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { BoardArrow } from "@/lib/arrows/types";
 import ChallengeCard from "./challengeCard";
 import CoachCard from "./coachCard";
 import {
@@ -42,6 +47,7 @@ import {
   gameAtom,
   gameEndAtom,
   hintArrowsAtom,
+  hintPositionKeyAtom,
   isGameInProgressAtom,
   playerColorAtom,
   savedGameIdAtom,
@@ -67,11 +73,31 @@ export default function GamePanel({ botEngine }: Props) {
   const strength = challenge ? CHALLENGE_STRENGTH : savedStrength;
   const setFlipped = useSetAtom(boardFlippedAtom);
   const setHintArrows = useSetAtom(hintArrowsAtom);
-  const analysisEngineName = useAtomValue(engineNameAtom);
+  const positionKey = useAtomValue(hintPositionKeyAtom);
+  const publishHintArrows = useCallback(
+    (arrows: BoardArrow[]) => setHintArrows({ positionKey, arrows }),
+    [setHintArrows, positionKey]
+  );
+  const analysisEngineName = useFeatureEngineName("advice");
   const { goToMove, undoMove } = useChessActions(gameAtom);
 
   const [hintsOpen, setHintsOpen] = useState(false);
-  const [hintSide, setHintSide] = useState<MoveSide>("mover");
+  const fen = game.fen();
+  const [hintSideChoice, setHintSideChoice] = useState<MoveSideChoice>({
+    side: "mover",
+    fen,
+    positionKey,
+  });
+  const currentHintChoice = resetMoveSideChoice(
+    hintSideChoice,
+    fen,
+    positionKey
+  );
+  const hintSide = effectiveMoveSide(currentHintChoice, fen, positionKey);
+  // Forget the relative what-if after any position visit, including takebacks.
+  if (currentHintChoice !== hintSideChoice) {
+    setHintSideChoice(currentHintChoice);
+  }
   const [confirmResign, setConfirmResign] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -245,14 +271,18 @@ export default function GamePanel({ botEngine }: Props) {
       {isInProgress && isCasual && hintsOpen && (
         <Panel title="Hints">
           <TopMovesPanel
-            fen={game.fen()}
+            fen={fen}
+            positionKey={positionKey}
             engine={hintEngine.engine}
             engineStatus={hintEngine.status}
             engineError={hintEngine.error}
             onRetryEngine={hintEngine.retry}
             side={hintSide}
-            onSideChange={setHintSide}
-            onArrows={setHintArrows}
+            onSideChange={(side) => {
+              setHintArrows([]);
+              setHintSideChoice({ side, fen, positionKey });
+            }}
+            onArrows={publishHintArrows}
           />
         </Panel>
       )}

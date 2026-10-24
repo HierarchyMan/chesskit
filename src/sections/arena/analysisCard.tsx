@@ -15,6 +15,7 @@ import {
 } from "@/lib/engine/arenaAnalysis";
 import { buildMoveStory } from "@/lib/visualize/moveStory";
 import { describeMove } from "@/lib/visualize/explain";
+import { getPreviousBestMoveFeedback } from "@/lib/bestMoveHint";
 import {
   Alert,
   Button,
@@ -32,10 +33,6 @@ const ARENA_OPTION_COPY: Record<AnalysisOption, AnalysisOptionCopy> = {
   annotations: {
     label: "Move annotations",
     help: "Grade each move on the board and in the move list. Select a move to explain or visualize it.",
-  },
-  bestMove: {
-    label: "Best-move arrow",
-    help: "Show the better alternative to the last move, alongside candidate arrows.",
   },
 };
 
@@ -68,18 +65,20 @@ export default function AnalysisCard({ arena }: { arena: Arena }) {
               </Typography>
             </Stack>
           ) : undefined,
-        bestMove: analysis.betterMove ? (
-          <Typography variant="caption">
-            Better alternative: {analysis.betterMove}
-          </Typography>
-        ) : undefined,
       }}
       footer={
         <>
+          {analysis.showArrows && analysis.bestMove && (
+            <Typography variant="caption">
+              {analysis.bestMove.color === "w" ? "White" : "Black"} to move:{" "}
+              {analysis.bestMove.san}
+            </Typography>
+          )}
           <Typography variant="caption" sx={{ opacity: 0.7, pt: 1 }}>
             {ENGINE_LABELS[analysis.engineName].small} · depth{" "}
-            {ARENA_ANALYSIS_DEPTH}. Uses the analysis engine selected in the top
-            bar. Positive scores favor White. Options are remembered.
+            {ARENA_ANALYSIS_DEPTH}. Uses the engine chosen for Arena evaluation
+            in Settings, which is the analysis engine unless you change it.
+            Positive scores favor White. Options are remembered.
           </Typography>
           {analysis.error ? (
             <Alert
@@ -124,6 +123,11 @@ export function MoveFeedback({
   const setStory = useSetAtom(moveStoryAtom);
   const { move, before, after } = entry;
   const classification = after?.moveClassification;
+  const previousBestMove = getPreviousBestMoveFeedback({
+    lastMove: move,
+    lastEval: before,
+    eval: after,
+  });
   const story = useMemo(() => {
     if (!before || !after || !classification) return undefined;
     const result = buildMoveStory({
@@ -153,6 +157,12 @@ export function MoveFeedback({
       {after?.lines[0] && (
         <Typography variant="caption" sx={{ opacity: 0.75 }}>
           Evaluation after the move: {getLineEvalLabel(after.lines[0])}
+        </Typography>
+      )}
+      {previousBestMove && (
+        <Typography variant="caption" color="text.secondary">
+          Previous move · {previousBestMove.context},{" "}
+          {previousBestMove.alternative.san} was the best move.
         </Typography>
       )}
       {story && (

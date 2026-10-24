@@ -25,17 +25,14 @@ import {
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/router";
 import { useMemo } from "react";
-import { Arrow, Square } from "react-chessboard/dist/chessboard/types";
+import { arrowFromUci } from "@/lib/arrows/uci";
+import { BoardArrow } from "@/lib/arrows/types";
 import { openingGameAtom } from "./states";
 import { OpeningMode, OpeningStudy, useOpeningStudy } from "./useOpeningStudy";
 
 const SIDE_PANEL_WIDTH = 440;
 
-const toArrow = (uci: string, color: string): Arrow => [
-  uci.slice(0, 2) as Square,
-  uci.slice(2, 4) as Square,
-  color,
-];
+const LEARN_COLOR = "rgba(255,170,0,0.7)";
 
 export default function OpeningsPage() {
   const router = useRouter();
@@ -174,12 +171,15 @@ function StudyView({
   const learnMode = study.mode === "learn";
 
   const arrows = useMemo(() => {
-    const list: Arrow[] = [];
+    const list: BoardArrow[] = [];
     if (study.learnUci)
-      list.push(toArrow(study.learnUci, "rgba(255,170,0,0.7)"));
-    if (study.hintUci) list.push(toArrow(study.hintUci, "#22ac38"));
+      list.push(
+        arrowFromUci(study.learnUci, { kind: "content", color: LEARN_COLOR })
+      );
+    if (study.hintUci)
+      list.push(arrowFromUci(study.hintUci, { kind: "best", side: line.side }));
     return list;
-  }, [study.learnUci, study.hintUci]);
+  }, [study.learnUci, study.hintUci, line.side]);
 
   useKeyboardShortcut("ArrowRight", () => study.goTo(study.ply + 1), learnMode);
   useKeyboardShortcut("ArrowLeft", () => study.goTo(study.ply - 1), learnMode);
@@ -210,7 +210,7 @@ function StudyView({
         whitePlayer={{ name: line.side === "w" ? "You" : "Opponent" }}
         blackPlayer={{ name: line.side === "b" ? "You" : "Opponent" }}
         boardOrientation={side}
-        extraArrows={arrows}
+        arrows={arrows}
       />
 
       <Stack

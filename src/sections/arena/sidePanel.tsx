@@ -7,7 +7,8 @@ import StrengthControl from "@/components/strengthControl";
 import { ENGINE_LABELS } from "@/constants";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { useModels } from "@/hooks/useModels";
-import { linesToTopMoves } from "@/lib/engine/topMoves";
+import { linesToTopMoves, PositionArrows } from "@/lib/engine/topMoves";
+import { chessPathKey } from "@/lib/chessHistory";
 import { EngineName } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
@@ -31,7 +32,8 @@ import {
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
-import { Arrow, Square } from "react-chessboard/dist/chessboard/types";
+import { BoardArrow } from "@/lib/arrows/types";
+import { arrowFromUci } from "@/lib/arrows/uci";
 import {
   ARENA_SPEEDS,
   ArenaSide,
@@ -48,7 +50,7 @@ export default function ArenaSidePanel({
   onArrows,
 }: {
   arena: Arena;
-  onArrows: (arrows: Arrow[]) => void;
+  onArrows: (arrows: PositionArrows) => void;
 }) {
   const editingPlayers = useAtomValue(arenaEditingPlayersAtom);
   // Shown under the card that holds its button: Controls while playing, Result
@@ -402,10 +404,15 @@ function ProposalCard({
   onArrows,
 }: {
   arena: Arena;
-  onArrows: (arrows: Arrow[]) => void;
+  onArrows: (arrows: PositionArrows) => void;
 }) {
   const { proposal } = arena;
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<{
+    positionKey: string;
+    uci: string;
+  } | null>(null);
+  const positionKey = chessPathKey(arena.game);
+  const hoveredUci = hovered?.positionKey === positionKey ? hovered.uci : null;
 
   const candidates = useMemo(
     () =>
@@ -417,34 +424,35 @@ function ProposalCard({
 
   useEffect(() => {
     if (proposal.status !== "ready" || proposal.fen !== arena.game.fen()) {
-      onArrows([]);
+      onArrows({ positionKey, arrows: [] });
       return;
     }
 
-    const arrows: Arrow[] = [
-      [
-        proposal.choice.uci.slice(0, 2) as Square,
-        proposal.choice.uci.slice(2, 4) as Square,
-        "rgba(34, 172, 56, 0.85)",
-      ],
+    const side = arena.game.turn();
+    const arrows: BoardArrow[] = [
+      arrowFromUci(proposal.choice.uci, { kind: "planned", side }),
     ];
 
-    if (
-      hovered &&
-      hovered !== proposal.choice.uci &&
-      candidates.some((candidate) => candidate.uci === hovered)
-    ) {
-      arrows.push([
-        hovered.slice(0, 2) as Square,
-        hovered.slice(2, 4) as Square,
-        "rgba(56, 148, 235, 0.85)",
-      ]);
+    const hovered = candidates.find(
+      (candidate) => candidate.uci === hoveredUci
+    );
+    if (hovered && hovered.uci !== proposal.choice.uci) {
+      arrows.push(
+        arrowFromUci(hovered.uci, {
+          kind: "candidate",
+          rank: hovered.rank,
+          side,
+        })
+      );
     }
 
-    onArrows(arrows);
-  }, [proposal, hovered, onArrows, candidates, arena.game]);
+    onArrows({ positionKey, arrows });
+  }, [proposal, hoveredUci, positionKey, onArrows, candidates, arena.game]);
 
-  useEffect(() => () => onArrows([]), [onArrows]);
+  useEffect(
+    () => () => onArrows({ positionKey, arrows: [] }),
+    [onArrows, positionKey]
+  );
 
   const moverName = sideLabel(arena.mover);
 
@@ -491,7 +499,9 @@ function ProposalCard({
               direction="row"
               alignItems="center"
               gap={1}
-              onMouseEnter={() => setHovered(candidate.uci)}
+              onMouseEnter={() =>
+                setHovered({ positionKey, uci: candidate.uci })
+              }
               onMouseLeave={() => setHovered(null)}
               sx={{
                 p: 0.75,

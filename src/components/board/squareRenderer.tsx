@@ -1,7 +1,6 @@
 import { CurrentPosition } from "@/types/eval";
 import { MoveClassification } from "@/types/enums";
 import { Atom, PrimitiveAtom, atom, useAtomValue } from "jotai";
-import Image from "next/image";
 import { CSSProperties, forwardRef, memo, useMemo } from "react";
 import {
   CustomSquareProps,
@@ -11,40 +10,42 @@ import { CLASSIFICATION_COLORS } from "@/constants";
 import { boardHueAtom } from "./states";
 import { areObjectsEqual, isObject } from "@/lib/object";
 import { CheckedKing } from "@/lib/chess";
-import { useMediaQuery } from "@mui/material";
-
-const moveIconOffAtom = atom(false);
 
 export interface Props {
   currentPositionAtom: PrimitiveAtom<CurrentPosition>;
   clickedSquaresAtom: PrimitiveAtom<Square[]>;
   playableSquaresAtom: PrimitiveAtom<Square[]>;
   checkedKingAtom: Atom<CheckedKing | null>;
-  showPlayerMoveIconAtom?: PrimitiveAtom<boolean>;
 }
 
+/**
+ * Paints a square's own state: the check, the selection, the last move and the
+ * squares a piece can go to. The move-quality mark is not drawn here, because
+ * a square's stacking context would keep it beneath the arrows.
+ */
 export function getSquareRenderer({
   currentPositionAtom,
   clickedSquaresAtom,
   playableSquaresAtom,
   checkedKingAtom,
-  showPlayerMoveIconAtom = moveIconOffAtom,
 }: Props) {
   const squareRenderer = memo(
     forwardRef<HTMLDivElement, CustomSquareProps>((props, ref) => {
       const { children, square, style } = props;
       const boardHue = useAtomValue(boardHueAtom);
 
-      const isCheckedKing = useAtomValue(
+      const checkedKing = useAtomValue(
         useMemo(
           () =>
             atom((get) => {
-              const checkedKing = get(checkedKingAtom);
-              return checkedKing?.square === square;
+              const king = get(checkedKingAtom);
+              return king?.square === square ? king : null;
             }),
           [square]
         )
       );
+      const isCheckedKing = !!checkedKing;
+      const isMatedKing = !!checkedKing?.mated;
 
       const isClicked = useAtomValue(
         useMemo(
@@ -75,17 +76,6 @@ export function getSquareRenderer({
         )
       );
 
-      const showPlayerMoveIcon = useAtomValue(
-        useMemo(
-          () =>
-            atom((get) => {
-              const showIcon = get(showPlayerMoveIconAtom);
-              return isToSquare ? showIcon : false;
-            }),
-          [isToSquare]
-        )
-      );
-
       const moveClassification = useAtomValue(
         useMemo(
           () =>
@@ -111,13 +101,6 @@ export function getSquareRenderer({
         [isClicked, isFromSquare, isToSquare, moveClassification]
       );
 
-      const isLgOrGreater = useMediaQuery((theme) =>
-        theme.breakpoints.up("lg")
-      );
-
-      const isBorderColumn = square[0] === "a" || square[0] === "h";
-      const iconOffset = isBorderColumn && !isLgOrGreater ? 8 : 0;
-
       return (
         <div
           ref={ref}
@@ -129,24 +112,9 @@ export function getSquareRenderer({
         >
           {isCheckedKing && <div style={checkedKingStyle} />}
           {children}
+          {isMatedKing && <div style={checkmateMarkStyle}>#</div>}
           {highlightSquareStyle && <div style={highlightSquareStyle} />}
           {isPlayable && <div style={playableSquareStyles} />}
-          {moveClassification && showPlayerMoveIcon && isToSquare && (
-            <Image
-              src={`/icons/${moveClassification}.png`}
-              alt="move-icon"
-              width={40}
-              height={40}
-              style={{
-                position: "absolute",
-                width: "min(40px, calc(var(--board-size) * 0.06))",
-                height: "min(40px, calc(var(--board-size) * 0.06))",
-                top: `calc(max(-13.5px, calc(var(--board-size) * -0.03)) + ${iconOffset}px)`,
-                right: `calc(max(-13.5px, calc(var(--board-size) * -0.03)) + ${iconOffset}px)`,
-                zIndex: 100,
-              }}
-            />
-          )}
         </div>
       );
     }),
@@ -183,6 +151,31 @@ const checkedKingStyle: CSSProperties = {
   height: "100%",
   background:
     "radial-gradient(ellipse at center, rgba(255,0,0,1) 0%, rgba(231,0,0,1) 25%, rgba(169,0,0,0) 89%, rgba(158,0,0,0) 100%)",
+};
+
+/** The checkmated king's mark: a red hash in the square's top right corner. */
+const checkmateMarkStyle: CSSProperties = {
+  position: "absolute",
+  // Centred at 90% of the way to the square's top right corner.
+  top: "10%",
+  left: "90%",
+  transform: "translate(-50%, -50%)",
+  width: "38%",
+  height: "38%",
+  borderRadius: "50%",
+  backgroundColor: "#e53935",
+  color: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontWeight: 800,
+  lineHeight: 1,
+  // The hash is about half the circle's height, so it stays inside the circle.
+  fontSize: "calc(var(--board-size, 400px) * 0.035)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.5)",
+  pointerEvents: "none",
+  // Above the piece, which the square paints beneath this mark.
+  zIndex: 5,
 };
 
 const playableSquareStyles: CSSProperties = {

@@ -51,6 +51,8 @@ export interface EvaluatePositionWithUpdateParams {
 }
 
 export interface CurrentPosition {
+  /** The board FEN this snapshot describes; see positionFor. */
+  fen?: string;
   lastMove?: Move;
   eval?: PositionEval;
   lastEval?: PositionEval;

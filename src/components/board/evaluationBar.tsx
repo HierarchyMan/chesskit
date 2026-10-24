@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getEvaluationBarValue } from "@/lib/chess";
 import { Color } from "@/types/enums";
 import { CurrentPosition } from "@/types/eval";
+import { positionFor } from "@/lib/currentPosition";
 
 const noPositionAtom = atom<CurrentPosition>({});
 
@@ -12,6 +13,7 @@ interface Props {
   boardOrientation?: Color;
   currentPositionAtom?: PrimitiveAtom<CurrentPosition>;
   resetWhenPending?: boolean;
+  fen: string;
 }
 
 export default function EvaluationBar({
@@ -19,12 +21,13 @@ export default function EvaluationBar({
   boardOrientation,
   currentPositionAtom = noPositionAtom,
   resetWhenPending = false,
+  fen,
 }: Props) {
   const [evalBar, setEvalBar] = useState({
     whiteBarPercentage: 50,
     label: "0.0",
   });
-  const position = useAtomValue(currentPositionAtom);
+  const position = positionFor(useAtomValue(currentPositionAtom), fen);
 
   useEffect(() => {
     const bestLine = position?.eval?.lines[0];

@@ -1,11 +1,17 @@
 import { loadGameFromText } from "@/lib/pgn";
-import { Chess, DEFAULT_POSITION } from "chess.js";
+import { Chess } from "chess.js";
 
-/** SAN and the final FEN cannot identify a path (roots and transpositions differ). */
+/**
+ * SAN and the final FEN cannot identify a path (roots and transpositions differ).
+ * The root must come from one source for every ply: chess.js's own FEN of the
+ * start position. A FEN header is the raw input text and can differ from it
+ * (for example an en-passant square with no capture), which would make a board
+ * at its start look unrelated to the same game one move later.
+ */
 export const chessPath = (game: Chess) => {
   const history = game.history({ verbose: true });
   return {
-    root: history[0]?.before ?? game.getHeaders().FEN ?? DEFAULT_POSITION,
+    root: history[0]?.before ?? game.fen(),
     moves: history.map((move) => move.lan),
     sans: history.map((move) => move.san),
   };

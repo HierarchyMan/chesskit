@@ -7,18 +7,20 @@ import {
 } from "../../../states";
 import { useAtomValue } from "jotai";
 import { LineEval } from "@/types/eval";
+import { positionFor } from "@/lib/currentPosition";
 
 export default function EngineLines(props: GridProps) {
   const board = useAtomValue(boardAtom);
   const linesNumber = useAtomValue(engineMultiPvAtom);
-  const position = useAtomValue(currentPositionAtom);
+  const position = positionFor(useAtomValue(currentPositionAtom), board.fen());
 
   const linesSkeleton: LineEval[] = Array.from({ length: linesNumber }).map(
     (_, i) => ({ pv: [`${i}`], depth: 0, multiPv: i + 1 })
   );
 
+  // The search may hold more lines than the list is set to show.
   const engineLines = position?.eval?.lines?.length
-    ? position.eval.lines
+    ? position.eval.lines.slice(0, linesNumber)
     : linesSkeleton;
 
   if (board.isGameOver()) return null;

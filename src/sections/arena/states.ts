@@ -1,6 +1,9 @@
 import { createAnalysisOptionAtoms } from "@/lib/analysisOptions";
+import { createArrowPrefsAtom } from "@/lib/arrows/prefsAtom";
 import { BotStrength } from "@/lib/engine/strength";
 import { storedAtom } from "@/lib/storedAtom";
+import { chessPathKey } from "@/lib/chessHistory";
+import { createPositionArrowsAtom } from "@/lib/engine/topMoves";
 import { EngineName } from "@/types/enums";
 import { CurrentPosition } from "@/types/eval";
 import { Chess } from "chess.js";
@@ -63,12 +66,19 @@ export const arenaAnalysisOptionAtoms = createAnalysisOptionAtoms(
   {
     evaluation: "arena-show-evaluation",
     annotations: "arena-show-annotations",
-    bestMove: "arena-show-best-move",
   },
-  { evaluation: true, annotations: false, bestMove: true }
+  { evaluation: true, annotations: false }
 );
 
+export const arenaArrowPrefsAtom = createArrowPrefsAtom("arena");
+
 export const arenaGameAtom = atom(new Chess());
+const arenaArrowPositionKeyAtom = atom((get) =>
+  chessPathKey(get(arenaGameAtom))
+);
+export const arenaProposalArrowsAtom = createPositionArrowsAtom(
+  arenaArrowPositionKeyAtom
+);
 export const arenaDataAtom = atom<CurrentPosition>({});
 export const arenaStartedAtom = atom(false);
 export const arenaRunningAtom = atom(false);
