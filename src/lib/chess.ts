@@ -323,6 +323,28 @@ export const getCheckedKing = (game: Chess): CheckedKing | null => {
   return null;
 };
 
+/**
+ * The squares of `color`'s pieces that the other side attacks. A pin does not
+ * count, since the piece could still be taken. A king is left out: it is
+ * checked rather than taken, and the checked king is marked on its own.
+ */
+export const getThreatenedPieces = (game: Chess, color: Color): Square[] => {
+  const attacker = color === Color.White ? Color.Black : Color.White;
+  const threatened: Square[] = [];
+  for (const row of game.board()) {
+    for (const piece of row) {
+      if (
+        piece?.color === color &&
+        piece.type !== "k" &&
+        game.isAttacked(piece.square, attacker)
+      ) {
+        threatened.push(piece.square);
+      }
+    }
+  }
+  return threatened;
+};
+
 export const getCapturedPieces = (
   fen: string,
   color: Color

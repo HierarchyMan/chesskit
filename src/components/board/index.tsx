@@ -18,7 +18,7 @@ import {
 } from "react";
 import { Color } from "@/types/enums";
 import { Chess } from "chess.js";
-import { getSquareRenderer } from "./squareRenderer";
+import { MoveTarget, getSquareRenderer } from "./squareRenderer";
 import { CurrentPosition } from "@/types/eval";
 import EvaluationBar from "./evaluationBar";
 import { Player } from "@/types/game";
@@ -28,7 +28,7 @@ import ArrowLayer, { useMaskSettling } from "./arrowLayer";
 import { useInkArrows } from "./useInkArrows";
 import { BoardArrow } from "@/lib/arrows/types";
 import { chessPathKey } from "@/lib/chessHistory";
-import { getCheckedKing } from "@/lib/chess";
+import { getCheckedKing, getThreatenedPieces } from "@/lib/chess";
 import QualityIcon, { useQualityMark } from "./moveQuality";
 
 const noPositionAtom = atom<CurrentPosition>({});
@@ -101,7 +101,7 @@ export default function Board({
   const { playMove } = useChessActions(gameAtom);
   const clickedSquaresAtom = useMemo(() => atom<Square[]>([]), []);
   const setClickedSquares = useSetAtom(clickedSquaresAtom);
-  const playableSquaresAtom = useMemo(() => atom<Square[]>([]), []);
+  const playableSquaresAtom = useMemo(() => atom<MoveTarget[]>([]), []);
   const setPlayableSquares = useSetAtom(playableSquaresAtom);
   const [showPromotionDialog, setShowPromotionDialog] = useState(false);
   const [moveClickFrom, setMoveClickFrom] = useState<Square | null>(null);
@@ -172,7 +172,13 @@ export default function Board({
       setShowPromotionDialog(false);
       if (square) {
         const moves = game.moves({ square, verbose: true });
-        setPlayableSquares(moves.map((m) => m.to));
+        setPlayableSquares(
+          moves.map((m) => ({
+            square: m.to,
+            // En passant captures a pawn that is not on the target square.
+            capture: m.isCapture() && !m.isEnPassant(),
+          }))
+        );
       } else {
         setPlayableSquares([]);
       }
@@ -297,18 +303,33 @@ export default function Board({
     [gameAtom]
   );
 
+  const threatenedSquaresAtom = useMemo(
+    () =>
+      atom((get) => {
+        // Only a side the viewer plays can be threatened, and only while the
+        // other side is to move: on the viewer's own turn they can act first.
+        if (canPlay !== Color.White && canPlay !== Color.Black) return [];
+        const game = get(gameAtom);
+        if (game.turn() === canPlay) return [];
+        return getThreatenedPieces(game, canPlay);
+      }),
+    [gameAtom, canPlay]
+  );
+
   const SquareRenderer: CustomSquareRenderer = useMemo(() => {
     return getSquareRenderer({
       currentPositionAtom: currentPositionAtom,
       clickedSquaresAtom,
       playableSquaresAtom,
       checkedKingAtom,
+      threatenedSquaresAtom,
     });
   }, [
     currentPositionAtom,
     clickedSquaresAtom,
     playableSquaresAtom,
     checkedKingAtom,
+    threatenedSquaresAtom,
   ]);
 
   return (

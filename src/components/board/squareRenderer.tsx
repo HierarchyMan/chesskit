@@ -11,23 +11,33 @@ import { boardHueAtom } from "./states";
 import { areObjectsEqual, isObject } from "@/lib/object";
 import { CheckedKing } from "@/lib/chess";
 
+/** A square the selected piece can move to. */
+export interface MoveTarget {
+  square: Square;
+  /** The move takes an enemy piece standing on the square. */
+  capture: boolean;
+}
+
 export interface Props {
   currentPositionAtom: PrimitiveAtom<CurrentPosition>;
   clickedSquaresAtom: PrimitiveAtom<Square[]>;
-  playableSquaresAtom: PrimitiveAtom<Square[]>;
+  playableSquaresAtom: PrimitiveAtom<MoveTarget[]>;
   checkedKingAtom: Atom<CheckedKing | null>;
+  threatenedSquaresAtom: Atom<Square[]>;
 }
 
 /**
- * Paints a square's own state: the check, the selection, the last move and the
- * squares a piece can go to. The move-quality mark is not drawn here, because
- * a square's stacking context would keep it beneath the arrows.
+ * Paints a square's own state: the check, the selection, the last move, the
+ * squares a piece can go to, and the pieces the other side can take. The
+ * move-quality mark is not drawn here, because a square's stacking context
+ * would keep it beneath the arrows.
  */
 export function getSquareRenderer({
   currentPositionAtom,
   clickedSquaresAtom,
   playableSquaresAtom,
   checkedKingAtom,
+  threatenedSquaresAtom,
 }: Props) {
   const squareRenderer = memo(
     forwardRef<HTMLDivElement, CustomSquareProps>((props, ref) => {
@@ -54,9 +64,23 @@ export function getSquareRenderer({
         )
       );
 
-      const isPlayable = useAtomValue(
+      const moveTarget = useAtomValue(
         useMemo(
-          () => atom((get) => get(playableSquaresAtom).includes(square)),
+          () =>
+            atom((get) =>
+              get(playableSquaresAtom).find(
+                (target) => target.square === square
+              )
+            ),
+          [square]
+        )
+      );
+      const isPlayable = !!moveTarget;
+      const isCapture = !!moveTarget?.capture;
+
+      const isThreatened = useAtomValue(
+        useMemo(
+          () => atom((get) => get(threatenedSquaresAtom).includes(square)),
           [square]
         )
       );
@@ -116,7 +140,12 @@ export function getSquareRenderer({
           {children}
           {isMatedKing && <div style={checkmateMarkStyle}>#</div>}
           {highlightSquareStyle && <div style={highlightSquareStyle} />}
-          {isPlayable && <div style={playableSquareStyles} />}
+          {isPlayable && (
+            <div
+              style={isCapture ? captureSquareStyles : playableSquareStyles}
+            />
+          )}
+          {isThreatened && <div style={captureSquareStyles} />}
         </div>
       );
     }),
@@ -189,6 +218,21 @@ const playableSquareStyles: CSSProperties = {
   backgroundClip: "content-box",
   borderRadius: "50%",
   boxSizing: "border-box",
+};
+
+/**
+ * A square whose piece can be taken is ringed rather than dotted: a dot would
+ * sit on the piece's own body and disappear behind it.
+ */
+const captureSquareStyles: CSSProperties = {
+  position: "absolute",
+  width: "100%",
+  height: "100%",
+  borderRadius: "50%",
+  border: "calc(var(--board-size, 400px) * 0.012) solid rgba(0,0,0,.14)",
+  boxSizing: "border-box",
+  // Scales the whole ring, its stroke included, around the square's centre.
+  transform: "scale(0.9)",
 };
 
 const previousMoveSquareStyle = (
