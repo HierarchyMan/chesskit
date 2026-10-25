@@ -19,8 +19,6 @@ export const ToolbarButton = ({
   iconHeight = 24,
   active,
 }: Props) => {
-  const paddingX = `${Math.round(20 - (iconHeight - 24) / 2)}px`;
-
   return (
     <Tooltip title={tooltip} disableInteractive>
       <span>
@@ -31,10 +29,12 @@ export const ToolbarButton = ({
           aria-pressed={active}
           color={active ? "primary" : "default"}
           sx={{
-            paddingX: { xs: "8px", sm: paddingX },
-            borderRadius: "8px",
-            width: "auto",
-            height: "46px",
+            padding: "8px",
+            borderRadius: "6px",
+            width: "40px",
+            height: "40px",
+            flexShrink: 0,
+            userSelect: "none",
             // A toggle that is off reads as dimmed, so its state is clear at a glance.
             opacity: active === false ? 0.5 : 1,
           }}

@@ -1,4 +1,4 @@
-import { EngineName } from "@/types/enums";
+import { EngineId } from "@/types/enums";
 import {
   EvaluateGameParams,
   EvaluatePositionWithUpdateParams,
@@ -15,14 +15,19 @@ import { getIsStalemate, getWhoIsCheckmated } from "../chess";
 import { getLichessEval } from "../lichess";
 import { getMovesClassification } from "./helpers/moveClassification";
 import { computeEstimatedElo } from "./helpers/estimateElo";
-import { hasNativeEloLimit } from "@/constants";
-import { NATIVE_MAX_ELO, NATIVE_MIN_ELO } from "./strength";
 import { EngineWorker, WorkerJob } from "@/types/engine";
 import { getEngineWorker, sendCommandsToWorker } from "./worker";
+import { UciOption, parseUciOptions } from "./uciOptions";
+import { getEngineModel } from "./models";
 import { logMessageIfLocalhost } from "../helpers";
 
+/** UCI commands for a new worker, built from the options the engine advertised. */
+export type EngineSource = string | (() => EngineWorker);
+
+export type EngineSetup = (options: Map<string, UciOption>) => string[];
+
 export class UciEngine {
-  public readonly name: EngineName;
+  public readonly name: EngineId;
   private workers: EngineWorker[] = [];
   private pendingWorkers = new Set<EngineWorker>();
   private closed = false;
@@ -30,31 +35,32 @@ export class UciEngine {
   private isReady = false;
   private positionGeneration = 0;
   private positionSetup: Promise<unknown> = Promise.resolve();
-  private enginePath: string;
-  private customEngineInit?:
-    | ((worker: EngineWorker) => Promise<void>)
-    | undefined = undefined;
-  private multiPv = 3;
+  // A script or bridge URL to start, or a factory for engines that run in the page.
+  private enginePath: EngineSource;
+  private setup?: EngineSetup;
+  // What the engine advertised in its "uci" reply, keyed by lower-case option name.
+  private options = new Map<string, UciOption>();
+  private multiPv = 1;
   private elo: number | undefined = undefined;
   private stopInFlight: Promise<void> | undefined = undefined;
 
   private constructor(
-    engineName: EngineName,
-    enginePath: string,
-    customEngineInit: UciEngine["customEngineInit"]
+    engineName: EngineId,
+    enginePath: EngineSource,
+    setup: EngineSetup | undefined
   ) {
     this.name = engineName;
     this.enginePath = enginePath;
-    this.customEngineInit = customEngineInit;
+    this.setup = setup;
   }
 
   public static async create(
-    engineName: EngineName,
-    enginePath: string,
-    customEngineInit?: UciEngine["customEngineInit"],
+    engineName: EngineId,
+    enginePath: EngineSource,
+    setup?: EngineSetup,
     signal?: AbortSignal
   ): Promise<UciEngine> {
-    const engine = new UciEngine(engineName, enginePath, customEngineInit);
+    const engine = new UciEngine(engineName, enginePath, setup);
 
     const abort = () => engine.shutdown();
     signal?.addEventListener("abort", abort, { once: true });
@@ -109,12 +115,28 @@ export class UciEngine {
     }
   }
 
-  private async setMultiPv(multiPv: number) {
-    if (multiPv === this.multiPv) return;
+  /** What this engine supports, read from its own "uci" reply. */
+  public get capabilities() {
+    const range = (name: string) => {
+      const option = this.options.get(name);
+      return option?.min !== undefined && option.max !== undefined
+        ? { min: option.min, max: option.max }
+        : undefined;
+    };
+    return {
+      maxMultiPv: this.options.get("multipv")?.max ?? 1,
+      elo: this.options.has("uci_limitstrength") ? range("uci_elo") : undefined,
+      hash: range("hash"),
+      threads: range("threads"),
+    };
+  }
 
-    if (multiPv < 2 || multiPv > 6) {
-      throw new Error(`Invalid MultiPV value : ${multiPv}`);
-    }
+  private async setMultiPv(requested: number) {
+    const multiPv = Math.max(
+      1,
+      Math.min(Math.round(requested), this.capabilities.maxMultiPv)
+    );
+    if (multiPv === this.multiPv) return;
 
     await this.sendCommandsToEachWorker(
       [`setoption name MultiPV value ${multiPv}`, "isready"],
@@ -124,8 +146,13 @@ export class UciEngine {
     this.multiPv = multiPv;
   }
 
-  private async setElo(elo: number | undefined) {
-    if (!hasNativeEloLimit(this.name)) return;
+  private async setElo(requested: number | undefined) {
+    const range = this.capabilities.elo;
+    if (!range) return;
+    const elo =
+      requested === undefined
+        ? undefined
+        : Math.max(range.min, Math.min(range.max, Math.round(requested)));
     if (elo === this.elo) return;
 
     if (elo === undefined) {
@@ -135,10 +162,6 @@ export class UciEngine {
       );
       this.elo = undefined;
       return;
-    }
-
-    if (elo < NATIVE_MIN_ELO || elo > NATIVE_MAX_ELO) {
-      throw new Error(`Invalid Elo value : ${elo}`);
     }
 
     await this.sendCommandsToEachWorker(
@@ -179,7 +202,7 @@ export class UciEngine {
   }
 
   private terminateWorker(worker: EngineWorker) {
-    console.log(`Terminating worker from ${this.enginePath}`);
+    console.log(`Terminating worker of ${this.name}`);
     worker.isReady = false;
     worker.cancelPending?.();
     try {
@@ -291,22 +314,35 @@ export class UciEngine {
 
   private async addNewWorker() {
     if (this.closed) throw new DOMException("Engine closed", "AbortError");
-    const worker = getEngineWorker(this.enginePath);
+    const worker =
+      typeof this.enginePath === "string"
+        ? getEngineWorker(this.enginePath)
+        : this.enginePath();
     this.pendingWorkers.add(worker);
     try {
       const check = () => {
         if (this.closed) throw new DOMException("Engine closed", "AbortError");
       };
-      await sendCommandsToWorker(worker, ["uci"], "uciok");
+      const handshake = await sendCommandsToWorker(worker, ["uci"], "uciok");
       check();
-      await sendCommandsToWorker(
-        worker,
-        [`setoption name MultiPV value ${this.multiPv}`, "isready"],
-        "readyok"
-      );
-      check();
-      await this.customEngineInit?.(worker);
-      check();
+      if (!this.options.size) this.options = parseUciOptions(handshake);
+      if (this.options.has("multipv")) {
+        await sendCommandsToWorker(
+          worker,
+          [`setoption name MultiPV value ${this.multiPv}`, "isready"],
+          "readyok"
+        );
+        check();
+      }
+      const setupCommands = this.setup?.(this.options) ?? [];
+      if (setupCommands.length) {
+        await sendCommandsToWorker(
+          worker,
+          [...setupCommands, "isready"],
+          "readyok"
+        );
+        check();
+      }
       await sendCommandsToWorker(worker, ["ucinewgame", "isready"], "readyok");
       check();
       this.workers.push(worker);
@@ -368,7 +404,10 @@ export class UciEngine {
     await this.setMultiPv(multiPv);
     await this.setElo(undefined);
     await this.sendCommandsToEachWorker(["ucinewgame", "isready"], "readyok");
-    await this.setWorkersNb(workersNb);
+    // Built-in engines may run their own advisor engine, so they never fan out.
+    await this.setWorkersNb(
+      getEngineModel(this.name).source === "builtin" ? 1 : workersNb
+    );
 
     const positions: PositionEval[] = new Array(fens.length);
     let completed = 0;
@@ -478,6 +517,8 @@ export class UciEngine {
     const generation = ++this.positionGeneration;
     const current = () =>
       generation === this.positionGeneration && this.isReady;
+    // Lichess lines are real evaluations; an engine whose scores are not real must show its own.
+    useCloudEval &&= getEngineModel(this.name).reliableEval;
     const cloudPromise = useCloudEval
       ? getLichessEval(fen, multiPv)
       : undefined;
@@ -540,7 +581,8 @@ export class UciEngine {
   public async getEngineNextMove(
     fen: string,
     elo: number | undefined,
-    depth = 16
+    depth = 16,
+    movetimeMs?: number
   ): Promise<string | undefined> {
     this.throwErrorIfNotReady();
 
@@ -550,7 +592,12 @@ export class UciEngine {
     logMessageIfLocalhost(`Evaluating position: ${fen}`);
 
     const results = await this.sendCommands(
-      [`position fen ${fen}`, `go depth ${depth}`],
+      [
+        `position fen ${fen}`,
+        movetimeMs
+          ? `go movetime ${Math.round(movetimeMs)}`
+          : `go depth ${depth}`,
+      ],
       "bestmove"
     );
 

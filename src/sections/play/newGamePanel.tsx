@@ -1,12 +1,12 @@
-import ModelMenuLabel from "@/components/modelMenuLabel";
 import Panel from "@/components/panel";
 import StrengthControl from "@/components/strengthControl";
-import { ENGINE_LABELS } from "@/constants";
+import { EngineField } from "@/components/enginePicker";
+import { engineLabel } from "@/constants";
 import { EngineState } from "@/hooks/useEngine";
 import { useModels } from "@/hooks/useModels";
 import { getEngineModel } from "@/lib/engine/models";
 import { ODDS_OPTIONS } from "@/lib/odds";
-import { Color, EngineName } from "@/types/enums";
+import { Color, EngineId } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
   Alert,
@@ -15,9 +15,7 @@ import {
   Chip,
   Collapse,
   FormControl,
-  InputLabel,
   MenuItem,
-  OutlinedInput,
   Select,
   Stack,
   Switch,
@@ -27,7 +25,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom } from "jotai";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import {
@@ -44,6 +42,8 @@ import {
   timeControlAtom,
 } from "./states";
 import { useStartGame } from "./useStartGame";
+import { playSetupPosition } from "@/lib/setupPosition";
+import { setHandoff } from "@/lib/handoff";
 
 const TIME_PRESETS: { label: string; minutes: number; increment: number }[] = [
   { label: "No clock", minutes: 0, increment: 0 },
@@ -70,16 +70,22 @@ export default function NewGamePanel({ botEngine }: Props) {
   const [timeControl, setTimeControl] = useAtom(timeControlAtom);
   const [odds, setOdds] = useAtom(oddsAtom);
   const [startingPosition, setStartingPosition] = useAtom(startingPositionAtom);
-  const setPlayerColor = useSetAtom(playerColorAtom);
+  const [playerColor, setPlayerColor] = useAtom(playerColorAtom);
   const [showPosition, setShowPosition] = useState(false);
   const [error, setError] = useState("");
   const { startGame } = useStartGame();
-  const { models, refresh } = useModels();
+  const { models } = useModels();
   const router = useRouter();
   const selectedModel = models.find((view) => view.model.name === engineName);
 
   useEffect(() => {
-    if (colorChoice !== "random") setPlayerColor(colorChoice);
+    setPlayerColor(
+      colorChoice === "random"
+        ? Math.random() < 0.5
+          ? Color.White
+          : Color.Black
+        : colorChoice
+    );
   }, [colorChoice, setPlayerColor]);
 
   useEffect(() => {
@@ -87,6 +93,11 @@ export default function NewGamePanel({ botEngine }: Props) {
   }, [startingPosition]);
 
   const ready = botEngine.status === "ready";
+  const setup = playSetupPosition(
+    startingPosition,
+    odds,
+    playerColor === Color.White ? Color.Black : Color.White
+  );
 
   const handleStart = () => {
     const message = startGame();
@@ -98,29 +109,14 @@ export default function NewGamePanel({ botEngine }: Props) {
       <Stack spacing={2.5}>
         <Section title="Opponent">
           <Stack spacing={1.5}>
-            <FormControl size="small" fullWidth>
-              <InputLabel id="play-engine-label">Engine</InputLabel>
-              <Select
-                labelId="play-engine-label"
-                input={<OutlinedInput label="Engine" />}
-                value={engineName}
-                onOpen={() => refresh()}
-                onChange={(event) =>
-                  setEngineName(event.target.value as EngineName)
-                }
-                renderValue={(value) => ENGINE_LABELS[value as EngineName].full}
-              >
-                {models.map((view) => (
-                  <MenuItem
-                    key={view.model.name}
-                    value={view.model.name}
-                    disabled={!view.supported}
-                  >
-                    <ModelMenuLabel view={view} />
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <EngineField
+              label="Opponent engine"
+              role="play"
+              value={engineName}
+              onChange={(next) => {
+                if (next !== "analysis") setEngineName(next);
+              }}
+            />
 
             <EngineStatusLine
               engine={botEngine}
@@ -262,12 +258,21 @@ export default function NewGamePanel({ botEngine }: Props) {
                 label="FEN or PGN"
                 value={startingPosition}
                 onChange={(event) => setStartingPosition(event.target.value)}
+                error={!!setup.error}
+                helperText={
+                  setup.error ??
+                  "The board previews this starting position. Clear to use the standard position."
+                }
               />
               <Button
                 size="small"
                 variant="outlined"
                 startIcon={<Icon icon="mdi:pencil-ruler" height={18} />}
-                onClick={() => router.push("/editor")}
+                disabled={!!setup.error}
+                onClick={() => {
+                  setHandoff({ kind: "fen", fen: setup.fen }, "/editor");
+                  void router.push("/editor");
+                }}
               >
                 Build one in the board editor
               </Button>
@@ -280,7 +285,7 @@ export default function NewGamePanel({ botEngine }: Props) {
         <Button
           variant="contained"
           size="large"
-          disabled={!ready}
+          disabled={!ready || !!setup.error}
           onClick={handleStart}
           startIcon={<Icon icon="mdi:play" height={22} />}
         >
@@ -321,13 +326,13 @@ function EngineStatusLine({
   downloaded,
 }: {
   engine: EngineState;
-  engineName: EngineName;
+  engineName: EngineId;
   downloaded: boolean;
 }) {
   if (engine.status === "ready") {
     return (
       <Typography variant="body2" color="success.main">
-        {ENGINE_LABELS[engineName].small} is ready.
+        {engineLabel(engineName).small} is ready.
       </Typography>
     );
   }
@@ -351,7 +356,7 @@ function EngineStatusLine({
 
   return (
     <Typography variant="body2" sx={{ opacity: 0.75 }}>
-      Loading {ENGINE_LABELS[engineName].small}
+      Loading {engineLabel(engineName).small}
       {!downloaded && sizeMb > 20
         ? ` (about ${sizeMb}MB, first time only)`
         : ""}

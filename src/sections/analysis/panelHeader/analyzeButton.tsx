@@ -20,17 +20,16 @@ import {
 import { loadGameFromText } from "@/lib/pgn";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { LoadingButton } from "@mui/lab";
-import EngineStatusChip from "@/components/engineStatusChip";
 import { logAnalyticsEvent } from "@/lib/firebase";
 import { SavedEvals } from "@/types/eval";
 import { useEffect, useCallback } from "react";
 import { usePlayersData } from "@/hooks/usePlayersData";
-import { Stack, Typography } from "@mui/material";
 import { useAnalysisEngine } from "../engineContext";
 
 export default function AnalyzeButton() {
   const store = useStore();
   const setError = useSetAtom(analysisSourceErrorAtom);
+  const activeRequest = useAtomValue(analysisFullRequestAtom);
   const engineName = useAtomValue(engineNameAtom);
   const engineState = useAnalysisEngine();
   const engine = engineState.engine;
@@ -154,24 +153,33 @@ export default function AnalyzeButton() {
   // Live position analysis is automatic; a full-line analysis is explicit so
   // exploring a new continuation does not restart a game-wide search each move.
 
-  if (evaluationProgress) return null;
-
   return (
-    <Stack direction="row" alignItems="center" gap={1.5}>
-      <EngineStatusChip state={engineState} engineName={engineName} />
-      <LoadingButton
-        variant="contained"
-        size="small"
-        startIcon={
-          <Icon icon="streamline:magnifying-glass-solid" height={12} />
-        }
-        onClick={handleAnalyze}
-        disabled={!readyToAnalyse}
-      >
-        <Typography fontSize="0.9em" fontWeight="500" lineHeight="1.4em">
-          {gameEval ? "Analyze again" : "Analyze"}
-        </Typography>
-      </LoadingButton>
-    </Stack>
+    <LoadingButton
+      variant="contained"
+      size="small"
+      startIcon={
+        <Icon
+          icon={
+            activeRequest ? "mdi:stop" : "streamline:magnifying-glass-solid"
+          }
+          height={16}
+        />
+      }
+      onClick={() => {
+        if (activeRequest) {
+          store.set(analysisFullRequestAtom, null);
+          setEvaluationProgress(0);
+          engineState.retry();
+        } else void handleAnalyze();
+      }}
+      disabled={!activeRequest && !readyToAnalyse}
+      sx={{ minHeight: 36, borderRadius: "6px", whiteSpace: "nowrap" }}
+    >
+      {activeRequest
+        ? `Stop${evaluationProgress ? ` (${Math.round(evaluationProgress)}%)` : " analysis"}`
+        : gameEval
+          ? "Analyze again"
+          : "Analyze line"}
+    </LoadingButton>
   );
 }

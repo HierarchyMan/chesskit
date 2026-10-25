@@ -4,6 +4,7 @@ import { CLASSIFICATION_COLORS } from "@/constants";
 import { useChessActions } from "@/hooks/useChessActions";
 import {
   CLASSIFICATION_PHRASES,
+  classificationName,
   WORTH_VISUALIZING,
 } from "@/lib/classificationLabels";
 import { MoveClassification } from "@/types/enums";
@@ -31,8 +32,12 @@ const GOOD_MOVES: MoveClassification[] = [
   MoveClassification.Forced,
 ];
 
-export default function CoachCard() {
-  const { feedback, engineState, playerMoveIndex } = useMoveCoach(true);
+export default function CoachCard({
+  coach,
+}: {
+  coach: ReturnType<typeof useMoveCoach>;
+}) {
+  const { feedback, engineState, playerMoveIndex, error } = coach;
   const game = useAtomValue(gameAtom);
   const setStory = useSetAtom(moveStoryAtom);
   const { goToMove } = useChessActions(gameAtom);
@@ -60,7 +65,7 @@ export default function CoachCard() {
       }
     >
       <Stack spacing={1.25}>
-        {engineState.status === "error" && (
+        {error && (
           <Alert
             severity="error"
             action={
@@ -69,11 +74,11 @@ export default function CoachCard() {
               </Button>
             }
           >
-            {engineState.error ?? "The coach's engine did not start."}
+            {error}
           </Alert>
         )}
 
-        {!feedback && engineState.status !== "error" && (
+        {!feedback && !error && (
           <Typography variant="body2" sx={{ opacity: 0.75 }}>
             Make a move and I&apos;ll tell you how good it was.
           </Typography>
@@ -99,7 +104,7 @@ export default function CoachCard() {
             <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
               <Chip
                 size="small"
-                label={classification}
+                label={classificationName(classification)}
                 icon={
                   <Image
                     src={`/icons/${classification}.png`}

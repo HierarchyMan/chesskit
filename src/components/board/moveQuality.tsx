@@ -1,5 +1,6 @@
 import { squareCenter, Orientation } from "@/lib/arrows/geometry";
 import { MoveClassification } from "@/types/enums";
+import { classificationName } from "@/lib/classificationLabels";
 import { CurrentPosition } from "@/types/eval";
 import { Square } from "chess.js";
 import { PrimitiveAtom, atom, useAtomValue } from "jotai";
@@ -83,7 +84,7 @@ export default function QualityIcon({
   return (
     <Image
       src={`/icons/${mark.classification}.png`}
-      alt={`${mark.classification} move`}
+      alt={`${classificationName(mark.classification)} move`}
       width={40}
       height={40}
       style={position}

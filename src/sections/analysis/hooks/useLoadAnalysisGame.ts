@@ -26,6 +26,7 @@ export const useLoadAnalysisGame = () => {
       const gameFromPgn = loadGameFromText(pgn);
       load({
         game: gameFromPgn,
+        pgn,
         orientation: newOrientation,
         evaluation: gameEval,
         sourceGameId,

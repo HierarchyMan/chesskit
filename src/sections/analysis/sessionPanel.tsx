@@ -5,11 +5,16 @@ import {
   copyAnalysisSession,
   newAnalysisSession,
   parseAnalysisSessionBackup,
-  analysisLinePath,
+  analysisLineLabel,
+  selectAnalysisLine,
+  sessionLine,
 } from "@/lib/analysisSession";
 import {
   AnalysisSessionSummary,
   getAnalysisSession,
+  getStoredAnalysisSession,
+  getOriginalAnalysisSession,
+  hasOriginalAnalysisSession,
   listAnalysisSessionSummaries,
   saveAnalysisSession,
 } from "@/lib/gameDatabase";
@@ -34,6 +39,7 @@ import {
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
+import ReportHistory from "./reportHistory";
 import {
   analysisSourceErrorAtom,
   analysisSaveRequestAtom,
@@ -43,11 +49,7 @@ import {
   restoreAnalysisSessionAtom,
   storeAnalysisBranchesAtom,
 } from "./sessionAtoms";
-import {
-  arrangeModeAtom,
-  boardOrientationAtom,
-  editablePositionAtom,
-} from "./states";
+import { arrangeModeAtom } from "./states";
 
 const REMEMBER_HELP =
   "Record new moves for back and forward replay. Turning this off keeps all remembered moves.";
@@ -60,13 +62,11 @@ export default function SessionPanel() {
   const revision = useAtomValue(analysisSessionsRevisionAtom);
   const requestSave = useSetAtom(analysisSaveRequestAtom);
   const restore = useSetAtom(restoreAnalysisSessionAtom);
-  const setOrientation = useSetAtom(boardOrientationAtom);
-  const setArrange = useSetAtom(arrangeModeAtom);
   const arranging = useAtomValue(arrangeModeAtom);
-  const setPosition = useSetAtom(editablePositionAtom);
   const [open, setOpen] = useState(false);
   const [sessions, setSessions] = useState<AnalysisSessionSummary[]>([]);
   const [error, setError] = useState("");
+  const [hasOriginal, setHasOriginal] = useState(false);
   const [cleared, setCleared] = useState<AnalysisSession | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -74,6 +74,11 @@ export default function SessionPanel() {
   useEffect(() => {
     if (!open) return;
     let current = true;
+    void hasOriginalAnalysisSession(session?.id ?? "")
+      .then((exists) => {
+        if (current) setHasOriginal(exists);
+      })
+      .catch(() => undefined);
     void listAnalysisSessionSummaries()
       .then((rows) => {
         if (current) setSessions(rows);
@@ -84,7 +89,7 @@ export default function SessionPanel() {
     return () => {
       current = false;
     };
-  }, [open, revision]);
+  }, [open, revision, session?.id]);
 
   if (!session) return null;
   const changeSession = async (
@@ -102,9 +107,6 @@ export default function SessionPanel() {
         { scroll: false }
       );
       restore(next);
-      setOrientation(next.orientation);
-      setArrange(!!next.draft);
-      if (next.draft) setPosition(next.draft);
       setOpen(false);
       setError("");
     } catch (reason) {
@@ -126,15 +128,15 @@ export default function SessionPanel() {
   };
 
   return (
-    <Box width="100%" sx={{ px: 1 }}>
+    <Box width="100%" sx={{ minWidth: 0 }}>
       <Stack
         direction="row"
         alignItems="center"
         justifyContent="space-between"
-        flexWrap="wrap"
+        flexWrap="nowrap"
         gap={1}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography fontWeight={600} noWrap>
             {session.title}
           </Typography>
@@ -148,10 +150,16 @@ export default function SessionPanel() {
                   : "Opening session…"}
           </Typography>
         </Box>
-        <Stack direction="row" alignItems="center" gap={1}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          gap={0.5}
+          sx={{ flexShrink: 0 }}
+        >
           {!arranging && (
             <Tooltip title={REMEMBER_HELP}>
               <FormControlLabel
+                sx={{ m: 0 }}
                 control={
                   <Switch
                     size="small"
@@ -159,12 +167,17 @@ export default function SessionPanel() {
                     onChange={(_, checked) => setBranches(checked)}
                   />
                 }
-                label={<Typography variant="body2">Remember</Typography>}
+                label={<Typography variant="caption">Remember</Typography>}
               />
             </Tooltip>
           )}
-          <Button size="small" onClick={() => setOpen(true)}>
-            Sessions & options
+          <Button
+            size="small"
+            aria-label="Sessions and options"
+            onClick={() => setOpen(true)}
+            sx={{ minWidth: 0, px: 0.5 }}
+          >
+            Sessions
           </Button>
         </Stack>
       </Stack>
@@ -207,34 +220,24 @@ export default function SessionPanel() {
               label="Saved analysis line"
               value={session.selectedLineId}
               onChange={(event) =>
-                restore({
-                  ...session,
-                  selectedLineId: event.target.value,
-                  cursorPly: 0,
-                })
+                restore(selectAnalysisLine(session, event.target.value))
               }
             >
               <MenuItem value="main">Main game</MenuItem>
               {session.branches.map((line, index) => (
                 <MenuItem key={line.id} value={line.id}>
-                  Branch {index + 1}: {analysisLinePath(line).sans.join(" ")}
+                  {analysisLineLabel(session, line, index)}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          {!!session.branches.length && (
-            <Button
-              size="small"
-              color="warning"
-              onClick={() => {
-                setCleared(session);
-                restore(clearAnalysisBranches(session));
-              }}
-            >
-              Clear branches
-            </Button>
-          )}
         </Stack>
+      )}
+      {!arranging && (
+        <ReportHistory
+          key={session.selectedLineId}
+          line={sessionLine(session)}
+        />
       )}
       {cleared?.id === session.id && (
         <Button
@@ -295,6 +298,18 @@ export default function SessionPanel() {
               and offers Undo.
             </Typography>
             <Stack direction="row" gap={1} flexWrap="wrap">
+              {!!session.branches.length && (
+                <Button
+                  color="warning"
+                  onClick={() => {
+                    setCleared(session);
+                    restore(clearAnalysisBranches(session));
+                    setOpen(false);
+                  }}
+                >
+                  Clear variations
+                </Button>
+              )}
               <Button
                 variant="outlined"
                 onClick={() => {
@@ -304,6 +319,42 @@ export default function SessionPanel() {
                 New session
               </Button>
               <Button onClick={download}>Download session backup</Button>
+              {hasOriginal && (
+                <Button
+                  onClick={() => {
+                    void getOriginalAnalysisSession(session.id)
+                      .then((original) => {
+                        if (!original) {
+                          setError("The original backup is unavailable.");
+                          return;
+                        }
+                        const url = URL.createObjectURL(
+                          new Blob(
+                            [
+                              JSON.stringify(
+                                {
+                                  format: "chesskit-analysis-session",
+                                  session: original,
+                                },
+                                null,
+                                2
+                              ),
+                            ],
+                            { type: "application/json" }
+                          )
+                        );
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = "chesskit-original-session.json";
+                        link.click();
+                        setTimeout(() => URL.revokeObjectURL(url), 0);
+                      })
+                      .catch((reason) => setError(String(reason)));
+                  }}
+                >
+                  Download original backup
+                </Button>
+              )}
               <Button onClick={() => file.current?.click()}>
                 Restore session backup
               </Button>
@@ -340,22 +391,63 @@ export default function SessionPanel() {
             {error && <Alert severity="error">{error}</Alert>}
             <Typography fontWeight={600}>Reopen a session</Typography>
             {sessions.map((saved) => (
-              <Button
-                key={saved.id}
-                variant={saved.id === session.id ? "outlined" : "text"}
-                sx={{ justifyContent: "flex-start", textAlign: "left" }}
-                onClick={() => {
-                  void getAnalysisSession(saved.id)
-                    .then((next) => {
-                      if (next) return changeSession(next);
-                      throw new Error("This session is no longer available.");
-                    })
-                    .catch((reason) => setError(String(reason)));
-                }}
-              >
-                {saved.title} · {new Date(saved.updatedAt).toLocaleString()}
-                {` · ${saved.branchCount} branches`}
-              </Button>
+              <Stack key={saved.id} direction="row" gap={1} alignItems="center">
+                <Button
+                  variant={saved.id === session.id ? "outlined" : "text"}
+                  sx={{
+                    justifyContent: "flex-start",
+                    textAlign: "left",
+                    flex: 1,
+                  }}
+                  onClick={() => {
+                    void getAnalysisSession(saved.id)
+                      .then((next) => {
+                        if (next) return changeSession(next);
+                        throw new Error("This session is no longer available.");
+                      })
+                      .catch((reason) => setError(String(reason)));
+                  }}
+                >
+                  {saved.title} · {new Date(saved.updatedAt).toLocaleString()}
+                  {` · ${saved.branchCount} branches`}
+                </Button>
+                <Button
+                  size="small"
+                  aria-label={`Download backup of ${saved.title}`}
+                  onClick={() => {
+                    void getStoredAnalysisSession(saved.id)
+                      .then((record) => {
+                        if (!record)
+                          throw new Error(
+                            "This session is no longer available."
+                          );
+                        const url = URL.createObjectURL(
+                          new Blob(
+                            [
+                              JSON.stringify(
+                                {
+                                  format: "chesskit-analysis-session",
+                                  session: record,
+                                },
+                                null,
+                                2
+                              ),
+                            ],
+                            { type: "application/json" }
+                          )
+                        );
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = "chesskit-saved-session.json";
+                        link.click();
+                        setTimeout(() => URL.revokeObjectURL(url), 0);
+                      })
+                      .catch((reason) => setError(String(reason)));
+                  }}
+                >
+                  Backup
+                </Button>
+              </Stack>
             ))}
             <Button onClick={() => setOpen(false)}>Close</Button>
           </Stack>

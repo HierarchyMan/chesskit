@@ -4,6 +4,10 @@ const isTypingTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
 
   return (
+    (!!target.closest(
+      'button, a, [role="button"], [role="tab"], [role="slider"]'
+    ) &&
+      !target.closest("[data-board-shortcuts]")) ||
     target.isContentEditable ||
     target.tagName === "INPUT" ||
     target.tagName === "TEXTAREA" ||

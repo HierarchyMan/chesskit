@@ -17,6 +17,8 @@ export interface ModelState {
   progress?: ModelProgress;
   error?: string;
   bridge: BridgeStatus;
+  // What the bridge said about this native engine's program, when it is running.
+  bridgeEngine?: { available: boolean; error?: string };
   supported: boolean;
 }
 
@@ -30,6 +32,7 @@ export interface ModelView {
   progress?: ModelProgress;
   error?: string;
   bridge: BridgeStatus;
+  bridgeEngine?: { available: boolean; error?: string };
   available: boolean;
 }
 
@@ -53,8 +56,11 @@ export const buildModelView = (
     progress: state.progress,
     error: state.error,
     bridge: state.bridge,
+    bridgeEngine: state.bridgeEngine,
     available:
-      model.source === "bridge" ? state.bridge === "up" : state.supported,
+      model.source === "bridge"
+        ? state.bridge === "up" && state.bridgeEngine?.available !== false
+        : state.supported,
   };
 };
 
@@ -75,7 +81,22 @@ const BRIDGE_LINES: Record<BridgeStatus, { text: string; tone: StatusTone }> = {
 export const describeModel = (
   view: ModelView
 ): { text: string; tone: StatusTone } => {
+  if (view.model.source === "builtin") {
+    return {
+      text: view.model.needsAdvisor
+        ? "Built in · asks the advisor engine"
+        : "Built in · instant",
+      tone: "success",
+    };
+  }
+
   if (view.model.source === "bridge") {
+    if (view.bridge === "up" && view.bridgeEngine?.available === false) {
+      return {
+        text: view.bridgeEngine.error ?? "Bridge running, program missing",
+        tone: "error",
+      };
+    }
     const line = BRIDGE_LINES[view.bridge];
     return view.loaded ? { ...line, text: `${line.text} · Loaded` } : line;
   }

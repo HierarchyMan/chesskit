@@ -1,18 +1,40 @@
-import { loadGameFromText } from "@/lib/pgn";
+import { loadGameFromText, normalizePgn } from "@/lib/pgn";
+import {
+  decodeAnalysisSession,
+  encodeAnalysisSession,
+} from "@/lib/analysisSessionCodec";
 import {
   EditablePosition,
   parseFenLoose,
   positionToFen,
 } from "@/lib/editorPosition";
-import { EngineName, MoveClassification } from "@/types/enums";
+import { MoveClassification } from "@/types/enums";
+import { isEngineId } from "./engine/models";
 import { GameEval } from "@/types/eval";
 import { Chess } from "chess.js";
 import { chessPath, isChessPrefix } from "@/lib/chessHistory";
+import {
+  addStudyPath,
+  parseStudyPgn,
+  writeStudyPath,
+  writeStudyTree,
+  studyNodePath,
+  studyFromGame,
+} from "@/lib/studyTree";
+
+export interface AnalysisReport {
+  id: string;
+  pgn: string;
+  evaluation: GameEval;
+}
 
 export interface AnalysisLine {
   id: string;
   pgn: string;
   evaluation?: GameEval;
+  reports?: AnalysisReport[];
+  cursorPly?: number;
+  aliases?: string[];
 }
 
 export interface AnalysisSession {
@@ -31,15 +53,39 @@ export interface AnalysisSession {
   orientation: boolean;
   draft?: EditablePosition;
   draftInput?: string;
+  editableMain?: boolean;
 }
+
+/** React session snapshots are immutable. Cursor/draft/metadata changes can be
+ * persisted separately without serializing the unchanged tree and reports. */
+export const sameAnalysisContent = (a: AnalysisSession, b: AnalysisSession) => {
+  const sameLine = (left: AnalysisLine, right: AnalysisLine) =>
+    left.id === right.id &&
+    left.pgn === right.pgn &&
+    left.evaluation === right.evaluation &&
+    left.reports === right.reports &&
+    left.aliases === right.aliases;
+  return (
+    a.id === b.id &&
+    a.version === b.version &&
+    a.createdAt === b.createdAt &&
+    a.sourceGameId === b.sourceGameId &&
+    a.sourcePgn === b.sourcePgn &&
+    a.editableMain === b.editableMain &&
+    sameLine(a.main, b.main) &&
+    a.branches.length === b.branches.length &&
+    a.branches.every((line, index) => sameLine(line, b.branches[index]))
+  );
+};
 
 export const newAnalysisSession = (
   game: Chess = new Chess(),
-  sourceGameId?: number
+  sourceGameId?: number,
+  sourcePgn?: string
 ): AnalysisSession => {
   const now = new Date().toISOString();
   const headers = game.getHeaders();
-  return {
+  const session: AnalysisSession = {
     version: 1,
     id: crypto.randomUUID(),
     title:
@@ -49,13 +95,130 @@ export const newAnalysisSession = (
     createdAt: now,
     updatedAt: now,
     sourceGameId,
-    sourcePgn: sourceGameId !== undefined ? game.pgn() : undefined,
+    sourcePgn:
+      sourcePgn ?? (sourceGameId !== undefined ? game.pgn() : undefined),
     main: { id: "main", pgn: game.pgn() },
     branches: [],
     selectedLineId: "main",
     cursorPly: 0,
     orientation: true,
+    editableMain: game.history().length === 0 && sourceGameId === undefined,
   };
+  if (sourcePgn) {
+    const study = parseStudyPgn(normalizePgn(sourcePgn));
+    session.main.pgn = writeStudyPath(study.tree, study.main);
+    const seen = new Set([study.main.endpoint]);
+    session.branches = study.variations
+      .filter((path) => {
+        if (seen.has(path.endpoint)) return false;
+        seen.add(path.endpoint);
+        return true;
+      })
+      .map((path) => ({
+        id: crypto.randomUUID(),
+        pgn: writeStudyPath(study.tree, path),
+      }));
+  }
+  return session;
+};
+
+/** Reports have their own target snapshot; extending a line never destroys them. */
+export const retainAnalysisReport = (line: AnalysisLine): AnalysisLine => {
+  if (!line.evaluation) return line;
+  const reports = line.reports ?? [];
+  if (
+    reports.some(
+      (report) =>
+        report.pgn === line.pgn && report.evaluation === line.evaluation
+    )
+  )
+    return line;
+  return {
+    ...line,
+    reports: [
+      ...reports,
+      { id: crypto.randomUUID(), pgn: line.pgn, evaluation: line.evaluation },
+    ],
+  };
+};
+
+/** Old evaluated prefixes were stored as separate branches. Collapse only
+ * compatible prefixes, retaining every report and the former line identities. */
+export const migrateLegacyAnalysisSession = (
+  session: AnalysisSession
+): AnalysisSession => {
+  const targets = new Map<string, string>();
+  const branches = session.branches.map((line) => ({ ...line }));
+  for (const line of branches) {
+    const path = analysisLinePath(line);
+    const candidates = branches.filter(
+      (other) =>
+        other.id !== line.id &&
+        path.moves.length < analysisLinePath(other).moves.length &&
+        pathIsPrefix(path, analysisLinePath(other))
+    );
+    // Ambiguous forks remain separate: migration must not guess ownership.
+    if (!candidates.length) continue;
+    const deepest = candidates.sort(
+      (a, b) =>
+        analysisLinePath(b).moves.length - analysisLinePath(a).moves.length
+    )[0];
+    if (
+      candidates.some(
+        (candidate) =>
+          !pathIsPrefix(analysisLinePath(candidate), analysisLinePath(deepest))
+      )
+    )
+      continue;
+    const comments = replayAnalysis(line).getComments();
+    const laterComments = new Map(
+      replayAnalysis(deepest)
+        .getComments()
+        .map((comment) => [comment.fen, comment.comment])
+    );
+    if (
+      !line.evaluation &&
+      comments.some(
+        (comment) => laterComments.get(comment.fen) !== comment.comment
+      )
+    )
+      continue;
+    const archived = retainAnalysisReport(line);
+    const existing = new Set(
+      (deepest.reports ?? []).map((report) => report.id)
+    );
+    deepest.reports = [
+      ...(deepest.reports ?? []),
+      ...(archived.reports ?? []).filter((report) => !existing.has(report.id)),
+    ];
+    deepest.aliases = [
+      ...(deepest.aliases ?? []),
+      line.id,
+      ...(line.aliases ?? []),
+    ];
+    targets.set(line.id, deepest.id);
+  }
+  if (!targets.size) return session;
+  const resolve = (id: string): string =>
+    targets.has(id) ? resolve(targets.get(id)!) : id;
+  return {
+    ...session,
+    branches: branches.filter((line) => !targets.has(line.id)),
+    selectedLineId: resolve(session.selectedLineId),
+  };
+};
+
+export const exportAnalysisStudy = (session: AnalysisSession): string => {
+  const parsed = parseStudyPgn(session.main.pgn);
+  for (const line of session.branches) {
+    const path = addStudyPath(parsed.tree, line.pgn);
+    for (const [id, annotations] of Object.entries(path.annotations)) {
+      for (const value of annotations)
+        if (!parsed.tree.nodes[id].annotations.includes(value))
+          parsed.tree.nodes[id].annotations.push(value);
+    }
+  }
+  return writeStudyTree(parsed.tree, parsed.main.headers);
 };
 
 interface AnalysisPath {
@@ -88,6 +251,54 @@ export const isAnalysisPrefix = isChessPrefix;
 export const sessionLine = (session: AnalysisSession) =>
   session.branches.find((line) => line.id === session.selectedLineId) ??
   session.main;
+
+export const selectAnalysisLine = (
+  session: AnalysisSession,
+  id: string
+): AnalysisSession => {
+  const lines = [session.main, ...session.branches];
+  const next = lines.find((line) => line.id === id);
+  if (!next) return session;
+  const current = sessionLine(session);
+  const currentPath = analysisLinePath(current);
+  const nextPath = analysisLinePath(next);
+  let common = 0;
+  while (
+    common < currentPath.moves.length &&
+    currentPath.moves[common] === nextPath.moves[common]
+  )
+    common++;
+  const cursorPly = Math.min(
+    next.cursorPly ?? Math.min(nextPath.moves.length, common + 1),
+    nextPath.moves.length
+  );
+  const saveCursor = (line: AnalysisLine) =>
+    line.id === current.id ? { ...line, cursorPly: session.cursorPly } : line;
+  return {
+    ...session,
+    main: saveCursor(session.main),
+    branches: session.branches.map(saveCursor),
+    selectedLineId: id,
+    cursorPly,
+  };
+};
+
+export const analysisLineLabel = (
+  session: AnalysisSession,
+  line: AnalysisLine,
+  index: number
+) => {
+  const main = analysisLinePath(session.main);
+  const path = analysisLinePath(line);
+  let fork = 0;
+  while (fork < main.moves.length && main.moves[fork] === path.moves[fork])
+    fork++;
+  const root = path.root.split(" ");
+  const absolutePly =
+    (Number(root[5]) - 1) * 2 + (root[1] === "b" ? 1 : 0) + fork;
+  const number = `${Math.floor(absolutePly / 2) + 1}${absolutePly % 2 ? "..." : "."}`;
+  return `Variation ${index + 1} · ${number} ${path.sans.slice(fork, fork + 3).join(" ")}${path.sans.length > fork + 3 ? " …" : ""}`;
+};
 
 export const replayAnalysis = (line: AnalysisLine, ply?: number): Chess => {
   const game = loadGameFromText(line.pgn);
@@ -123,24 +334,36 @@ export const captureAnalysisBoard = (
     const changedComments = board
       .getComments()
       .some(({ fen, comment }) => savedComments.get(fen) !== comment);
+    let editedPgn = prefix.pgn;
     if (storeBranches && changedComments) {
       const comments = new Map(
         [...full.getComments(), ...board.getComments()].map(
           ({ fen, comment }) => [fen, comment]
         )
       );
-      const moves = full.history({ verbose: true });
-      while (full.undo()) {
-        /* Keep headers and rebuild comments on the complete path. */
+      const study = parseStudyPgn(prefix.pgn);
+      const replay = new Chess(study.tree.rootFen);
+      for (const node of [
+        study.tree.nodes.root,
+        ...studyNodePath(study.tree, study.main.endpoint),
+      ]) {
+        if (node.uci) replay.move(node.uci);
+        const comment = comments.get(replay.fen());
+        if (comment !== undefined)
+          study.main.annotations[node.id] = [
+            ...(study.main.annotations[node.id] ?? []).filter(
+              (value) => !value.startsWith("{")
+            ),
+            `{${comment}}`,
+          ];
       }
-      if (comments.has(full.fen())) full.setComment(comments.get(full.fen())!);
-      for (const move of moves) {
-        full.move(move);
-        if (comments.has(full.fen()))
-          full.setComment(comments.get(full.fen())!);
-      }
+      editedPgn = writeStudyPath(study.tree, study.main);
     }
-    const updated = { ...prefix, pgn: full.pgn() };
+    const updated = {
+      ...prefix,
+      pgn: editedPgn,
+      cursorPly: boardPath.moves.length,
+    };
     return {
       ...session,
       main: prefix.id === "main" ? updated : session.main,
@@ -156,13 +379,14 @@ export const captureAnalysisBoard = (
   const extension = lines
     .filter((line) => {
       const path = analysisLinePath(line);
-      // Preserve the imported/main game and every evaluated variation. A
-      // continuation gets its own editable branch rather than deleting the
-      // complete line's evaluation. Only a pristine empty main can be seeded.
+      // Source games remain immutable. Invented main lines and alternatives
+      // grow in place regardless of whether a prior prefix was evaluated.
       const editable =
-        !line.evaluation &&
-        (line.id !== "main" ||
-          (path.moves.length === 0 && session.branches.length === 0));
+        line.id !== "main" ||
+        session.editableMain === true ||
+        (path.moves.length === 0 &&
+          session.branches.length === 0 &&
+          !line.evaluation);
       return editable && pathIsPrefix(path, boardPath);
     })
     .sort(
@@ -170,7 +394,12 @@ export const captureAnalysisBoard = (
         analysisLinePath(b).moves.length - analysisLinePath(a).moves.length
     )[0];
   if (extension) {
-    const updated = { ...extension, pgn: board.pgn(), evaluation: undefined };
+    const updated = {
+      ...retainAnalysisReport(extension),
+      pgn: continuationPgn(board, extension),
+      evaluation: undefined,
+      cursorPly: boardPath.moves.length,
+    };
     return {
       ...session,
       main: extension.id === "main" ? updated : session.main,
@@ -184,7 +413,11 @@ export const captureAnalysisBoard = (
   }
   // An unrelated root is a new session, never a variation of this game.
   if (analysisLinePath(session.main).root !== boardPath.root) return session;
-  const branch = { id: crypto.randomUUID(), pgn: board.pgn() };
+  const branch = {
+    id: crypto.randomUUID(),
+    pgn: continuationPgn(board, sessionLine(session)),
+    cursorPly: boardPath.moves.length,
+  };
   return {
     ...session,
     branches: [...session.branches, branch],
@@ -192,6 +425,35 @@ export const captureAnalysisBoard = (
     cursorPly: board.history().length,
     updatedAt: new Date().toISOString(),
   };
+};
+
+/** An exploration does not inherit the source game's final result. */
+const continuationPgn = (board: Chess, previous?: AnalysisLine) => {
+  const study = studyFromGame(board);
+  if (previous) {
+    const old = parseStudyPgn(previous.pgn);
+    for (const [id, annotations] of Object.entries(old.main.annotations)) {
+      if (!study.tree.nodes[id]) continue;
+      const current = study.main.annotations[id] ?? [];
+      study.main.annotations[id] = [
+        ...annotations.filter(
+          (value) =>
+            value.startsWith("$") ||
+            !current.some((entry) => entry.startsWith("{"))
+        ),
+        ...current,
+      ];
+    }
+  }
+  study.main.headers.Result = board.isCheckmate()
+    ? board.turn() === "w"
+      ? "0-1"
+      : "1-0"
+    : board.isDraw()
+      ? "1/2-1/2"
+      : "*";
+  delete study.main.headers.Termination;
+  return writeStudyPath(study.tree, study.main);
 };
 
 export const clearAnalysisBranches = (
@@ -216,7 +478,7 @@ export const evaluationMatches = (
     Number.isFinite(evaluation.accuracy?.white)) &&
   (evaluation.accuracy?.black === null ||
     Number.isFinite(evaluation.accuracy?.black)) &&
-  Object.values(EngineName).includes(evaluation.settings?.engine) &&
+  isEngineId(evaluation.settings?.engine) &&
   Number.isFinite(evaluation.settings?.depth) &&
   Number.isFinite(evaluation.settings?.multiPv) &&
   Array.isArray(evaluation.positions) &&
@@ -241,7 +503,14 @@ export const evaluationMatches = (
   );
 
 export const analysisSessionBackup = (session: AnalysisSession): string =>
-  JSON.stringify({ format: "chesskit-analysis-session", session }, null, 2);
+  JSON.stringify(
+    {
+      format: "chesskit-analysis-session",
+      session: encodeAnalysisSession(session),
+    },
+    null,
+    2
+  );
 
 export const copyAnalysisSession = (
   session: AnalysisSession
@@ -263,7 +532,7 @@ export const parseAnalysisSessionBackup = (text: string): AnalysisSession => {
   const parsed = JSON.parse(text);
   if (parsed?.format !== "chesskit-analysis-session")
     throw new Error("Not a Chesskit analysis-session backup.");
-  const session = parsed.session as AnalysisSession;
+  const session = decodeAnalysisSession(parsed.session);
   validateAnalysisSession(session);
   return session;
 };
@@ -301,6 +570,20 @@ export const validateAnalysisSession = (session: AnalysisSession): void => {
       throw new Error("Analysis branches have different starting positions.");
     if (line.evaluation && !evaluationMatches(line.evaluation, game))
       throw new Error("Invalid saved evaluation.");
+    if (
+      line.reports &&
+      (!Array.isArray(line.reports) || line.reports.length > 2000)
+    )
+      throw new Error("Invalid analysis reports.");
+    for (const report of line.reports ?? []) {
+      if (
+        typeof report.id !== "string" ||
+        !evaluationMatches(report.evaluation, replayAnalysis(report))
+      )
+        throw new Error("Invalid saved analysis report.");
+      if (!isAnalysisPrefix(root, replayAnalysis(report)))
+        throw new Error("Analysis report has a different starting position.");
+    }
   }
   if (!ids.has(session.selectedLineId))
     throw new Error("Unknown selected analysis line.");

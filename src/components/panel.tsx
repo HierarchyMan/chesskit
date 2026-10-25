@@ -1,5 +1,6 @@
 import { Box, BoxProps, Typography } from "@mui/material";
 import { ReactNode } from "react";
+import { useInBoardInspector } from "./boardWorkspace";
 
 interface Props extends Omit<BoxProps, "title"> {
   title?: ReactNode;
@@ -14,6 +15,7 @@ export default function Panel({
   sx,
   ...rest
 }: Props) {
+  const inInspector = useInBoardInspector();
   return (
     <Box
       sx={{
@@ -23,6 +25,16 @@ export default function Panel({
         borderRadius: 3,
         p: 2,
         boxShadow: "0 2px 10px rgba(0, 0, 0, 0.25)",
+        ...(inInspector
+          ? {
+              border: 0,
+              borderBottom: 1,
+              borderColor: "divider",
+              borderRadius: 0,
+              boxShadow: "none",
+              p: 1.5,
+            }
+          : {}),
         ...sx,
       }}
       {...rest}

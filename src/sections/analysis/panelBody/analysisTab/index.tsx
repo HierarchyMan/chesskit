@@ -10,6 +10,7 @@ import PlayersMetric from "./playersMetric";
 import MoveInfo from "./moveInfo";
 import Opening from "./opening";
 import EngineLines from "./engineLines";
+import VisualizeContinuation from "./visualizeContinuation";
 
 export default function AnalysisTab(props: GridProps) {
   const gameEval = useAtomValue(gameEvalAtom);
@@ -23,19 +24,21 @@ export default function AnalysisTab(props: GridProps) {
       size={12}
       justifyContent={{ xs: "center", lg: gameEval ? "start" : "center" }}
       alignItems="center"
-      flexWrap={{ lg: gameEval ? "nowrap" : undefined }}
+      flexWrap="wrap"
       gap={2}
       marginY={{ lg: gameEval ? 1 : undefined }}
-      paddingX={{ xs: 0, lg: "calc(4% - 2rem)" }}
+      paddingX={0}
       {...props}
       sx={props.hidden ? { display: "none" } : props.sx}
     >
       <Stack
         justifyContent="center"
-        alignItems="center"
+        alignItems="stretch"
         rowGap={1}
-        minWidth={gameEval ? "min(25rem, 95vw)" : undefined}
+        minWidth={0}
+        width="100%"
       >
+        <VisualizeContinuation />
         {gameEval && (
           <PlayersMetric
             title="Accuracy"
@@ -79,7 +82,7 @@ export default function AnalysisTab(props: GridProps) {
         )}
       </Stack>
 
-      <EngineLines size={{ lg: gameEval ? undefined : 12 }} />
+      <EngineLines size={12} />
     </Grid>
   );
 }

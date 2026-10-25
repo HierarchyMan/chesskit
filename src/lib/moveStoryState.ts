@@ -8,6 +8,7 @@ export interface MoveStoryDialogState {
   classification?: MoveClassification;
   loading?: boolean;
   error?: string;
+  trigger?: HTMLElement;
 }
 
 export const moveStoryAtom = atom<MoveStoryDialogState>({ open: false });

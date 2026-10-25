@@ -11,11 +11,12 @@ none of it is fixed in the code that uses it. There are three layers:
 | Layer                 | Where                    | What                                                                                                                  |
 | --------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
 | What is on            | the board overlay        | master switch, **Moves**, **Ahead**, **Missed**, **Threats**, one set per mode. Beside the Analysis board it is the inspector; elsewhere a summary above the board opens the same controls |
+| How the arrows look   | Settings → Arrows        | the hue of the side to move and the hue of the other side (defaults blue and orange), with a live preview             |
 | How the arrows decide | Settings → Arrows        | wait-for depth, which grade earns a better-move arrow, threat sensitivity, threats shown, threat search depth         |
 | Which engine          | Settings → Engine        | one engine for threats, Play suggestions, the Play coach and Arena evaluation, each defaulting to the analysis engine |
 
 The defaults live in one place each (`lib/arrows/prefs.ts`, `lib/arrows/tuning.ts`,
-`lib/engine/featureEngines.ts`), and the functions that need a value take it as
+`lib/arrows/palette.ts`, `lib/engine/featureEngines.ts`), and the functions that need a value take it as
 a parameter.
 
 ## Modules
@@ -43,8 +44,11 @@ a parameter.
 
 ## What an arrow says
 
-Three questions, three channels. Who moves is the hue: blue is the side to move
-on the displayed position, orange the other side. Flipping the board never
+Three questions, three channels. Who moves is the hue: by default blue is the
+side to move on the displayed position and orange the other side, and both are
+set in Settings → Arrows (`ArrowPalette`, stored as `arrow-palette`; the style
+functions take the palette as a parameter, and `ArrowLayer`, the legend and the
+Top Moves rows read it from `arrowPaletteAtom`). Flipping the board never
 changes it, and neither does which colour you play. When is the line style (solid
 for a move to play now, numbered for a later move of the line, checkered for the
 move that should have been played). How strong is the width, which falls with
@@ -53,8 +57,10 @@ rank. A threat carries a "!".
 There is no outline. A saturated hue alone cannot reach 3:1 against both squares
 of every board theme, so each theme darkens the blue and orange just far enough
 to reach 2:1 against its own darker square (`contrast.ts`, `style.ts`). The hue
-is kept; the tone is the only thing that changes. The user's own colours are
-adapted the same way, while the page's rgba training colours are left exactly
+is kept; the tone is the only thing that changes. The colours chosen in Settings
+are adapted the same way, so a pale choice is darkened on a light square rather
+than vanishing (`tests/arrowContrast.test.ts` checks every preset on every theme),
+and the Settings preview shows the adapted result, while the page's rgba training colours are left exactly
 as authored. `tests/arrowContrast.test.ts` keeps each theme honest.
 
 An arrow is drawn behind its own piece and above every other piece. The cut is

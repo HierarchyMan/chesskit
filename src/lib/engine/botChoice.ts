@@ -1,11 +1,11 @@
-import { hasNativeEloLimit } from "@/constants";
 import { Chess } from "chess.js";
+import { BotMoveOptions, planBotMove } from "./botMove";
+import { getEngineModel } from "./models";
 import { LineEval } from "@/types/eval";
 import {
   BotStrength,
   ScoredMove,
   pickSampledMove,
-  planMove,
   scoreFromLine,
 } from "./strength";
 import { UciEngine } from "./uciEngine";
@@ -40,13 +40,12 @@ export const getBotChoice = async (
     candidateCount = 3,
     variety = 0,
     random = Math.random,
-    maxDepth,
+    ...moveOptions
   }: {
     candidateCount?: number;
     variety?: number;
     random?: () => number;
-    maxDepth?: number;
-  } = {}
+  } & BotMoveOptions = {}
 ): Promise<BotChoice | undefined> => {
   const game = new Chess(fen);
   const legalMoves = game
@@ -54,8 +53,8 @@ export const getBotChoice = async (
     .map((move) => move.from + move.to + (move.promotion ?? ""));
   if (!legalMoves.length) return undefined;
 
-  const plan = planMove(strength, hasNativeEloLimit(engine.name));
-  const depth = Math.max(1, Math.min(plan.depth, maxDepth ?? plan.depth));
+  const ownMoves = !!getEngineModel(engine.name).playsOwnMoves;
+  const plan = planBotMove(engine, strength, moveOptions);
   const multiPv = Math.max(
     2,
     candidateCount,
@@ -64,10 +63,11 @@ export const getBotChoice = async (
 
   const result = await engine.evaluatePositionWithUpdate({
     fen,
-    depth,
+    depth: ownMoves ? 1 : plan.depth,
     multiPv,
     useCloudEval: false,
     elo: plan.kind === "native" ? plan.elo : undefined,
+    movetimeMs: !ownMoves && plan.kind === "best" ? plan.movetimeMs : undefined,
   });
 
   const turn = game.turn();
@@ -76,7 +76,10 @@ export const getBotChoice = async (
     .map((line) => ({ uci: line.pv[0], cp: scoreFromLine(line, turn) }));
 
   let uci: string | undefined;
-  if (plan.kind === "sampled") {
+  if (ownMoves) {
+    // Lines are sorted by score, so a joke engine's own pick is its "bestmove".
+    uci = result.bestMove ?? candidates[0]?.uci;
+  } else if (plan.kind === "sampled") {
     uci = pickSampledMove(candidates, legalMoves, plan, strength.elo, random);
   } else {
     uci = pickWithVariety(candidates, variety, random);

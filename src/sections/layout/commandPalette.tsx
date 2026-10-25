@@ -1,4 +1,4 @@
-import { ENGINE_LABELS } from "@/constants";
+import { engineLabel } from "@/constants";
 import { useModels } from "@/hooks/useModels";
 import { engineNameAtom } from "@/sections/analysis/states";
 import { describeModel } from "@/lib/engine/modelStatus";
@@ -76,12 +76,12 @@ export default function CommandPalette({ switchDarkMode }: Props) {
     }));
 
     const engines: Command[] = models
-      .filter((view) => view.supported)
+      .filter((view) => view.supported && view.model.roles.analysis)
       .map((view) => {
         const name = view.model.name;
         return {
           id: `engine-${name}`,
-          label: `Use ${ENGINE_LABELS[name].small} for analysis`,
+          label: `Use ${engineLabel(name).small} for analysis`,
           hint: describeModel(view).text,
           icon: "mdi:chip",
           run: () => setEngineName(name),

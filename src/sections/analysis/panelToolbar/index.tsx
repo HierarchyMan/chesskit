@@ -1,5 +1,5 @@
 import { Stack } from "@mui/material";
-import ArrowsButton from "./arrowsButton";
+import TopMovesButton from "./topMovesButton";
 import ClearMovesButton from "./clearMovesButton";
 import SaveButton from "./saveButton";
 import MoreMenu from "./moreMenu";
@@ -15,7 +15,7 @@ export default function PanelToolBar() {
       gap={{ xs: 0, sm: 1.5 }}
       width="100%"
     >
-      <ArrowsButton />
+      <TopMovesButton />
       <ClearMovesButton />
       <CopyPgnButton />
       <SaveButton />

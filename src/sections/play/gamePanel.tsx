@@ -1,7 +1,10 @@
 import MovesList from "@/components/movesList";
 import Panel from "@/components/panel";
 import TopMovesPanel from "@/components/topMovesPanel";
-import { ENGINE_LABELS } from "@/constants";
+import { engineLabel } from "@/constants";
+import { getEngineModel } from "@/lib/engine/models";
+import { effectiveStrength } from "@/lib/engine/botMove";
+import { EngineName } from "@/types/enums";
 import { EngineState, useEngineState } from "@/hooks/useEngine";
 import { useChessActions } from "@/hooks/useChessActions";
 import { getEndgame } from "@/lib/endgames";
@@ -53,12 +56,14 @@ import {
   savedGameIdAtom,
 } from "./states";
 import { opposite, useStartGame } from "./useStartGame";
+import { useMoveCoach } from "./useMoveCoach";
 
 interface Props {
   botEngine: EngineState;
+  coach: ReturnType<typeof useMoveCoach>;
 }
 
-export default function GamePanel({ botEngine }: Props) {
+export default function GamePanel({ botEngine, coach }: Props) {
   const game = useAtomValue(gameAtom);
   const playerColor = useAtomValue(playerColorAtom);
   const [isInProgress, setIsInProgress] = useAtom(isGameInProgressAtom);
@@ -71,6 +76,7 @@ export default function GamePanel({ botEngine }: Props) {
   const challengeId = useAtomValue(challengeIdAtom);
   const challenge = challengeId ? getEndgame(challengeId) : undefined;
   const strength = challenge ? CHALLENGE_STRENGTH : savedStrength;
+  const shownStrength = effectiveStrength(botEngineName, strength);
   const setFlipped = useSetAtom(boardFlippedAtom);
   const setHintArrows = useSetAtom(hintArrowsAtom);
   const positionKey = useAtomValue(hintPositionKeyAtom);
@@ -137,6 +143,20 @@ export default function GamePanel({ botEngine }: Props) {
     const engine = botEngine.engine;
     if (!engine || !isPlayerTurn) return;
 
+    // Joke engines score moves by their own taste, so their scores cannot judge a draw.
+    if (getEngineModel(botEngineName).playsOwnMoves) {
+      if (botEngineName === EngineName.Drawfish) {
+        setEnd({ type: "draw-agreed" });
+        setIsInProgress(false);
+        setNotice("Drawfish accepted your draw offer. Of course it did.");
+      } else {
+        setNotice(
+          `${engineLabel(botEngineName).small} plays on, whatever happens.`
+        );
+      }
+      return;
+    }
+
     try {
       const result = await engine.evaluatePositionWithUpdate({
         fen: game.fen(),
@@ -151,13 +171,13 @@ export default function GamePanel({ botEngine }: Props) {
         setEnd({ type: "draw-agreed" });
         setIsInProgress(false);
         setNotice(
-          `${ENGINE_LABELS[botEngineName].small} accepted your draw offer.`
+          `${engineLabel(botEngineName).small} accepted your draw offer.`
         );
       } else {
         setNotice(
           history.length < 16
-            ? `${ENGINE_LABELS[botEngineName].small} declined: it is too early for a draw.`
-            : `${ENGINE_LABELS[botEngineName].small} declined the draw offer.`
+            ? `${engineLabel(botEngineName).small} declined: it is too early for a draw.`
+            : `${engineLabel(botEngineName).small} declined the draw offer.`
         );
       }
     } catch (error) {
@@ -181,15 +201,18 @@ export default function GamePanel({ botEngine }: Props) {
         title={
           <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
             <Typography fontWeight={600}>
-              vs {ENGINE_LABELS[botEngineName].small}
+              vs {engineLabel(botEngineName).small}
             </Typography>
-            {strength.mode === "elo" && (
-              <Chip size="small" label={`${strength.elo}`} />
+            {shownStrength?.mode === "elo" && (
+              <Chip size="small" label={`${shownStrength.elo}`} />
             )}
-            {strength.mode === "depth" && (
-              <Chip size="small" label={`depth ${strength.depth}`} />
+            {shownStrength?.mode === "depth" && (
+              <Chip size="small" label={`depth ${shownStrength.depth}`} />
             )}
-            {strength.mode === "max" && <Chip size="small" label="max" />}
+            {shownStrength?.mode === "max" && (
+              <Chip size="small" label="full strength" />
+            )}
+            {!shownStrength && <Chip size="small" label="joke" />}
             <Chip
               size="small"
               variant="outlined"
@@ -214,6 +237,14 @@ export default function GamePanel({ botEngine }: Props) {
             firstMoveNumber={firstMoveNumber}
             currentPly={history.length}
             maxHeight={230}
+            annotations={coach.moves.map((entry) => ({
+              classification: entry.after?.moveClassification,
+              evaluation: entry.after?.lines[0],
+              status:
+                coach.error && !entry.after?.moveClassification
+                  ? "error"
+                  : undefined,
+            }))}
           />
 
           {isInProgress && (
@@ -266,7 +297,7 @@ export default function GamePanel({ botEngine }: Props) {
         </Stack>
       </Panel>
 
-      {coachActive && <CoachCard />}
+      {coachActive && <CoachCard coach={coach} />}
 
       {isInProgress && isCasual && hintsOpen && (
         <Panel title="Hints">
@@ -292,7 +323,7 @@ export default function GamePanel({ botEngine }: Props) {
           reason={info.reason}
           outcome={outcome}
           result={info.result}
-          opponent={ENGINE_LABELS[botEngineName].small}
+          opponent={engineLabel(botEngineName).small}
         />
       )}
 

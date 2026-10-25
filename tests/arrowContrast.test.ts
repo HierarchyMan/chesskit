@@ -1,12 +1,24 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { BOARD_THEMES } from "@/components/board/states";
+import { readableArrowColor, arrowContrast } from "@/lib/arrows/contrast";
+import { mergeArrows } from "@/lib/arrows/merge";
+import { legendFor } from "@/lib/arrows/legend";
 import {
-  OTHER_HUE,
-  TO_MOVE_HUE,
+  ARROW_HUE_PRESETS,
+  ARROW_PALETTE_DEFAULTS,
+  isArrowPalette,
+} from "@/lib/arrows/palette";
+import {
+  arrowStyle,
   checkerTint,
+  ownerColor,
   rankedStyle,
 } from "@/lib/arrows/style";
+
+const TO_MOVE_HUE = ARROW_PALETTE_DEFAULTS.toMove;
+const OTHER_HUE = ARROW_PALETTE_DEFAULTS.other;
+const PALETTE = ARROW_PALETTE_DEFAULTS;
 
 const luminance = (hex: string) => {
   const value = parseInt(hex.slice(1), 16);
@@ -63,7 +75,93 @@ describe("arrow palette", () => {
   });
 });
 
+describe("arrow colour settings", () => {
+  const custom = { toMove: "#009E73", other: "#7B3FA0" };
+
+  it("keeps blue and orange as the defaults", () => {
+    assert.deepEqual(ARROW_PALETTE_DEFAULTS, {
+      toMove: "#0067B4",
+      other: "#CE6400",
+    });
+    assert.equal(ARROW_HUE_PRESETS[0].hex, ARROW_PALETTE_DEFAULTS.toMove);
+    assert.equal(ARROW_HUE_PRESETS[1].hex, ARROW_PALETTE_DEFAULTS.other);
+  });
+
+  it("gives the side to move the first hue and the other side the second", () => {
+    assert.equal(ownerColor("w", "w", custom), custom.toMove);
+    assert.equal(ownerColor("b", "w", custom), custom.other);
+    assert.equal(ownerColor(undefined, "b", custom), custom.toMove);
+  });
+
+  it("draws every engine arrow kind in the chosen hues", () => {
+    for (const kind of [
+      "best",
+      "candidate",
+      "line",
+      "missed",
+      "threat",
+    ] as const) {
+      const arrow = { from: "e2", to: "e4", kind, rank: 2 } as const;
+      assert.equal(
+        arrowStyle({ ...arrow, side: "w" }, "w", custom).color,
+        custom.toMove
+      );
+      assert.equal(
+        arrowStyle({ ...arrow, side: "b" }, "w", custom).color,
+        custom.other
+      );
+    }
+  });
+
+  it("accepts only two six-digit hex colours from storage", () => {
+    assert.ok(isArrowPalette(custom));
+    assert.ok(!isArrowPalette({ toMove: "blue", other: "#CE6400" }));
+    assert.ok(!isArrowPalette({ toMove: "#fff", other: "#CE6400" }));
+    assert.ok(!isArrowPalette({ toMove: "#0067B4" }));
+    assert.ok(!isArrowPalette(null));
+  });
+
+  it("keeps every preset readable on every board square", () => {
+    for (const { hex } of ARROW_HUE_PRESETS)
+      for (const theme of Object.values(BOARD_THEMES))
+        for (const square of [theme.light, theme.dark])
+          assert.ok(
+            arrowContrast(readableArrowColor(hex, square), square) >= 2.3
+          );
+  });
+});
+
 describe("arrow emphasis", () => {
+  it("preserves chosen and best roles while ranking a non-best choice by its actual rank", () => {
+    const chosen = {
+      from: "e2",
+      to: "e4",
+      kind: "planned",
+      side: "w",
+      rank: 3,
+    } as const;
+    assert.ok(
+      arrowStyle(chosen, "w", PALETTE).opacity <
+        arrowStyle({ ...chosen, kind: "best" }, "w", PALETTE).opacity
+    );
+    const merged = mergeArrows([chosen, { ...chosen, kind: "best", rank: 1 }]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].roles?.length, 2);
+    assert.equal(arrowStyle(merged[0], "w", PALETTE).opacity, 1);
+    assert.deepEqual(
+      legendFor(merged, () => "White's").map((entry) => entry.kind),
+      ["best", "planned"]
+    );
+  });
+  it("keeps a continuous arrow readable on both square colours without an outline", () => {
+    for (const theme of Object.values(BOARD_THEMES))
+      for (const square of [theme.light, theme.dark])
+        for (const color of [TO_MOVE_HUE, OTHER_HUE]) {
+          assert.ok(
+            arrowContrast(readableArrowColor(color, square), square) >= 2.3
+          );
+        }
+  });
   it("makes the best move fully opaque and steps every other candidate down", () => {
     const best = rankedStyle(1, TO_MOVE_HUE).opacity;
     const second = rankedStyle(2, TO_MOVE_HUE).opacity;

@@ -6,6 +6,7 @@ import {
   replayAnalysis,
   sessionLine,
   isAnalysisPrefix,
+  retainAnalysisReport,
 } from "@/lib/analysisSession";
 import { getGameSignature } from "@/lib/chess";
 import {
@@ -21,11 +22,7 @@ import {
 import { storedAtom } from "@/lib/storedAtom";
 import { CurrentPosition, GameEval } from "@/types/eval";
 import { Chess } from "chess.js";
-import {
-  EditablePosition,
-  positionFromFen,
-  START_FEN,
-} from "@/lib/editorPosition";
+import { createEditorAtoms } from "@/lib/editorState";
 import { atom } from "jotai";
 import type { UciEngine } from "@/lib/engine/uciEngine";
 
@@ -57,10 +54,13 @@ const branchPreferenceAtom = storedAtom(
 
 export const gameAtom = atom(new Chess());
 export const arrangeModeAtom = atom(false);
-export const editablePositionAtom = atom<EditablePosition>(
-  positionFromFen(START_FEN)
-);
-export const arrangeFenDraftAtom = atom<string | null>(null);
+const editor = createEditorAtoms();
+export const editablePositionAtom = editor.position;
+export const arrangeFenDraftAtom = editor.draft;
+export const resetArrangePositionAtom = editor.reset;
+export const arrangeHistoryAtom = editor.history;
+export const undoArrangeAtom = editor.undo;
+export const redoArrangeAtom = editor.redo;
 export const boardOrientationAtom = atom(true);
 const boardValueAtom = atom(new Chess());
 const evaluationValueAtom = atom<GameEval | undefined>(undefined);
@@ -95,8 +95,12 @@ export const restoreAnalysisSessionAtom = atom(
     set(topMovesSideAtom, { side: "mover", fen: null });
     set(boardOrientationAtom, session.orientation);
     set(arrangeModeAtom, !!session.draft);
-    set(arrangeFenDraftAtom, session.draftInput ?? null);
-    if (session.draft) set(editablePositionAtom, session.draft);
+    if (session.draft)
+      set(resetArrangePositionAtom, {
+        position: session.draft,
+        draft: session.draftInput,
+      });
+    else set(arrangeFenDraftAtom, null);
   }
 );
 
@@ -158,11 +162,12 @@ export const gameEvalAtom = atom(
     const session = get(analysisSessionAtom);
     if (!session) return;
     const line = sessionLine(session);
+    const retained = retainAnalysisReport(line);
     set(analysisSessionAtom, {
       ...session,
-      main: line.id === "main" ? { ...line, evaluation } : session.main,
+      main: line.id === "main" ? { ...retained, evaluation } : session.main,
       branches: session.branches.map((branch) =>
-        branch.id === line.id ? { ...branch, evaluation } : branch
+        branch.id === line.id ? { ...retained, evaluation } : branch
       ),
       updatedAt: new Date().toISOString(),
     });
@@ -178,6 +183,15 @@ export const displayedAnalysisGameAtom = atom((get) => {
   const board = get(boardAtom);
   const game = get(gameAtom);
   return isAnalysisPrefix(board, game) ? game : board;
+});
+
+export const displayedAnalysisPgnAtom = atom((get) => {
+  const displayed = get(displayedAnalysisGameAtom);
+  const session = get(analysisSessionAtom);
+  const line = session ? sessionLine(session) : undefined;
+  return line && isAnalysisPrefix(displayed, replayAnalysis(line))
+    ? line.pgn
+    : displayed.pgn();
 });
 
 export const navigateAnalysisAtom = atom(
@@ -204,9 +218,14 @@ export const loadAnalysisGameAtom = atom(
       orientation?: boolean;
       evaluation?: GameEval;
       sourceGameId?: number;
+      pgn?: string;
     }
   ) => {
-    const session = newAnalysisSession(params.game, params.sourceGameId);
+    const session = newAnalysisSession(
+      params.game,
+      params.sourceGameId,
+      params.pgn
+    );
     session.orientation = params.orientation ?? true;
     session.main.evaluation = evaluationMatches(params.evaluation, params.game)
       ? params.evaluation

@@ -8,7 +8,8 @@ export interface BotStrength {
 
 export type MovePlan =
   | { kind: "native"; elo: number; depth: number }
-  | { kind: "best"; depth: number }
+  // With movetimeMs the engine thinks for that long; depth is then only a fallback.
+  | { kind: "best"; depth: number; movetimeMs?: number }
   | {
       kind: "sampled";
       depth: number;
@@ -23,9 +24,28 @@ export interface ScoredMove {
 }
 
 export const MIN_BOT_ELO = 400;
+// The slider's top when an engine's rating is unknown. Rated engines reach their own rating.
 export const MAX_BOT_ELO = 3200;
 export const NATIVE_MIN_ELO = 1320;
 export const NATIVE_MAX_ELO = 3190;
+// Deepest fixed search the Elo emulation uses just below an engine's full strength.
+export const MAX_EMULATED_DEPTH = 24;
+
+/** What a bot's strength can use on one engine. */
+export interface StrengthProfile {
+  // The engine's own UCI_Elo range, when it has one.
+  nativeElo?: { min: number; max: number };
+  // The engine's rating: the top of the Elo slider, which means full strength.
+  maxElo: number;
+  // Think time per move at full strength.
+  fullStrengthMs: number;
+}
+
+export const DEFAULT_STRENGTH_PROFILE: StrengthProfile = {
+  nativeElo: { min: NATIVE_MIN_ELO, max: NATIVE_MAX_ELO },
+  maxElo: MAX_BOT_ELO,
+  fullStrengthMs: 3000,
+};
 export const MIN_BOT_DEPTH = 1;
 export const MAX_BOT_DEPTH = 30;
 export const FULL_STRENGTH_DEPTH = 16;
@@ -109,35 +129,46 @@ const interpolate = (table: [number, number][], x: number): number => {
   return table[table.length - 1][1];
 };
 
-export const clampElo = (elo: number): number =>
-  Math.min(MAX_BOT_ELO, Math.max(MIN_BOT_ELO, Math.round(elo)));
+export const clampElo = (elo: number, maxElo = MAX_BOT_ELO): number =>
+  Math.min(maxElo, Math.max(MIN_BOT_ELO, Math.round(elo)));
+
+// The emulation's depth table, ending at the engine's own rating.
+const depthTableFor = (maxElo: number): [number, number][] => [
+  ...DEPTH_BY_ELO.filter(([elo]) => elo < maxElo),
+  [maxElo, MAX_EMULATED_DEPTH],
+];
 
 export const clampDepth = (depth: number): number =>
   Math.min(MAX_BOT_DEPTH, Math.max(MIN_BOT_DEPTH, Math.round(depth)));
 
 export const planMove = (
   strength: BotStrength,
-  nativeEloSupported: boolean
+  profile: StrengthProfile = DEFAULT_STRENGTH_PROFILE
 ): MovePlan => {
-  if (strength.mode === "max") {
-    return { kind: "best", depth: FULL_STRENGTH_DEPTH };
-  }
+  const full: MovePlan = {
+    kind: "best",
+    depth: MAX_BOT_DEPTH,
+    movetimeMs: profile.fullStrengthMs,
+  };
+
+  if (strength.mode === "max") return full;
 
   if (strength.mode === "depth") {
     return { kind: "best", depth: clampDepth(strength.depth) };
   }
 
-  const elo = clampElo(strength.elo);
+  const elo = clampElo(strength.elo, profile.maxElo);
+  // The top of the slider is the engine's rating, which it reaches only at full strength.
+  if (elo >= profile.maxElo) return full;
 
-  if (nativeEloSupported && elo >= NATIVE_MIN_ELO) {
-    return elo > NATIVE_MAX_ELO
-      ? { kind: "best", depth: FULL_STRENGTH_DEPTH }
-      : { kind: "native", elo, depth: FULL_STRENGTH_DEPTH };
+  const native = profile.nativeElo;
+  if (native && elo >= native.min && elo <= native.max) {
+    return { kind: "native", elo, depth: FULL_STRENGTH_DEPTH };
   }
 
   const temperatureCp = interpolate(TEMPERATURE_BY_ELO, elo);
   const randomMoveChance = interpolate(RANDOM_MOVE_CHANCE_BY_ELO, elo);
-  const depth = Math.round(interpolate(DEPTH_BY_ELO, elo));
+  const depth = Math.round(interpolate(depthTableFor(profile.maxElo), elo));
 
   if (temperatureCp < 1 && randomMoveChance === 0) {
     return { kind: "best", depth };
@@ -202,18 +233,21 @@ export const pickSampledMove = (
   return best.uci;
 };
 
+const formatSeconds = (ms: number): string =>
+  `${Number((ms / 1000).toFixed(1))} s`;
+
 export const describeStrength = (
   strength: BotStrength,
-  nativeEloSupported: boolean
+  profile: StrengthProfile = DEFAULT_STRENGTH_PROFILE
 ): string => {
-  const plan = planMove(strength, nativeEloSupported);
+  const plan = planMove(strength, profile);
 
   switch (plan.kind) {
     case "native":
       return `Uses the engine's built-in strength limit (${plan.elo}).`;
     case "best":
-      return strength.mode === "max"
-        ? "Always plays its best move."
+      return plan.movetimeMs
+        ? `Full strength: thinks ${formatSeconds(plan.movetimeMs)} per move and plays its best move. A game clock can make it move sooner.`
         : `Always plays its best move found at depth ${plan.depth}.`;
     case "sampled":
       return `Searches to depth ${plan.depth} and sometimes picks a weaker move on purpose, like a human would.`;
@@ -229,3 +263,11 @@ export const maxDepthForTime = (
   if (remainingMs < 30_000) return 10;
   return undefined;
 };
+
+// A clocked bot spends at most about a thirtieth of its remaining time on one move.
+export const maxMovetimeForClock = (
+  remainingMs: number | undefined
+): number | undefined =>
+  remainingMs === undefined
+    ? undefined
+    : Math.max(100, Math.round(remainingMs / 30));

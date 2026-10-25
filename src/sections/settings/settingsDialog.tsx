@@ -9,11 +9,22 @@ import {
   showCoordinatesAtom,
   soundEnabledAtom,
 } from "@/components/board/states";
-import { PIECE_SETS, ENGINE_LABELS } from "@/constants";
-import { useModels } from "@/hooks/useModels";
+import { PIECE_SETS } from "@/constants";
 import { getRecommendedWorkersNb } from "@/lib/engine/worker";
-import { EngineName } from "@/types/enums";
-import ModelMenuLabel from "@/components/modelMenuLabel";
+import { EngineField } from "@/components/enginePicker";
+import MaxStrengthGuide from "@/components/maxStrengthGuide";
+import {
+  DEFAULT_HASH_MB,
+  HASH_CHOICES,
+  MAX_FULL_STRENGTH_MS,
+  MAX_NATIVE_THREADS,
+  MIN_FULL_STRENGTH_MS,
+  engineHashMbAtom,
+  fullStrengthMsAtom,
+  jokeAdvisorDepthAtom,
+  nativeThreadsAtom,
+  recommendedNativeThreads,
+} from "@/lib/engine/engineSettings";
 import {
   engineDepthAtom,
   engineMultiPvAtom,
@@ -45,6 +56,7 @@ import {
 } from "@mui/material";
 import { Icon } from "@iconify/react";
 import { useAtom } from "jotai";
+import { useState } from "react";
 import Image from "next/image";
 import {
   settingsOpenAtom,
@@ -124,38 +136,27 @@ function EngineTab() {
   const [multiPv, setMultiPv] = useAtom(engineMultiPvAtom);
   const [workers, setWorkers] = useAtom(engineWorkersNbAtom);
   const [cloud, setCloud] = useAtom(useCloudEvalAtom);
-  const { models, refresh } = useModels();
+  const [hashMb, setHashMb] = useAtom(engineHashMbAtom);
+  const [threads, setThreads] = useAtom(nativeThreadsAtom);
+  const [thinkMs, setThinkMs] = useAtom(fullStrengthMsAtom);
+  const [advisorDepth, setAdvisorDepth] = useAtom(jokeAdvisorDepthAtom);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   return (
     <Grid container spacing={3} justifyContent="center">
       <Grid size={12}>
-        <FormControl fullWidth>
-          <InputLabel id="settings-engine-label">Analysis engine</InputLabel>
-          <Select
-            labelId="settings-engine-label"
-            input={<OutlinedInput label="Analysis engine" />}
-            value={engineName}
-            onOpen={() => refresh()}
-            onChange={(event) =>
-              setEngineName(event.target.value as EngineName)
-            }
-            renderValue={(value) => ENGINE_LABELS[value as EngineName].full}
-          >
-            {models.map((view) => (
-              <MenuItem
-                key={view.model.name}
-                value={view.model.name}
-                disabled={!view.supported}
-              >
-                <ModelMenuLabel view={view} />
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <EngineField
+          label="Analysis engine"
+          role="analysis"
+          value={engineName}
+          onChange={(next) => {
+            if (next !== "analysis") setEngineName(next);
+          }}
+        />
         <Typography variant="caption" sx={{ opacity: 0.7 }}>
           Used for analysis and the editor, and by every feature below unless
           you give it an engine of its own. Bots in Play and the Arena have
-          their own engine pickers. Download engines and check Reckless in the
+          their own engine pickers. Download engines and check the bridge in the
           Models tab.
         </Typography>
       </Grid>
@@ -217,6 +218,89 @@ function EngineTab() {
           />
         </Stack>
       </Grid>
+
+      <Grid size={12}>
+        <Stack spacing={1}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            gap={1}
+            flexWrap="wrap"
+          >
+            <Typography variant="subtitle2">Engine power</Typography>
+            <Button
+              size="small"
+              startIcon={<Icon icon="mdi:rocket-launch-outline" height={18} />}
+              onClick={() => setGuideOpen(true)}
+            >
+              How to get maximum strength
+            </Button>
+          </Stack>
+          <Typography variant="caption" sx={{ opacity: 0.7 }}>
+            Each engine keeps these within what it supports.
+          </Typography>
+        </Stack>
+      </Grid>
+      <Slider
+        label="Bot think time at full strength (seconds)"
+        value={thinkMs / 1000}
+        setValue={(seconds) => setThinkMs(Math.round(seconds * 1000))}
+        min={MIN_FULL_STRENGTH_MS / 1000}
+        max={MAX_FULL_STRENGTH_MS / 1000}
+      />
+      <Grid size={12}>
+        <FormControl fullWidth size="small">
+          <InputLabel id="settings-hash-label">
+            Hash (memory per engine)
+          </InputLabel>
+          <Select
+            labelId="settings-hash-label"
+            input={<OutlinedInput label="Hash (memory per engine)" />}
+            value={HASH_CHOICES.includes(hashMb) ? hashMb : DEFAULT_HASH_MB}
+            onChange={(event) => setHashMb(Number(event.target.value))}
+          >
+            {HASH_CHOICES.map((mb) => (
+              <MenuItem key={mb} value={mb}>
+                {mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`}
+                {mb === DEFAULT_HASH_MB ? " (default)" : ""}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Grid>
+      <Slider
+        label="Threads for native engines"
+        value={threads}
+        setValue={setThreads}
+        min={1}
+        max={Math.min(
+          MAX_NATIVE_THREADS,
+          Math.max(2, recommendedNativeThreads())
+        )}
+        marksFilter={4}
+        infoContent={
+          <>
+            Only engines through the bridge, such as Reckless, use more than one
+            thread. Browser engines always use one.
+          </>
+        }
+      />
+      <Slider
+        label="Joke engines' advisor depth"
+        value={advisorDepth}
+        setValue={setAdvisorDepth}
+        min={1}
+        max={20}
+        marksFilter={2}
+        infoContent={
+          <>
+            How deep the advisor searches each move for Drawfish, Worstfish,
+            Pacifist and Bongcloud. Deeper is slower but better at their jokes.
+          </>
+        }
+      />
+      <MaxStrengthGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </Grid>
   );
 }

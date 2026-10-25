@@ -9,21 +9,27 @@ export class EvaluationParser {
   update(results: string[]): PositionEval {
     for (; this.consumed < results.length; this.consumed++) {
       const result = results[this.consumed];
-      const tokens = result.split(" ");
+      const tokens = result.trim().split(/\s+/);
+      const pvIndex = tokens.indexOf("pv");
+      // Fields come in any order, but nothing after "pv" is a field.
+      const fields = pvIndex < 0 ? tokens : tokens.slice(0, pvIndex);
       const property = (name: string) => {
-        const i = tokens.indexOf(name);
-        return i < 0 ? undefined : tokens[i + 1];
+        const i = fields.indexOf(name);
+        return i < 0 ? undefined : fields[i + 1];
       };
       if (result.startsWith("bestmove"))
-        this.bestMove = property("bestmove") ?? this.bestMove;
+        this.bestMove = tokens[1] ?? this.bestMove;
       if (!result.startsWith("info")) continue;
-      const pvIndex = tokens.indexOf("pv");
-      const multiPv = property("multipv"),
+      // Engines without MultiPV (tomitankChess) print no "multipv": it is line 1.
+      const multiPv = property("multipv") ?? "1",
         depth = property("depth");
-      if (pvIndex < 0 || pvIndex + 1 >= tokens.length || !multiPv || !depth)
-        continue;
-      if (this.lines[multiPv] && Number(depth) < this.lines[multiPv].depth)
-        continue;
+      if (pvIndex < 0 || pvIndex + 1 >= tokens.length || !depth) continue;
+      const previous = this.lines[multiPv];
+      if (previous && Number(depth) < previous.depth) continue;
+      // A bound is only a guess from an unfinished search; keep the exact score of that depth.
+      const bound =
+        fields.includes("lowerbound") || fields.includes("upperbound");
+      if (bound && previous && Number(depth) === previous.depth) continue;
       const cp = property("cp"),
         mate = property("mate");
       this.lines[multiPv] = {

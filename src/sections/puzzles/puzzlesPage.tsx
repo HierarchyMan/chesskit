@@ -1,5 +1,5 @@
 import Board from "@/components/board";
-import { useBoardLayout } from "@/hooks/useBoardLayout";
+import BoardWorkspace from "@/components/boardWorkspace";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Color } from "@/types/enums";
 import { Box } from "@mui/material";
@@ -17,10 +17,6 @@ const LAST_MOVE_COLOR = "rgba(255, 170, 0, 0.55)";
 export default function PuzzlesPage() {
   const trainer = usePuzzleTrainer();
   const game = useAtomValue(puzzleGameAtom);
-  const { boardSize, sideBySide } = useBoardLayout({
-    sidePanelWidth: SIDE_PANEL_WIDTH,
-    extraWidth: 40,
-  });
 
   const { puzzle, phase, arrowMove, solver } = trainer;
   const atStart = game.history().length === 0;
@@ -46,34 +42,33 @@ export default function PuzzlesPage() {
   useKeyboardShortcut(["n", "ArrowRight"], trainer.next, solved);
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: { xs: "column", sm: sideBySide ? "row" : "column" },
-        justifyContent: "center",
-        alignItems: { xs: "center", sm: sideBySide ? "flex-start" : "center" },
-        gap: 4,
-      }}
-    >
-      <Board
-        id="PuzzleBoard"
-        canPlay={phase === "solving" ? (solver as Color) : false}
-        gameAtom={puzzleGameAtom}
-        boardSize={boardSize}
-        whitePlayer={{ name: solver === "w" ? "You" : "Opponent" }}
-        blackPlayer={{ name: solver === "b" ? "You" : "Opponent" }}
-        boardOrientation={solver === "w" ? Color.White : Color.Black}
-        arrows={arrows}
-      />
-
-      <Box
-        sx={{
-          width: { xs: "100%", sm: sideBySide ? SIDE_PANEL_WIDTH : "100%" },
-          maxWidth: "100%",
-        }}
-      >
-        <PuzzlePanel trainer={trainer} />
-      </Box>
-    </Box>
+    <BoardWorkspace
+      inspectorMinWidth={SIDE_PANEL_WIDTH}
+      inspectorLabel="Puzzle controls"
+      board={
+        <Board
+          id="PuzzleBoard"
+          canPlay={phase === "solving" ? (solver as Color) : false}
+          gameAtom={puzzleGameAtom}
+          whitePlayer={{ name: solver === "w" ? "You" : "Opponent" }}
+          blackPlayer={{ name: solver === "b" ? "You" : "Opponent" }}
+          boardOrientation={solver === "w" ? Color.White : Color.Black}
+          arrows={arrows}
+        />
+      }
+      inspector={
+        <Box
+          data-inspector-scroller
+          sx={{
+            minHeight: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            scrollbarGutter: "stable",
+          }}
+        >
+          <PuzzlePanel trainer={trainer} />
+        </Box>
+      }
+    />
   );
 }

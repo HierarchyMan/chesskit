@@ -18,7 +18,9 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { BoardArrow } from "@/lib/arrows/types";
 import { arrowFromUci } from "@/lib/arrows/uci";
+import { arrowPaletteAtom } from "@/lib/arrows/paletteAtom";
 import { colorWithOpacity, ownerColor, rankedStyle } from "@/lib/arrows/style";
+import { useAtomValue } from "jotai";
 
 interface Props {
   fen: string;
@@ -65,6 +67,7 @@ export default function TopMovesPanel({
     depth,
     count,
   });
+  const palette = useAtomValue(arrowPaletteAtom);
   const hoverKey = `${positionKey ?? ""}|${fen}|${side}`;
   const [hoverChoice, setHoverChoice] = useState<{
     key: string;
@@ -95,7 +98,10 @@ export default function TopMovesPanel({
   const turnColor = queryFen?.split(" ")[1] === "b" ? "b" : "w";
   const displayedTurn = fen.split(" ")[1] === "b" ? "b" : "w";
   const rowMark = (rank: number) => {
-    const style = rankedStyle(rank, ownerColor(turnColor, displayedTurn));
+    const style = rankedStyle(
+      rank,
+      ownerColor(turnColor, displayedTurn, palette)
+    );
     return {
       color: colorWithOpacity(style.color, Math.min(1, style.opacity + 0.2)),
       width: Math.max(2, Math.round(style.width * 20)),

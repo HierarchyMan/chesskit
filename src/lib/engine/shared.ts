@@ -1,4 +1,6 @@
-import { EngineName } from "@/types/enums";
+import { EngineId } from "@/types/enums";
+import { EngineModel, getEngineModel } from "./models";
+
 export const isWasmSupported = () =>
   typeof WebAssembly === "object" &&
   WebAssembly.validate(
@@ -14,8 +16,10 @@ export const isMobileDevice = () =>
   (typeof navigator !== "undefined" &&
     /Android|Opera Mini/i.test(navigator.userAgent));
 
-export const isEngineSupported = (name: EngineName): boolean =>
-  name === EngineName.Stockfish11 ||
-  (name === EngineName.Reckless
-    ? typeof WebSocket !== "undefined"
-    : isWasmSupported());
+export const isModelSupported = (model: EngineModel): boolean => {
+  if (model.source === "bridge") return typeof WebSocket !== "undefined";
+  return !model.needsWasm || isWasmSupported();
+};
+
+export const isEngineSupported = (name: EngineId): boolean =>
+  isModelSupported(getEngineModel(name));

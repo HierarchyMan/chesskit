@@ -20,7 +20,7 @@ function MovesPanel({ visible }: { visible: boolean }) {
   const history = game.history({ verbose: true });
   if (!history.length) return null;
   return (
-    <Grid size={6} sx={{ minWidth: 0, overflowY: "auto" }} id="moves-panel">
+    <Grid size={12} sx={{ minWidth: 0 }} id="moves-panel">
       <MovesList
         moves={history.map((move) => move.san)}
         startsWithBlack={history[0].color === "b"}
@@ -29,7 +29,7 @@ function MovesPanel({ visible }: { visible: boolean }) {
           game === savedGame ? position.currentMoveIdx : history.length
         }
         onSelect={(ply) => goToMove(ply, game)}
-        maxHeight="22rem"
+        maxHeight="none"
         annotations={
           evaluation && game === savedGame
             ? history.map((_, index) => ({

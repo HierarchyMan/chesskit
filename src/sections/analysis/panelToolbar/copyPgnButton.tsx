@@ -1,18 +1,22 @@
 import { useAtomValue } from "jotai";
-import { displayedAnalysisGameAtom } from "../sessionAtoms";
+import { displayedAnalysisPgnAtom } from "../sessionAtoms";
 import { ToolbarButton } from "@/components/ToolbarButton";
+import { useCopyText } from "@/hooks/useCopyText";
 
 export const CopyPgnButton = () => {
-  const game = useAtomValue(displayedAnalysisGameAtom);
+  const pgn = useAtomValue(displayedAnalysisPgnAtom);
+  const { copy, feedback } = useCopyText();
 
   return (
-    <ToolbarButton
-      tooltip="Copy PGN"
-      onClick={() => {
-        navigator.clipboard?.writeText?.(game.pgn());
-      }}
-      icon="ri:clipboard-line"
-      disabled={game.history().length === 0}
-    />
+    <>
+      <ToolbarButton
+        tooltip="Copy line PGN"
+        onClick={() => {
+          void copy(pgn, "Line PGN");
+        }}
+        icon="ri:clipboard-line"
+      />
+      {feedback}
+    </>
   );
 };

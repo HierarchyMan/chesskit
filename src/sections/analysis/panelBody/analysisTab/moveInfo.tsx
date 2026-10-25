@@ -1,26 +1,22 @@
-import { Button, Skeleton, Stack, Typography } from "@mui/material";
+import { Skeleton, Stack, Typography } from "@mui/material";
 import { Icon } from "@iconify/react";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue } from "jotai";
 import { boardAtom, currentPositionAtom } from "../../states";
 import { useMemo } from "react";
 import { getMoveFeedback } from "@/lib/bestMoveHint";
 import Image from "next/image";
 import PrettyMoveSan from "@/components/prettyMoveSan";
-import { moveStoryAtom } from "@/lib/moveStoryState";
 import { positionFor } from "@/lib/currentPosition";
-import { buildMoveStory } from "@/lib/visualize/moveStory";
 import { CLASSIFICATION_PHRASES } from "@/lib/classificationLabels";
 
 export default function MoveInfo() {
   const board = useAtomValue(boardAtom);
   const position = positionFor(useAtomValue(currentPositionAtom), board.fen());
-  const setMoveStory = useSetAtom(moveStoryAtom);
 
-  const {
-    classification: moveClassification,
-    previousBestMove,
-    canVisualize,
-  } = useMemo(() => getMoveFeedback(position), [position]);
+  const { classification: moveClassification, previousBestMove } = useMemo(
+    () => getMoveFeedback(position),
+    [position]
+  );
 
   if (board.history().length === 0) return null;
 
@@ -30,8 +26,8 @@ export default function MoveInfo() {
         <Skeleton
           variant="rounded"
           animation="wave"
-          width={"12em"}
-          sx={{ color: "transparent", maxWidth: "7vw" }}
+          width={220}
+          sx={{ color: "transparent", maxWidth: "100%" }}
         >
           <Typography align="center" fontSize="0.9rem">
             placeholder
@@ -41,28 +37,13 @@ export default function MoveInfo() {
     );
   }
 
-  const handleVisualize = () => {
-    const move = position.lastMove;
-    if (!move || !position.lastEval || !position.eval) return;
-
-    setMoveStory({
-      open: true,
-      classification: moveClassification,
-      story: buildMoveStory({
-        fenBefore: move.before,
-        playedUci: move.from + move.to + (move.promotion ?? ""),
-        beforeLines: position.lastEval.lines,
-        afterLines: position.eval.lines,
-      }),
-    });
-  };
-
   return (
     <Stack
       direction="row"
       alignItems="center"
-      justifyContent="center"
-      columnGap={4}
+      justifyContent="flex-start"
+      columnGap={2}
+      rowGap={1}
       marginTop={0.5}
       flexWrap="wrap"
     >
@@ -73,10 +54,6 @@ export default function MoveInfo() {
             alt="move-icon"
             width={16}
             height={16}
-            style={{
-              maxWidth: "3.5vw",
-              maxHeight: "3.5vw",
-            }}
           />
 
           <PrettyMoveSan
@@ -95,6 +72,7 @@ export default function MoveInfo() {
           direction="row"
           alignItems="center"
           spacing={0.5}
+          flexWrap="wrap"
           sx={{ color: "text.secondary" }}
         >
           <Icon icon="mdi:history" height={16} />
@@ -108,17 +86,6 @@ export default function MoveInfo() {
             additionalText=" was the best move"
           />
         </Stack>
-      )}
-
-      {canVisualize && (
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<Icon icon="mdi:eye-outline" height={18} />}
-          onClick={handleVisualize}
-        >
-          Visualize
-        </Button>
       )}
     </Stack>
   );

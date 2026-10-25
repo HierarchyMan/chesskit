@@ -1,26 +1,18 @@
 import EngineStatusChip from "@/components/engineStatusChip";
-import ModelMenuLabel from "@/components/modelMenuLabel";
 import MovesList from "@/components/movesList";
 import Panel from "@/components/panel";
 import PrettyMoveSan from "@/components/prettyMoveSan";
 import StrengthControl from "@/components/strengthControl";
-import { ENGINE_LABELS } from "@/constants";
+import { EngineField } from "@/components/enginePicker";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
-import { useModels } from "@/hooks/useModels";
 import { linesToTopMoves, PositionArrows } from "@/lib/engine/topMoves";
 import { chessPathKey } from "@/lib/chessHistory";
-import { EngineName } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  OutlinedInput,
-  Select,
   Slider,
   Stack,
   TextField,
@@ -31,7 +23,7 @@ import {
 } from "@mui/material";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { BoardArrow } from "@/lib/arrows/types";
 import { arrowFromUci } from "@/lib/arrows/uci";
 import {
@@ -44,13 +36,17 @@ import {
 } from "./states";
 import { Arena, sideLabel } from "./useArena";
 import AnalysisCard, { MoveFeedback } from "./analysisCard";
+import { setupPosition } from "@/lib/setupPosition";
+import { setHandoff } from "@/lib/handoff";
 
 export default function ArenaSidePanel({
   arena,
   onArrows,
+  overlays,
 }: {
   arena: Arena;
   onArrows: (arrows: PositionArrows) => void;
+  overlays?: ReactNode;
 }) {
   const editingPlayers = useAtomValue(arenaEditingPlayersAtom);
   // Shown under the card that holds its button: Controls while playing, Result
@@ -64,6 +60,7 @@ export default function ArenaSidePanel({
       {!arena.started && <PlayersCard arena={arena} />}
       {arena.started && <ControlsCard arena={arena} />}
       {!arena.isOver && playersEditor}
+      {overlays}
       <AnalysisCard arena={arena} />
       {arena.started && !arena.isOver && (
         <ProposalCard arena={arena} onArrows={onArrows} />
@@ -87,36 +84,19 @@ function SideSetup({
   onChange: (side: ArenaSide) => void;
   state: Arena["whiteEngine"];
 }) {
-  const { models, refresh } = useModels();
-
   return (
     <Stack spacing={1.25}>
       <Typography variant="overline" sx={{ opacity: 0.7 }}>
         {title}
       </Typography>
-      <FormControl size="small" fullWidth>
-        <InputLabel id={`arena-${title}-engine`}>Engine</InputLabel>
-        <Select
-          labelId={`arena-${title}-engine`}
-          input={<OutlinedInput label="Engine" />}
-          value={side.engine}
-          onOpen={() => refresh()}
-          onChange={(event) =>
-            onChange({ ...side, engine: event.target.value as EngineName })
-          }
-          renderValue={(value) => ENGINE_LABELS[value as EngineName].full}
-        >
-          {models.map((view) => (
-            <MenuItem
-              key={view.model.name}
-              value={view.model.name}
-              disabled={!view.supported}
-            >
-              <ModelMenuLabel view={view} />
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <EngineField
+        label={`${title} engine`}
+        role="play"
+        value={side.engine}
+        onChange={(engine) => {
+          if (engine !== "analysis") onChange({ ...side, engine });
+        }}
+      />
       <Box>
         <EngineStatusChip state={state} engineName={side.engine} />
       </Box>
@@ -131,11 +111,10 @@ function SideSetup({
 
 function PlayersCard({ arena }: { arena: Arena }) {
   const router = useRouter();
-  const [draftFen, setDraftFen] = useState("");
-
-  useEffect(() => {
-    setDraftFen(arena.startFen ?? "");
-  }, [arena.startFen]);
+  const preview = useMemo(
+    () => setupPosition(arena.startFen),
+    [arena.startFen]
+  );
 
   const bothReady =
     arena.whiteEngine.status === "ready" &&
@@ -172,7 +151,11 @@ function PlayersCard({ arena }: { arena: Arena }) {
             variant="outlined"
             color="inherit"
             startIcon={<Icon icon="mdi:pencil-ruler" height={18} />}
-            onClick={() => router.push("/editor")}
+            disabled={!!preview.error}
+            onClick={() => {
+              setHandoff({ kind: "fen", fen: preview.fen }, "/editor");
+              void router.push("/editor");
+            }}
           >
             Build a position
           </Button>
@@ -181,18 +164,21 @@ function PlayersCard({ arena }: { arena: Arena }) {
         <TextField
           size="small"
           label="Start from a FEN (optional)"
-          value={draftFen}
+          value={arena.startFen ?? ""}
           onChange={(event) => {
-            setDraftFen(event.target.value);
-            arena.setStartFen(event.target.value.trim() || undefined);
+            arena.setStartFen(event.target.value || undefined);
           }}
-          helperText="Leave empty for the standard starting position."
+          error={!!preview.error}
+          helperText={
+            preview.error ??
+            "The board previews this position. Leave empty for the standard starting position."
+          }
         />
 
         <Button
           variant="contained"
           size="large"
-          disabled={!bothReady}
+          disabled={!bothReady || !!preview.error}
           startIcon={<Icon icon="mdi:play" height={22} />}
           onClick={() => arena.start()}
         >
@@ -397,8 +383,6 @@ function ControlsCard({ arena }: { arena: Arena }) {
   );
 }
 
-const CANDIDATE_COLORS = ["#22ac38", "#3894eb", "#e69f00", "#a06bd6"];
-
 function ProposalCard({
   arena,
   onArrows,
@@ -429,8 +413,16 @@ function ProposalCard({
     }
 
     const side = arena.game.turn();
+    const chosenRank = candidates.find(
+      (candidate) => candidate.uci === proposal.choice.uci
+    )?.rank;
     const arrows: BoardArrow[] = [
-      arrowFromUci(proposal.choice.uci, { kind: "planned", side }),
+      arrowFromUci(proposal.choice.uci, {
+        kind: "planned",
+        side,
+        rank: chosenRank,
+        label: "▶",
+      }),
     ];
 
     const hovered = candidates.find(
@@ -488,7 +480,7 @@ function ProposalCard({
           </Alert>
         )}
 
-        {candidates.map((candidate, index) => {
+        {candidates.map((candidate) => {
           const chosen =
             proposal.status === "ready" &&
             candidate.uci === proposal.choice.uci;
@@ -496,6 +488,8 @@ function ProposalCard({
           return (
             <Stack
               key={candidate.uci}
+              role="group"
+              aria-label={`Candidate ${candidate.rank}: ${candidate.san}${chosen ? ", engine's choice" : ""}`}
               direction="row"
               alignItems="center"
               gap={1}
@@ -503,18 +497,27 @@ function ProposalCard({
                 setHovered({ positionKey, uci: candidate.uci })
               }
               onMouseLeave={() => setHovered(null)}
+              tabIndex={0}
+              onFocus={() => setHovered({ positionKey, uci: candidate.uci })}
+              onBlur={() => setHovered(null)}
               sx={{
                 p: 0.75,
-                borderRadius: 2,
+                borderRadius: 1,
                 border: 1,
                 borderColor: chosen ? "success.main" : "divider",
                 borderLeft: "4px solid",
                 borderLeftColor:
-                  CANDIDATE_COLORS[index % CANDIDATE_COLORS.length],
+                  candidate.rank === 1 ? "primary.main" : "divider",
+                backgroundColor:
+                  candidate.rank === 1 ? "action.selected" : undefined,
               }}
             >
               <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <Stack direction="row" alignItems="center" gap={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    #{candidate.rank}
+                    {candidate.rank === 1 ? " · Best" : ""}
+                  </Typography>
                   <Typography fontWeight={700} component="span">
                     <PrettyMoveSan san={candidate.san} color={arena.turn} />
                   </Typography>
@@ -598,6 +601,10 @@ function MovesCard({ arena }: { arena: Arena }) {
             ? analysis.moves.map((move) => ({
                 classification: move.after?.moveClassification,
                 evaluation: move.after?.lines[0],
+                status:
+                  analysis.error && !move.after?.moveClassification
+                    ? "error"
+                    : undefined,
               }))
             : undefined
         }

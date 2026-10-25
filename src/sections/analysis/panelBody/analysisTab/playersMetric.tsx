@@ -13,14 +13,17 @@ export default function PlayersMetric({
 }: Props) {
   return (
     <Stack
-      justifyContent="center"
       alignItems="center"
-      flexDirection="row"
-      columnGap={{ xs: "8vw", md: 10 }}
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
+        columnGap: 2,
+        width: "100%",
+      }}
     >
       <ValueBlock value={whiteValue} color="white" />
 
-      <Typography align="center" fontSize="0.8em" noWrap>
+      <Typography align="center" fontSize="0.875rem" noWrap>
         {title}
       </Typography>
 
@@ -42,10 +45,11 @@ const ValueBlock = ({
       sx={{
         backgroundColor: color,
         color: color === "white" ? "black" : "white",
+        justifySelf: "center",
       }}
       borderRadius="5px"
       lineHeight="1em"
-      fontSize="0.9em"
+      fontSize="0.9rem"
       padding={0.8}
       fontWeight="500"
       border="1px solid #424242"

@@ -1,5 +1,6 @@
-import { Grid2 as Grid } from "@mui/material";
-import { Chessboard } from "react-chessboard";
+import { Box, Grid2 as Grid } from "@mui/material";
+import { useBoardStage } from "@/components/boardWorkspace";
+import Chessboard from "./motionChessboard";
 import { Atom, PrimitiveAtom, atom, useAtomValue, useSetAtom } from "jotai";
 import {
   CustomSquareRenderer,
@@ -13,6 +14,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -24,20 +26,21 @@ import EvaluationBar from "./evaluationBar";
 import { Player } from "@/types/game";
 import PlayerHeader from "./playerHeader";
 import { useBoardAppearance } from "./appearance";
-import ArrowLayer, { useMaskSettling } from "./arrowLayer";
+import ArrowLayer from "./arrowLayer";
 import { useInkArrows } from "./useInkArrows";
 import { BoardArrow } from "@/lib/arrows/types";
 import { chessPathKey } from "@/lib/chessHistory";
 import { getCheckedKing, getThreatenedPieces } from "@/lib/chess";
 import QualityIcon, { useQualityMark } from "./moveQuality";
+import DrawBadges from "./drawBadges";
+import { getBoardDraw } from "@/lib/boardDraw";
+import { GameEnd } from "@/lib/gameResult";
 
 const noPositionAtom = atom<CurrentPosition>({});
 const NO_ARROWS: readonly BoardArrow[] = [];
 
 /** How long a move takes to slide, in milliseconds. */
 export const MOVE_ANIMATION_MS = 200;
-/** Masks wait this much longer than a slide, so they are cut only on settled pieces. */
-const MASK_SETTLE_MS = MOVE_ANIMATION_MS + 30;
 
 export interface Props {
   id: string;
@@ -57,6 +60,9 @@ export interface Props {
   /** Controls that belong with the board, shown beneath it. */
   footer?: ReactNode;
   clocksAtom?: Atom<{ w: number; b: number } | null>;
+  previewFen?: string;
+  gameEnd?: GameEnd | null;
+  recordedDraw?: boolean;
 }
 
 /** The board's width in pixels, measured as it changes. */
@@ -78,7 +84,7 @@ export default function Board({
   id: boardId,
   canPlay,
   gameAtom,
-  boardSize,
+  boardSize: suppliedBoardSize,
   whitePlayer,
   blackPlayer,
   boardOrientation = Color.White,
@@ -90,8 +96,34 @@ export default function Board({
   header,
   footer,
   clocksAtom,
+  previewFen,
+  gameEnd,
+  recordedDraw,
 }: Props) {
+  const stage = useBoardStage();
+  const boardSize = stage?.width ?? suppliedBoardSize;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const stackRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const [barTop, setBarTop] = useState(0);
+  const reportChrome = stage?.reportChrome;
+  useLayoutEffect(() => {
+    if (!stackRef.current || !boardRef.current) return;
+    const measure = () => {
+      const board = boardRef.current?.getBoundingClientRect();
+      const stack = stackRef.current?.getBoundingClientRect();
+      const root = rootRef.current?.getBoundingClientRect();
+      if (board && stack && root) {
+        reportChrome?.(stack.height - board.height, root.width - board.width);
+        setBarTop(board.top - root.top);
+      }
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(stackRef.current);
+    observer.observe(boardRef.current);
+    return () => observer.disconnect();
+  }, [reportChrome]);
   const pixels = useBoardPixels(boardRef);
   const game = useAtomValue(gameAtom);
   const qualityMark = useQualityMark(
@@ -116,10 +148,22 @@ export default function Board({
     [clocksAtom]
   );
 
-  const gameFen = game.fen();
+  const gameFen = previewFen ?? game.fen();
+  const drawResult = useMemo(
+    () =>
+      getBoardDraw(
+        previewFen ?? game,
+        previewFen ? null : gameEnd,
+        !previewFen && recordedDraw
+      ),
+    [game, previewFen, gameEnd, recordedDraw]
+  );
   const turn = game.turn();
   const orientation = boardOrientation === Color.White ? "white" : "black";
-  const positionKey = useMemo(() => chessPathKey(game), [game]);
+  const positionKey = useMemo(
+    () => (previewFen ? `preview:${previewFen}` : chessPathKey(game)),
+    [game, previewFen]
+  );
   const { ink, draft, clearInk, handlers } = useInkArrows(
     positionKey,
     orientation
@@ -127,8 +171,6 @@ export default function Board({
 
   // A piece that is held is not where its square says, so arrows are not cut
   // around it while a drag is under way.
-  const [dragging, setDragging] = useState(false);
-  const settled = useMaskSettling(gameFen, MASK_SETTLE_MS);
 
   useEffect(() => {
     setClickedSquares([]);
@@ -250,14 +292,12 @@ export default function Board({
 
   const handlePieceDragBegin = useCallback(
     (_: string, square: Square) => {
-      setDragging(true);
       resetMoveClick(square);
     },
     [resetMoveClick]
   );
 
   const handlePieceDragEnd = useCallback(() => {
-    setDragging(false);
     resetMoveClick();
   }, [resetMoveClick]);
 
@@ -334,6 +374,7 @@ export default function Board({
 
   return (
     <Grid
+      ref={rootRef}
       container
       justifyContent="center"
       alignItems="center"
@@ -341,27 +382,46 @@ export default function Board({
       width={boardSize}
       sx={{ "--board-size": `${boardSize || 400}px`, maxWidth: "100%" }}
     >
-      {showEvaluationBar && (
-        <EvaluationBar
-          height={boardRef?.current?.offsetHeight || boardSize || 400}
-          boardOrientation={boardOrientation}
-          currentPositionAtom={currentPositionAtom}
-          resetWhenPending={resetEvaluationWhenPending}
-          fen={gameFen}
-        />
+      {(showEvaluationBar || stage) && (
+        <Box
+          sx={{
+            width: { xs: "1.6rem", sm: "2rem" },
+            flexShrink: 0,
+            alignSelf: "stretch",
+            position: "relative",
+          }}
+        >
+          <Box sx={{ position: "absolute", top: barTop, left: 0 }}>
+            {showEvaluationBar && (
+              <EvaluationBar
+                height={pixels ?? boardSize ?? 400}
+                boardOrientation={boardOrientation}
+                currentPositionAtom={currentPositionAtom}
+                resetWhenPending={resetEvaluationWhenPending}
+                fen={gameFen}
+              />
+            )}
+          </Box>
+        </Box>
       )}
 
       <Grid
+        ref={stackRef}
         container
         rowGap={1.5}
         justifyContent="center"
         alignItems="center"
-        paddingLeft={{ xs: 0.5, sm: showEvaluationBar ? 2 : 0 }}
+        paddingLeft={{
+          xs: stage || showEvaluationBar ? 0.5 : 0,
+          sm: stage || showEvaluationBar ? 2 : 0,
+        }}
         size="grow"
+        sx={{ minWidth: 0, flexWrap: "nowrap", flexDirection: "column" }}
       >
         {header}
 
         <PlayerHeader
+          previewFen={previewFen}
           color={boardOrientation === Color.White ? Color.Black : Color.White}
           gameAtom={gameAtom}
           player={boardOrientation === Color.White ? blackPlayer : whitePlayer}
@@ -411,15 +471,18 @@ export default function Board({
             turn={turn}
             fen={gameFen}
             size={pixels}
-            masking={settled && !dragging}
+            masking
             qualityMarkedSquare={qualityMark?.square}
           />
-          {qualityMark && (
-            <QualityIcon mark={qualityMark} orientation={orientation} />
-          )}
+          {qualityMark &&
+            !drawResult?.kings.some(
+              (king) => king.square === qualityMark.square
+            ) && <QualityIcon mark={qualityMark} orientation={orientation} />}
+          <DrawBadges result={drawResult} orientation={orientation} />
         </Grid>
 
         <PlayerHeader
+          previewFen={previewFen}
           color={boardOrientation}
           gameAtom={gameAtom}
           player={boardOrientation === Color.White ? whitePlayer : blackPlayer}

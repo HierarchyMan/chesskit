@@ -3,7 +3,7 @@ import { Grid2 as Grid, Typography } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { boardAtom, gameAtom, gameEvalAtom } from "../../../states";
 import Image from "next/image";
-import { capitalize } from "@/lib/helpers";
+import { classificationName } from "@/lib/classificationLabels";
 import { useChessActions } from "@/hooks/useChessActions";
 import { CLASSIFICATION_COLORS } from "@/constants";
 
@@ -105,7 +105,7 @@ export default function ClassificationRow({ classification }: Props) {
         />
 
         <Typography align="center" fontSize="0.9rem">
-          {capitalize(classification)}
+          {classificationName(classification)}
         </Typography>
       </Grid>
 

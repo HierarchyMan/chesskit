@@ -46,18 +46,16 @@ describe("Remember continuations", () => {
     session = captureAnalysisBoard(session, game("a3"), true);
     assert.deepEqual(replayAnalysis(session.main).history(), ["a3"]);
     assert.equal(session.branches.length, 0);
-    const main = session.main;
     session = captureAnalysisBoard(session, game("a3", "h6"), true);
     const continuationId = session.selectedLineId;
-    assert.notEqual(continuationId, "main");
+    assert.equal(continuationId, "main");
     for (const moves of [
       ["a3", "h6", "b3"],
       ["a3", "h6", "b3", "g6"],
     ]) {
       session = captureAnalysisBoard(session, game(...moves), true);
-      assert.equal(session.branches.length, 1);
+      assert.equal(session.branches.length, 0);
       assert.equal(session.selectedLineId, continuationId);
-      assert.deepEqual(session.main, main);
       assert.deepEqual(replayAnalysis(sessionLine(session)).history(), moves);
     }
   });
@@ -135,11 +133,15 @@ describe("Remember continuations", () => {
     const evaluatedRoot = newAnalysisSession();
     evaluatedRoot.main.evaluation = evaluation(new Chess());
     const fork = captureAnalysisBoard(evaluatedRoot, game("a3"), true);
-    assert.deepEqual(fork.main, evaluatedRoot.main);
-    assert.equal(fork.branches.length, 1);
+    assert.deepEqual(
+      fork.main.reports?.[0].evaluation,
+      evaluatedRoot.main.evaluation
+    );
+    assert.equal(fork.branches.length, 0);
+    assert.deepEqual(replayAnalysis(fork.main).history(), ["a3"]);
   });
 
-  it("forks evaluated alternatives without erasing their scores and grows only the new unevaluated continuation", () => {
+  it("extends evaluated alternatives in place and retains the evaluated prefix as a report", () => {
     let session = captureAnalysisBoard(
       newAnalysisSession(game("e4", "e5")),
       game("e4", "c5"),
@@ -152,18 +154,22 @@ describe("Remember continuations", () => {
     session = { ...session, branches: [savedBranch] };
     session = captureAnalysisBoard(session, game("e4", "c5", "Nf3"), true);
     const continuationId = session.selectedLineId;
-    assert.notEqual(continuationId, savedBranch.id);
-    assert.deepEqual(session.branches[0], savedBranch);
+    assert.equal(continuationId, savedBranch.id);
+    assert.deepEqual(
+      session.branches[0].reports?.[0].evaluation,
+      savedBranch.evaluation
+    );
+    assert.equal(session.branches[0].reports?.[0].pgn, savedBranch.pgn);
+    assert.equal(session.branches[0].evaluation, undefined);
     session = captureAnalysisBoard(
       session,
       game("e4", "c5", "Nf3", "d6"),
       true
     );
-    assert.equal(session.branches.length, 2);
+    assert.equal(session.branches.length, 1);
     assert.equal(session.selectedLineId, continuationId);
-    assert.deepEqual(session.branches[0], savedBranch);
     const restored = parseAnalysisSessionBackup(analysisSessionBackup(session));
-    assert.deepEqual(restored.branches[0], savedBranch);
+    assert.deepEqual(restored.branches[0].reports, session.branches[0].reports);
     assert.deepEqual(replayAnalysis(sessionLine(restored)).history(), [
       "e4",
       "c5",

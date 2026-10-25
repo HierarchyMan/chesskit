@@ -31,6 +31,8 @@ export interface BoardArrow {
   side?: ArrowSide;
   /** Candidate rank, where 1 is the best move. */
   rank?: number;
+  /** Semantic roles retained when several producers describe the same move. */
+  roles?: readonly { kind: ArrowKind; side?: ArrowSide; rank?: number }[];
   /** Short text on the arrowhead, such as the ply number of a line. */
   label?: string;
   /** Further ply numbers that a merged arrow also stands for, such as a line that revisits its squares. */
@@ -75,6 +77,9 @@ export const ARROW_PRIORITY: Record<ArrowKind, number> = {
 };
 
 export const isArrowFocused = (arrow: BoardArrow, focus: ArrowFocus): boolean =>
-  arrow.kind === focus.kind &&
-  (focus.side === undefined || arrow.side === focus.side) &&
-  (focus.rank === undefined || arrow.rank === focus.rank);
+  [arrow, ...(arrow.roles ?? [])].some(
+    (role) =>
+      role.kind === focus.kind &&
+      (focus.side === undefined || role.side === focus.side) &&
+      (focus.rank === undefined || role.rank === focus.rank)
+  );

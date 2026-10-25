@@ -1,7 +1,7 @@
 import Board from "@/components/board";
 import Panel from "@/components/panel";
 import { OPENING_LINES, OpeningLine } from "@/data/openingLines";
-import { useBoardLayout } from "@/hooks/useBoardLayout";
+import BoardWorkspace from "@/components/boardWorkspace";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { setHandoff } from "@/lib/handoff";
 import { buildSteps, lineToPgn, moveLabel } from "@/lib/openingTrainer";
@@ -162,10 +162,6 @@ function StudyView({
   onSelect: (id?: string) => void;
 }) {
   const study = useOpeningStudy(line);
-  const { boardSize, sideBySide } = useBoardLayout({
-    sidePanelWidth: SIDE_PANEL_WIDTH,
-    extraWidth: 40,
-  });
 
   const side = line.side === "w" ? Color.White : Color.Black;
   const learnMode = study.mode === "learn";
@@ -191,93 +187,93 @@ function StudyView({
   const next = OPENING_LINES[(index + 1) % OPENING_LINES.length];
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: { xs: "column", sm: sideBySide ? "row" : "column" },
-        justifyContent: "center",
-        alignItems: { xs: "center", sm: sideBySide ? "flex-start" : "center" },
-        gap: 4,
-      }}
-    >
-      <Board
-        id="OpeningBoard"
-        canPlay={
-          !learnMode && study.phase === "playing" ? (side as Color) : false
-        }
-        gameAtom={openingGameAtom}
-        boardSize={boardSize}
-        whitePlayer={{ name: line.side === "w" ? "You" : "Opponent" }}
-        blackPlayer={{ name: line.side === "b" ? "You" : "Opponent" }}
-        boardOrientation={side}
-        arrows={arrows}
-      />
+    <BoardWorkspace
+      inspectorMinWidth={SIDE_PANEL_WIDTH}
+      inspectorLabel="Opening study controls"
+      board={
+        <Board
+          id="OpeningBoard"
+          canPlay={
+            !learnMode && study.phase === "playing" ? (side as Color) : false
+          }
+          gameAtom={openingGameAtom}
+          whitePlayer={{ name: line.side === "w" ? "You" : "Opponent" }}
+          blackPlayer={{ name: line.side === "b" ? "You" : "Opponent" }}
+          boardOrientation={side}
+          arrows={arrows}
+        />
+      }
+      inspector={
+        <Stack
+          spacing={2}
+          data-inspector-scroller
+          sx={{
+            minHeight: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            scrollbarGutter: "stable",
+          }}
+        >
+          <Panel>
+            <Stack spacing={1.25}>
+              <Stack direction="row" alignItems="center" gap={1}>
+                <Button
+                  size="small"
+                  color="inherit"
+                  startIcon={<Icon icon="mdi:chevron-left" height={18} />}
+                  onClick={() => onSelect()}
+                >
+                  All openings
+                </Button>
+                <Chip size="small" variant="outlined" label={line.eco} />
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`You play ${line.side === "w" ? "White" : "Black"}`}
+                />
+              </Stack>
 
-      <Stack
-        spacing={2}
-        sx={{
-          width: { xs: "100%", sm: sideBySide ? SIDE_PANEL_WIDTH : "100%" },
-        }}
-      >
-        <Panel>
-          <Stack spacing={1.25}>
-            <Stack direction="row" alignItems="center" gap={1}>
-              <Button
+              <Typography variant="h6" fontWeight={700}>
+                {line.name}
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                {line.summary}
+              </Typography>
+
+              <ToggleButtonGroup
+                exclusive
+                fullWidth
                 size="small"
-                color="inherit"
-                startIcon={<Icon icon="mdi:chevron-left" height={18} />}
-                onClick={() => onSelect()}
+                value={study.mode}
+                onChange={(_, value: OpeningMode | null) => {
+                  if (value === "learn") study.startLearn();
+                  if (value === "drill") study.startDrill();
+                }}
               >
-                All openings
-              </Button>
-              <Chip size="small" variant="outlined" label={line.eco} />
-              <Chip
-                size="small"
-                variant="outlined"
-                label={`You play ${line.side === "w" ? "White" : "Black"}`}
-              />
+                <ToggleButton value="learn" sx={{ gap: 0.75 }}>
+                  <Icon icon="mdi:book-open-page-variant-outline" height={16} />
+                  Learn
+                </ToggleButton>
+                <ToggleButton value="drill" sx={{ gap: 0.75 }}>
+                  <Icon icon="mdi:target" height={16} />
+                  Drill
+                </ToggleButton>
+              </ToggleButtonGroup>
             </Stack>
+          </Panel>
 
-            <Typography variant="h6" fontWeight={700}>
-              {line.name}
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>
-              {line.summary}
-            </Typography>
-
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={study.mode}
-              onChange={(_, value: OpeningMode | null) => {
-                if (value === "learn") study.startLearn();
-                if (value === "drill") study.startDrill();
-              }}
-            >
-              <ToggleButton value="learn" sx={{ gap: 0.75 }}>
-                <Icon icon="mdi:book-open-page-variant-outline" height={16} />
-                Learn
-              </ToggleButton>
-              <ToggleButton value="drill" sx={{ gap: 0.75 }}>
-                <Icon icon="mdi:target" height={16} />
-                Drill
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Stack>
-        </Panel>
-
-        {learnMode ? (
-          <LearnPanel study={study} />
-        ) : (
-          <DrillPanel
-            study={study}
-            onNext={() => onSelect(next.id)}
-            nextName={next.name}
-          />
-        )}
-      </Stack>
-    </Box>
+          {learnMode ? (
+            <LearnPanel study={study} />
+          ) : (
+            <DrillPanel
+              study={study}
+              onNext={() => onSelect(next.id)}
+              nextName={next.name}
+            />
+          )}
+        </Stack>
+      }
+    />
   );
 }
 

@@ -198,9 +198,9 @@ describe("arrow choices", () => {
     });
   });
 
-  it("starts Play without suggestions and Analysis with the best move", () => {
+  it("starts Play without suggestions and Analysis with two ranked moves", () => {
     assert.equal(ARROW_DEFAULTS.play.moves, 0);
-    assert.equal(ARROW_DEFAULTS.analysis.moves, 1);
+    assert.equal(ARROW_DEFAULTS.analysis.moves, 2);
   });
 });
 

@@ -13,6 +13,7 @@ import {
 import { useSetAtom } from "jotai";
 import Image from "next/image";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import EngineChip from "./engineChip";
 import { findNavItem } from "./navItems";
 import {
@@ -53,6 +54,7 @@ export default function NavBar({
         borderBottom: 1,
         borderColor: "divider",
         backgroundImage: "none",
+        userSelect: "none",
       }}
     >
       <Toolbar variant="dense" sx={{ minHeight: 56, gap: 0.5 }}>
@@ -66,12 +68,19 @@ export default function NavBar({
             >
               <Icon icon="mdi:menu" />
             </IconButton>
-            <Image
-              src="/favicon-32x32.png"
-              alt="Chesskit logo"
-              width={28}
-              height={28}
-            />
+            <Link
+              href="/"
+              prefetch={false}
+              aria-label="Chesskit home"
+              style={{ display: "flex", flexShrink: 0 }}
+            >
+              <Image
+                src="/favicon-32x32.png"
+                alt="Chesskit logo"
+                width={28}
+                height={28}
+              />
+            </Link>
           </>
         )}
 

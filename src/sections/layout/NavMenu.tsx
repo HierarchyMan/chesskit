@@ -96,12 +96,22 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
   };
 
   const content = (
-    <Stack height="100%" sx={{ overflowX: "hidden" }}>
+    <Stack height="100%" sx={{ overflowX: "hidden", userSelect: "none" }}>
       <Stack
         direction="row"
         alignItems="center"
         gap={1.2}
-        sx={{ px: expanded ? 2.5 : 0, height: 56, flexShrink: 0 }}
+        component={NextLink}
+        href="/"
+        prefetch={false}
+        aria-label="Chesskit home"
+        sx={{
+          px: expanded ? 2.5 : 0,
+          height: 56,
+          flexShrink: 0,
+          color: "inherit",
+          textDecoration: "none",
+        }}
         justifyContent={expanded ? "flex-start" : "center"}
       >
         <Image

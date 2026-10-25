@@ -9,6 +9,7 @@ import {
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useMemo } from "react";
 import { useLoadAnalysisGame } from "../hooks/useLoadAnalysisGame";
+import { resetArrangePositionAtom } from "../sessionAtoms";
 import {
   arrangeModeAtom,
   arrangeStartFenAtom,
@@ -20,7 +21,8 @@ import {
 export const useArrangeMode = () => {
   const [arrange, setArrange] = useAtom(arrangeModeAtom);
   const board = useAtomValue(boardAtom);
-  const [position, setPosition] = useAtom(editablePositionAtom);
+  const position = useAtomValue(editablePositionAtom);
+  const resetPosition = useSetAtom(resetArrangePositionAtom);
   const [fenDraft, setFenDraft] = useAtom(arrangeFenDraftAtom);
   const [, setStartFen] = useAtom(arrangeStartFenAtom);
   const { loadFen } = useLoadAnalysisGame();
@@ -39,12 +41,12 @@ export const useArrangeMode = () => {
   const enterArrange = useCallback(
     (fen?: string) => {
       const next = positionFromFen(fen ?? board.fen());
-      setPosition(next);
+      resetPosition({ position: next });
       setFenDraft(null);
       setStartFen(fen ? null : positionToFen(next));
       setArrange(true);
     },
-    [board, setPosition, setStartFen, setArrange, setFenDraft]
+    [board, resetPosition, setStartFen, setArrange, setFenDraft]
   );
 
   const finishArrange = useCallback(

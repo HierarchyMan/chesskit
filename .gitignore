@@ -3,6 +3,7 @@ node_modules
 
 # next.js
 .next/
+.next-workspace/
 out/
 next-env.d.ts
 
@@ -24,3 +25,7 @@ cdk.context.json
 
 # Local performance verification artefacts
 .performance/
+
+# Engine binaries, restored by `npm run engines` from scripts/engine-binaries.json
+public/engines/**/*.wasm
+public/engines/**/*.nnue

@@ -1,14 +1,21 @@
 import { storedAtom } from "@/lib/storedAtom";
-import { EngineName } from "@/types/enums";
+import { EngineId } from "@/types/enums";
+import { DEFAULT_ENGINE } from "@/constants";
+import { isReliableEngineId } from "./models";
 
 /**
  * Every engine-driven feature picks its own engine. By default it is the
  * analysis engine, so nothing has to be chosen twice, but any engine can be
  * assigned to a feature: a strong one for threats, a light one for the coach.
  */
-export type EngineFeature = "threats" | "coach" | "advice" | "evaluator";
+export type EngineFeature =
+  | "threats"
+  | "coach"
+  | "advice"
+  | "evaluator"
+  | "jokes";
 
-export type EngineChoice = "analysis" | EngineName;
+export type EngineChoice = "analysis" | EngineId;
 
 export const ENGINE_FEATURES: {
   id: EngineFeature;
@@ -35,16 +42,28 @@ export const ENGINE_FEATURES: {
     label: "Arena evaluation",
     help: "Scores and grades the moves in the Engine Arena.",
   },
+  {
+    id: "jokes",
+    label: "Joke engines' advisor",
+    help: "The real engine that Drawfish, Worstfish, Pacifist and Bongcloud ask to score every move.",
+  },
 ];
 
 export const isEngineChoice = (value: unknown): value is EngineChoice =>
-  value === "analysis" ||
-  Object.values(EngineName).includes(value as EngineName);
+  value === "analysis" || isReliableEngineId(value);
 
+/**
+ * The engine a feature runs on. Features that grade moves need real
+ * evaluations, so when the analysis engine is a joke engine (or any engine
+ * whose scores are not real) they use the default engine instead.
+ */
 export const resolveEngineChoice = (
   choice: EngineChoice,
-  analysisEngine: EngineName
-): EngineName => (choice === "analysis" ? analysisEngine : choice);
+  analysisEngine: EngineId
+): EngineId => {
+  if (choice !== "analysis") return choice;
+  return isReliableEngineId(analysisEngine) ? analysisEngine : DEFAULT_ENGINE;
+};
 
 export const featureEngineAtoms = {
   threats: storedAtom<EngineChoice>(
@@ -64,6 +83,11 @@ export const featureEngineAtoms = {
   ),
   evaluator: storedAtom<EngineChoice>(
     "engine-for-evaluator",
+    "analysis",
+    isEngineChoice
+  ),
+  jokes: storedAtom<EngineChoice>(
+    "engine-for-jokes",
     "analysis",
     isEngineChoice
   ),

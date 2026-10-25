@@ -1,15 +1,16 @@
-import { probeRecklessBridge } from "@/lib/engine/bridge";
+import { BridgeListing, fetchBridgeListing } from "@/lib/engine/bridge";
 import {
   BridgeStatus,
   ModelProgress,
   buildModelView,
 } from "@/lib/engine/modelStatus";
 import {
-  ENGINE_MODELS,
+  getAllEngineModels,
   getAllModelFiles,
   getEngineModel,
   getModelFiles,
   getRemovableFiles,
+  setNativeEngines,
 } from "@/lib/engine/models";
 import {
   downloadModelFiles,
@@ -17,15 +18,16 @@ import {
   readStoredFiles,
   removeModelFiles,
 } from "@/lib/engine/modelStorage";
-import { isEngineSupported } from "@/lib/engine/shared";
-import { EngineName } from "@/types/enums";
+import { isModelSupported } from "@/lib/engine/shared";
+import { EngineId } from "@/types/enums";
 import { atom, createStore, useAtomValue, useStore } from "jotai";
 import { useCallback, useMemo } from "react";
 
 type Store = ReturnType<typeof createStore>;
-type PerEngine<T> = Partial<Record<EngineName, T>>;
+type PerEngine<T> = Partial<Record<EngineId, T>>;
 
 const bridgeAtom = atom<BridgeStatus>("unknown");
+const bridgeListingAtom = atom<BridgeListing | undefined>(undefined);
 const storedFilesAtom = atom<ReadonlyMap<string, number>>(new Map());
 const loadedCountsAtom = atom<PerEngine<number>>({});
 const progressAtom = atom<PerEngine<ModelProgress>>({});
@@ -34,7 +36,7 @@ const errorsAtom = atom<PerEngine<string>>({});
 // Called by useEngineState when an engine starts (+1) or is shut down (-1).
 export const markEngineLoadedAtom = atom(
   null,
-  (get, set, update: { name: EngineName; delta: 1 | -1 }) => {
+  (get, set, update: { name: EngineId; delta: 1 | -1 }) => {
     const counts = get(loadedCountsAtom);
     set(loadedCountsAtom, {
       ...counts,
@@ -45,7 +47,7 @@ export const markEngineLoadedAtom = atom(
 
 const withEntry = <T>(
   record: PerEngine<T>,
-  name: EngineName,
+  name: EngineId,
   value: T | undefined
 ): PerEngine<T> => {
   const next = { ...record };
@@ -63,7 +65,11 @@ const readStorage = async (store: Store): Promise<void> => {
 
 const probeBridge = async (store: Store): Promise<void> => {
   store.set(bridgeAtom, "checking");
-  store.set(bridgeAtom, (await probeRecklessBridge()) ? "up" : "down");
+  const listing = await fetchBridgeListing();
+  // Native engines are known only from the bridge, so the registry follows its listing.
+  if (listing) setNativeEngines(listing.engines);
+  store.set(bridgeListingAtom, listing);
+  store.set(bridgeAtom, listing ? "up" : "down");
 };
 
 let refreshing: Promise<void> | undefined;
@@ -80,7 +86,7 @@ const refreshModels = (store: Store): Promise<void> => {
   return refreshing;
 };
 
-const downloadModel = async (store: Store, name: EngineName): Promise<void> => {
+const downloadModel = async (store: Store, name: EngineId): Promise<void> => {
   const model = getEngineModel(name);
   if (model.source !== "browser" || store.get(progressAtom)[name]) return;
 
@@ -114,7 +120,7 @@ const downloadModel = async (store: Store, name: EngineName): Promise<void> => {
   }
 };
 
-const removeModel = async (store: Store, name: EngineName): Promise<void> => {
+const removeModel = async (store: Store, name: EngineId): Promise<void> => {
   const model = getEngineModel(name);
   if (model.source !== "browser" || store.get(progressAtom)[name]) return;
 
@@ -128,6 +134,7 @@ const removeModel = async (store: Store, name: EngineName): Promise<void> => {
 export const useModels = () => {
   const store = useStore();
   const bridge = useAtomValue(bridgeAtom);
+  const listing = useAtomValue(bridgeListingAtom);
   const stored = useAtomValue(storedFilesAtom);
   const loadedCounts = useAtomValue(loadedCountsAtom);
   const progress = useAtomValue(progressAtom);
@@ -135,26 +142,33 @@ export const useModels = () => {
 
   const models = useMemo(
     () =>
-      Object.values(ENGINE_MODELS).map((model) =>
+      getAllEngineModels().map((model) =>
         buildModelView(model, {
+          bridgeEngine:
+            model.source === "bridge" && listing
+              ? (listing.engines.find((entry) => entry.id === model.script) ?? {
+                  available: false,
+                  error: "Not listed in engines/engines.json",
+                })
+              : undefined,
           stored,
           loaded: loadedCounts[model.name] ?? 0,
           progress: progress[model.name],
           error: errors[model.name],
           bridge,
-          supported: isEngineSupported(model.name),
+          supported: isModelSupported(model),
         })
       ),
-    [stored, loadedCounts, progress, errors, bridge]
+    [stored, loadedCounts, progress, errors, bridge, listing]
   );
 
   const refresh = useCallback(() => refreshModels(store), [store]);
   const download = useCallback(
-    (name: EngineName) => downloadModel(store, name),
+    (name: EngineId) => downloadModel(store, name),
     [store]
   );
   const remove = useCallback(
-    (name: EngineName) => removeModel(store, name),
+    (name: EngineId) => removeModel(store, name),
     [store]
   );
 

@@ -4,7 +4,11 @@ import {
   evaluationMatches,
   validateAnalysisSession,
 } from "@/lib/analysisSession";
-import { getGameDatabase, listAnalysisSessions } from "@/lib/gameDatabase";
+import {
+  getGameDatabase,
+  getAnalysisSession,
+  listAnalysisSessions,
+} from "@/lib/gameDatabase";
 import { fetchLichessGame } from "@/lib/lichess";
 import { loadGameFromText } from "@/lib/pgn";
 import { useSetAtom, useStore } from "jotai";
@@ -15,12 +19,7 @@ import {
   analysisSourceErrorAtom,
   restoreAnalysisSessionAtom,
 } from "../sessionAtoms";
-import {
-  arrangeModeAtom,
-  boardOrientationAtom,
-  editablePositionAtom,
-  boardAtom,
-} from "../states";
+import { arrangeModeAtom, editablePositionAtom, boardAtom } from "../states";
 import { useArrangeMode } from "../arrange/useArrangeMode";
 import { useLoadAnalysisGame } from "./useLoadAnalysisGame";
 
@@ -30,7 +29,6 @@ export function useAnalysisSources(startInArrangeMode: boolean) {
   const { loadPgn, loadFen } = useLoadAnalysisGame();
   const { enterArrange } = useArrangeMode();
   const restore = useSetAtom(restoreAnalysisSessionAtom);
-  const setOrientation = useSetAtom(boardOrientationAtom);
   const setArrange = useSetAtom(arrangeModeAtom);
   const setPosition = useSetAtom(editablePositionAtom);
   const setSourceError = useSetAtom(analysisSourceErrorAtom);
@@ -48,25 +46,26 @@ export function useAnalysisSources(startInArrangeMode: boolean) {
   useEffect(() => {
     if (!router.isReady) return;
     let cancelled = false;
-    setSourceError(null);
+    if (sessionId || gameId || lichessGameId) setSourceError(null);
     void (async () => {
       let session;
       if (typeof sessionId === "string") {
-        session = await (
-          await getGameDatabase()
-        ).get("analysisSessions", sessionId);
+        session = await getAnalysisSession(sessionId);
         if (!session) throw new Error("That analysis session was not found.");
       } else if (typeof gameId === "string" && /^\d+$/.test(gameId)) {
         const game = await (
           await getGameDatabase()
         ).get("games", Number(gameId));
         if (!game) throw new Error("That saved game was not found.");
-        session = (await listAnalysisSessions()).find(
-          (saved) =>
-            saved.sourceGameId === game.id && saved.sourcePgn === game.pgn
-        );
+        session = (
+          await listAnalysisSessions({ gameId: game.id, pgn: game.pgn })
+        )[0];
         if (!session) {
-          session = newAnalysisSession(loadGameFromText(game.pgn), game.id);
+          session = newAnalysisSession(
+            loadGameFromText(game.pgn),
+            game.id,
+            game.pgn
+          );
           session.main.evaluation = evaluationMatches(
             game.eval,
             loadGameFromText(game.pgn)
@@ -86,10 +85,7 @@ export function useAnalysisSources(startInArrangeMode: boolean) {
       if (!session || cancelled) return;
       validateAnalysisSession(session);
       restore(session);
-      setOrientation(session.orientation);
-      setArrange(!!session.draft);
-      if (session.draft) setPosition(session.draft);
-      else if (startInArrangeMode) {
+      if (!session.draft && startInArrangeMode) {
         setPosition(positionFromFen(store.get(boardAtom).fen()));
         setArrange(true);
       }
@@ -114,7 +110,6 @@ export function useAnalysisSources(startInArrangeMode: boolean) {
     orientation,
     loadPgn,
     restore,
-    setOrientation,
     setArrange,
     setPosition,
     setSourceError,

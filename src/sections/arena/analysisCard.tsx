@@ -2,7 +2,7 @@ import { moveStoryAtom } from "@/lib/moveStoryState";
 import AnalysisOptionsPanel, {
   AnalysisOptionCopy,
 } from "@/components/analysisOptions/analysisOptionsPanel";
-import { ENGINE_LABELS } from "@/constants";
+import { engineLabel } from "@/constants";
 import {
   CLASSIFICATION_PHRASES,
   WORTH_VISUALIZING,
@@ -75,7 +75,7 @@ export default function AnalysisCard({ arena }: { arena: Arena }) {
             </Typography>
           )}
           <Typography variant="caption" sx={{ opacity: 0.7, pt: 1 }}>
-            {ENGINE_LABELS[analysis.engineName].small} · depth{" "}
+            {engineLabel(analysis.engineName).small} · depth{" "}
             {ARENA_ANALYSIS_DEPTH}. Uses the engine chosen for Arena evaluation
             in Settings, which is the analysis engine unless you change it.
             Positive scores favor White. Options are remembered.

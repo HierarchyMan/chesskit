@@ -1,5 +1,7 @@
 import Board from "@/sections/analysis/board";
 import PanelHeader from "@/sections/analysis/panelHeader";
+import GameDetails from "@/sections/analysis/panelHeader/gamePanel";
+import BoardWorkspace from "@/components/boardWorkspace";
 import PanelToolBar from "@/sections/analysis/panelToolbar";
 import AnalysisOverlayPanel from "@/sections/analysis/overlayPanel";
 import { useAnalysisOverlay } from "@/sections/analysis/hooks/useAnalysisOverlay";
@@ -18,14 +20,11 @@ import {
   CircularProgress,
   Stack,
   Divider,
-  Grid2 as Grid,
   Tab,
   Tabs,
-  useMediaQuery,
-  useTheme,
 } from "@mui/material";
 import { useAtomValue } from "jotai";
-import { useEffect, useRef, useState } from "react";
+import { Activity, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import TopMovesSection from "@/sections/analysis/panelBody/topMovesSection";
 import dynamic from "next/dynamic";
@@ -80,9 +79,8 @@ export default function AnalysisPage(props: Props) {
 }
 
 function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
-  const theme = useTheme();
   const [tab, setTab] = useState(0);
-  const isLgOrGreater = useMediaQuery(theme.breakpoints.up("lg"));
+  const [visited, setVisited] = useState(() => new Set([0]));
 
   const arrange = useAtomValue(arrangeModeAtom);
   const gameEval = useAtomValue(gameEvalAtom);
@@ -121,151 +119,162 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
     );
 
   return (
-    <Grid container gap={4} justifyContent="space-evenly" alignItems="start">
+    <>
       <PageTitle title={title} />
-
-      {arrange ? (
-        <ArrangeBoard />
-      ) : (
-        <Board overlay={overlay} overlayInspector={isLgOrGreater} />
-      )}
-
-      <Grid
-        container
-        justifyContent="start"
-        alignItems="center"
-        borderRadius={2}
-        border={1}
-        borderColor={"secondary.main"}
-        sx={{
-          backgroundColor: "secondary.main",
-          borderColor: "primary.main",
-          borderWidth: 2,
-          boxShadow: "0 2px 10px rgba(0, 0, 0, 0.5)",
-        }}
-        padding={{ xs: "10px 5px 20px", sm: 2 }}
-        style={{
-          maxWidth: "1200px",
-        }}
-        rowGap={2}
-        minHeight={{ lg: "calc(95vh - 60px)" }}
-        display="flex"
-        flexDirection="column"
-        flexWrap="nowrap"
-        size={{
-          xs: 12,
-          lg: "grow",
-        }}
-      >
-        <SessionPanel />
-        <ModeSwitch />
-
-        {arrange ? (
-          <Box
-            sx={{ flexGrow: 1, minHeight: 0, width: "100%", overflowY: "auto" }}
-          >
-            <ArrangePanel />
-          </Box>
-        ) : (
+      <BoardWorkspace
+        inspectorLabel="Analysis inspector"
+        board={arrange ? <ArrangeBoard /> : <Board overlay={overlay} />}
+        inspector={
           <>
-            {isLgOrGreater && (
-              <Box width="100%">
-                <AnalysisOverlayPanel overlay={overlay} view="inspector" />
-                <Divider sx={{ marginX: "5%", marginTop: 2.5 }} />
-              </Box>
-            )}
-
-            <Box width="100%">
-              <PanelHeader key="analysis-panel-header" />
-            </Box>
-
-            <Box
-              width="95%"
+            <Stack
+              spacing={1.25}
               sx={{
+                p: 1.5,
+                flexShrink: 0,
                 borderBottom: 1,
                 borderColor: "divider",
-                marginX: { sm: "5%", xs: undefined },
+                userSelect: "none",
               }}
             >
-              <Tabs
-                value={tab}
-                onChange={(_, newValue) => setTab(newValue)}
-                aria-label="Analysis views"
-                variant="fullWidth"
-                sx={{ minHeight: 0 }}
-              >
-                <Tab
-                  label="Analysis"
-                  id="tab0"
-                  icon={<Icon icon="mdi:magnify" height={15} />}
-                  iconPosition="start"
-                  sx={{
-                    textTransform: "none",
-                    minHeight: 15,
-                    padding: "5px 0em 12px",
-                  }}
-                  disableFocusRipple
-                />
-
-                <Tab
-                  label="Moves"
-                  id="tab1"
-                  icon={<Icon icon="mdi:format-list-bulleted" height={15} />}
-                  iconPosition="start"
-                  sx={{
-                    textTransform: "none",
-                    minHeight: 15,
-                    display: showMovesTab ? undefined : "none",
-                    padding: "5px 0em 12px",
-                  }}
-                  disableFocusRipple
-                />
-
-                <Tab
-                  label="Graph"
-                  id="tab2"
-                  icon={<Icon icon="mdi:chart-line" height={15} />}
-                  iconPosition="start"
-                  sx={{
-                    textTransform: "none",
-                    minHeight: 15,
-                    display: gameEval ? undefined : "none",
-                    padding: "5px 0em 12px",
-                  }}
-                  disableFocusRipple
-                />
-              </Tabs>
-            </Box>
-
-            {/* The one content area: it scrolls on its own, so the board stays put. */}
-            <Box
-              role="tabpanel"
-              aria-labelledby={`tab${tab}`}
-              width="100%"
-              sx={{
-                minHeight: 0,
-                overflowY: "auto",
-                maxHeight: { lg: "max(20rem, calc(100vh - 330px))" },
-                paddingX: { xs: 0, sm: "5%" },
-              }}
-            >
-              {tab === 0 && (
-                <>
-                  <AnalysisTab />
-                  <TopMovesSection />
-                </>
+              <SessionPanel />
+              {!arrange && <PanelHeader />}
+              <ModeSwitch />
+              {!arrange && (
+                <AnalysisOverlayPanel overlay={overlay} view="inspector" />
               )}
-              {tab === 1 && <ClassificationTab />}
-              {tab === 2 && gameEval && <GraphTab id="tabContent2" />}
-            </Box>
-
-            <Box width="100%">
-              <Divider sx={{ marginX: "5%", marginBottom: 1.5 }} />
-              <PanelToolBar key="review-panel-toolbar" />
-            </Box>
+            </Stack>
+            {arrange ? (
+              <Box
+                data-inspector-scroller
+                sx={{
+                  p: 1.5,
+                  minHeight: 0,
+                  overflowY: "auto",
+                  overscrollBehavior: "contain",
+                  scrollbarGutter: "stable",
+                }}
+              >
+                <ArrangePanel />
+              </Box>
+            ) : (
+              <>
+                <Tabs
+                  value={tab}
+                  onChange={(_, value: number) => {
+                    setVisited((previous) => new Set([...previous, value]));
+                    setTab(value);
+                  }}
+                  aria-label="Analysis views"
+                  variant="fullWidth"
+                  sx={{
+                    minHeight: 38,
+                    flexShrink: 0,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    "& .MuiTab-root": {
+                      minHeight: 38,
+                      py: 0.75,
+                      textTransform: "none",
+                    },
+                  }}
+                >
+                  <Tab
+                    label="Position"
+                    id="tab0"
+                    aria-controls="tabContent0"
+                    icon={<Icon icon="mdi:magnify" height={16} />}
+                    iconPosition="start"
+                  />
+                  <Tab
+                    label="Moves"
+                    id="tab1"
+                    aria-controls="tabContent1"
+                    disabled={!showMovesTab}
+                    icon={<Icon icon="mdi:format-list-bulleted" height={16} />}
+                    iconPosition="start"
+                  />
+                  <Tab
+                    label="Graph"
+                    id="tab2"
+                    aria-controls="tabContent2"
+                    disabled={!gameEval}
+                    icon={<Icon icon="mdi:chart-line" height={16} />}
+                    iconPosition="start"
+                  />
+                </Tabs>
+                <Box
+                  sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr)",
+                    gridTemplateRows: "minmax(0, 1fr)",
+                  }}
+                >
+                  {[0, 1, 2].map((view) => (
+                    <Box
+                      key={view}
+                      id={`tabContent${view}`}
+                      role="tabpanel"
+                      aria-labelledby={`tab${view}`}
+                      data-inspector-scroller
+                      hidden={tab !== view}
+                      sx={{
+                        display: tab === view ? "block" : "none",
+                        gridArea: "1 / 1",
+                        overflowY: "auto",
+                        minWidth: 0,
+                        minHeight: 0,
+                        p: 1.5,
+                        overscrollBehavior: "contain",
+                        scrollbarGutter: "stable",
+                      }}
+                    >
+                      <Activity mode={tab === view ? "visible" : "hidden"}>
+                        {visited.has(view) && view === 0 && (
+                          <>
+                            {game.getHeaders().White &&
+                              game.getHeaders().White !== "?" && (
+                                <Box
+                                  component="details"
+                                  sx={{
+                                    mb: 1.5,
+                                    "& summary": {
+                                      cursor: "pointer",
+                                      fontSize: "0.85rem",
+                                      color: "text.secondary",
+                                      py: 0.5,
+                                      userSelect: "none",
+                                    },
+                                  }}
+                                >
+                                  <summary>Game details</summary>
+                                  <GameDetails />
+                                </Box>
+                              )}
+                            <AnalysisTab hidden={tab !== 0} />
+                            <TopMovesSection />
+                          </>
+                        )}
+                        {visited.has(view) && view === 1 && (
+                          <ClassificationTab hidden={tab !== 1} />
+                        )}
+                        {visited.has(view) && view === 2 && gameEval && (
+                          <GraphTab hidden={tab !== 2} />
+                        )}
+                      </Activity>
+                    </Box>
+                  ))}
+                </Box>
+                <Box sx={{ px: 1, py: 0.5, flexShrink: 0, userSelect: "none" }}>
+                  <Divider sx={{ mb: 0.5 }} />
+                  <PanelToolBar />
+                </Box>
+              </>
+            )}
           </>
-        )}
-      </Grid>
-    </Grid>
+        }
+      />
+    </>
   );
 }

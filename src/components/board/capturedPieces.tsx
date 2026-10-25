@@ -2,21 +2,23 @@ import { getCapturedPieces, getMaterialDifference } from "@/lib/chess";
 import { Color } from "@/types/enums";
 import { Box, Grid2 as Grid, Stack, Typography } from "@mui/material";
 import { ReactElement, useMemo } from "react";
+import { Chess } from "chess.js";
 
 export interface Props {
   fen: string;
   color: Color;
+  game?: Chess;
 }
 
 const PIECE_SCALE = 0.55;
 
-export default function CapturedPieces({ fen, color }: Props) {
+export default function CapturedPieces({ fen, color, game }: Props) {
   const piecesComponents = useMemo(() => {
-    const capturedPieces = getCapturedPieces(fen, color);
+    const capturedPieces = game ? getCapturedPieces(game, color) : [];
     return capturedPieces.map(({ piece, count }) =>
       getCapturedPiecesComponents(piece, count)
     );
-  }, [fen, color]);
+  }, [game, color]);
 
   const materialDiff = useMemo(() => {
     const materialDiff = getMaterialDifference(fen);
@@ -30,6 +32,7 @@ export default function CapturedPieces({ fen, color }: Props) {
       spacing={0.7}
       size="auto"
       marginLeft={`-${0.3 * PIECE_SCALE}rem`}
+      aria-label={`Captured by ${color === Color.White ? "White" : "Black"}`}
     >
       <Stack direction="row" spacing={0.1}>
         {piecesComponents}

@@ -7,15 +7,22 @@ import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
 const pieceHash = createHash("sha256");
 function hashPieces(directory: string) {
-  for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const entry of readdirSync(directory, { withFileTypes: true }).sort(
+    (a, b) => a.name.localeCompare(b.name)
+  )) {
     const file = path.join(directory, entry.name);
     if (entry.isDirectory()) hashPieces(file);
-    else { pieceHash.update(file); pieceHash.update(readFileSync(file)); }
+    else {
+      pieceHash.update(file);
+      pieceHash.update(readFileSync(file));
+    }
   }
 }
 hashPieces("public/piece");
 const pieceVersion = pieceHash.digest("hex");
 const nextConfig = (phase: string): NextConfig => ({
+  // Keep an isolated verification build from replacing a running dev server's output.
+  distDir: process.env.CHESSKIT_DIST_DIR || ".next",
   output: phase === PHASE_PRODUCTION_BUILD ? "export" : undefined,
   trailingSlash: false,
   reactStrictMode: true,

@@ -12,6 +12,7 @@ export interface Props {
   color: Color;
   gameAtom: PrimitiveAtom<Chess>;
   clockMsAtom?: Atom<number | undefined>;
+  previewFen?: string;
 }
 
 const NO_CLOCK_ATOM = atom<number | undefined>(undefined);
@@ -20,6 +21,7 @@ export default function PlayerHeader({
   color,
   player,
   gameAtom,
+  previewFen,
   clockMsAtom = NO_CLOCK_ATOM,
 }: Props) {
   const game = useAtomValue(gameAtom);
@@ -54,8 +56,16 @@ export default function PlayerHeader({
       justifyContent="space-between"
       alignItems="center"
       size={12}
+      sx={{
+        minHeight: 40,
+        height: 40,
+        flexShrink: 0,
+        minWidth: 0,
+        userSelect: "none",
+        flexWrap: "nowrap",
+      }}
     >
-      <Stack direction="row">
+      <Stack direction="row" sx={{ minWidth: 0, overflow: "hidden" }}>
         <Avatar
           src={player.avatarUrl}
           alt={player.name}
@@ -71,9 +81,11 @@ export default function PlayerHeader({
           {player.name[0].toUpperCase()}
         </Avatar>
 
-        <Stack marginLeft={1}>
+        <Stack marginLeft={1} sx={{ minWidth: 0 }}>
           <Stack direction="row">
-            <Typography fontSize="0.9rem">{player.name}</Typography>
+            <Typography fontSize="0.9rem" noWrap>
+              {player.name}
+            </Typography>
 
             {player.rating && (
               <Typography marginLeft={0.5} fontSize="0.9rem" fontWeight="200">
@@ -82,7 +94,11 @@ export default function PlayerHeader({
             )}
           </Stack>
 
-          <CapturedPieces fen={gameFen} color={color} />
+          <CapturedPieces
+            fen={previewFen ?? gameFen}
+            color={color}
+            game={previewFen ? undefined : game}
+          />
         </Stack>
       </Stack>
 

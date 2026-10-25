@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  DEFAULT_STRENGTH_PROFILE,
   MovePlan,
+  StrengthProfile,
+  describeStrength,
   maxDepthForTime,
   pickSampledMove,
   planMove,
   scoreFromLine,
 } from "@/lib/engine/strength";
+
+const NATIVE: StrengthProfile = DEFAULT_STRENGTH_PROFILE;
+const EMULATED: StrengthProfile = { ...NATIVE, nativeElo: undefined };
+// Reckless 0.9.0 on CCRL Blitz: no UCI_Elo, rated 3766.
+const RECKLESS: StrengthProfile = { ...EMULATED, maxElo: 3766 };
 
 const sampledPlan = (
   overrides: Partial<Extract<MovePlan, { kind: "sampled" }>> = {}
@@ -26,30 +34,30 @@ const seeded = (values: number[]) => {
 
 describe("planMove", () => {
   it("uses the native limit when the engine has one and Elo is in range", () => {
-    const plan = planMove({ mode: "elo", elo: 1800, depth: 8 }, true);
+    const plan = planMove({ mode: "elo", elo: 1800, depth: 8 }, NATIVE);
     assert.deepEqual(plan, { kind: "native", elo: 1800, depth: 16 });
   });
 
   it("emulates strength below the native range", () => {
-    const plan = planMove({ mode: "elo", elo: 800, depth: 8 }, true);
+    const plan = planMove({ mode: "elo", elo: 800, depth: 8 }, NATIVE);
     assert.equal(plan.kind, "sampled");
   });
 
   it("emulates every Elo when the engine has no native limit", () => {
-    const plan = planMove({ mode: "elo", elo: 1800, depth: 8 }, false);
+    const plan = planMove({ mode: "elo", elo: 1800, depth: 8 }, EMULATED);
     assert.equal(plan.kind, "sampled");
   });
 
   it("plays plain best moves above the emulated range", () => {
     assert.equal(
-      planMove({ mode: "elo", elo: 3000, depth: 8 }, false).kind,
+      planMove({ mode: "elo", elo: 3000, depth: 8 }, EMULATED).kind,
       "best"
     );
   });
 
   it("gets weaker as Elo drops", () => {
-    const low = planMove({ mode: "elo", elo: 600, depth: 8 }, false);
-    const mid = planMove({ mode: "elo", elo: 1500, depth: 8 }, false);
+    const low = planMove({ mode: "elo", elo: 600, depth: 8 }, EMULATED);
+    const mid = planMove({ mode: "elo", elo: 1500, depth: 8 }, EMULATED);
     assert.ok(low.kind === "sampled" && mid.kind === "sampled");
     assert.ok(low.depth <= mid.depth);
     assert.ok(low.temperatureCp > mid.temperatureCp);
@@ -57,19 +65,72 @@ describe("planMove", () => {
   });
 
   it("honours the fixed depth and max modes", () => {
-    assert.deepEqual(planMove({ mode: "depth", elo: 1500, depth: 5 }, true), {
+    assert.deepEqual(planMove({ mode: "depth", elo: 1500, depth: 5 }, NATIVE), {
       kind: "best",
       depth: 5,
     });
-    assert.deepEqual(planMove({ mode: "max", elo: 1500, depth: 5 }, false), {
+    assert.deepEqual(planMove({ mode: "max", elo: 1500, depth: 5 }, EMULATED), {
       kind: "best",
-      depth: 16,
+      depth: 30,
+      movetimeMs: 3000,
     });
   });
 
   it("clamps out-of-range inputs", () => {
-    const plan = planMove({ mode: "depth", elo: 1500, depth: 99 }, true);
+    const plan = planMove({ mode: "depth", elo: 1500, depth: 99 }, NATIVE);
     assert.deepEqual(plan, { kind: "best", depth: 30 });
+  });
+});
+
+describe("per-engine strength range", () => {
+  it("lets the Elo slider reach a strong engine's own rating", () => {
+    const below = planMove({ mode: "elo", elo: 3600, depth: 8 }, RECKLESS);
+    assert.equal(below.kind, "best");
+    assert.ok(below.kind === "best" && !below.movetimeMs);
+    assert.ok(below.depth > 20 && below.depth < 24, `depth ${below.depth}`);
+  });
+
+  it("treats the top of an engine's range as full strength", () => {
+    assert.deepEqual(planMove({ mode: "elo", elo: 3766, depth: 8 }, RECKLESS), {
+      kind: "best",
+      depth: 30,
+      movetimeMs: 3000,
+    });
+    // Saved Elo above a weaker engine's rating means its full strength too.
+    const weak = { ...EMULATED, maxElo: 2050 };
+    assert.equal(
+      planMove({ mode: "elo", elo: 3000, depth: 8 }, weak).kind,
+      "best"
+    );
+  });
+
+  it("stops the native limit at the engine's own UCI_Elo maximum", () => {
+    const plan = planMove(
+      { mode: "elo", elo: 3400, depth: 8 },
+      {
+        ...NATIVE,
+        maxElo: 3792,
+      }
+    );
+    assert.equal(plan.kind, "best");
+  });
+
+  it("uses the configured think time at full strength", () => {
+    const plan = planMove(
+      { mode: "max", elo: 0, depth: 1 },
+      {
+        ...RECKLESS,
+        fullStrengthMs: 10_000,
+      }
+    );
+    assert.ok(plan.kind === "best" && plan.movetimeMs === 10_000);
+    assert.match(
+      describeStrength(
+        { mode: "max", elo: 0, depth: 1 },
+        { ...RECKLESS, fullStrengthMs: 10_000 }
+      ),
+      /10 s per move/
+    );
   });
 });
 
@@ -157,7 +218,7 @@ describe("pickSampledMove", () => {
   });
 
   it("rarely chooses clearly losing moves at club level", () => {
-    const plan = planMove({ mode: "elo", elo: 1800, depth: 8 }, false);
+    const plan = planMove({ mode: "elo", elo: 1800, depth: 8 }, EMULATED);
     assert.equal(plan.kind, "sampled");
     if (plan.kind !== "sampled") return;
 

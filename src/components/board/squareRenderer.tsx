@@ -222,17 +222,16 @@ const playableSquareStyles: CSSProperties = {
 
 /**
  * A square whose piece can be taken is ringed rather than dotted: a dot would
- * sit on the piece's own body and disappear behind it.
+ * sit on the piece's own body and disappear behind it. The corners outside
+ * the ring are filled too, so the open circle at the centre frames the piece.
  */
 const captureSquareStyles: CSSProperties = {
   position: "absolute",
   width: "100%",
   height: "100%",
-  borderRadius: "50%",
-  border: "calc(var(--board-size, 400px) * 0.012) solid rgba(0,0,0,.14)",
-  boxSizing: "border-box",
-  // Scales the whole ring, its stroke included, around the square's centre.
-  transform: "scale(0.9)",
+  // Radial stops are percentages of the half side, so 100% is the edge midpoint.
+  background:
+    "radial-gradient(circle closest-side, transparent 86%, rgba(0,0,0,.14) 86%)",
 };
 
 const previousMoveSquareStyle = (

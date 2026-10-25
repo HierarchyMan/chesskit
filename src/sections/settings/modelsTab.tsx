@@ -1,5 +1,5 @@
 import ModelMenuLabel, { statusColor } from "@/components/modelMenuLabel";
-import { ENGINE_LABELS } from "@/constants";
+import { engineLabel } from "@/constants";
 import { useModels } from "@/hooks/useModels";
 import {
   ModelView,
@@ -21,16 +21,18 @@ export default function ModelsTab() {
   const browserModels = models.filter(
     (view) => view.model.source === "browser"
   );
-  const reckless = models.find((view) => view.model.source === "bridge");
+  const natives = models.filter((view) => view.model.source === "bridge");
+  const bridge = natives[0]?.bridge ?? "unknown";
 
   return (
     <Stack spacing={2.5} divider={<Divider flexItem />}>
       <Stack spacing={1.5}>
         <Typography variant="body2">
-          Stockfish runs in your browser. Download an engine to keep a copy on
-          this device, so it loads faster and works offline. Removing a download
-          frees space only: the engine still loads from the server when you use
-          it online.
+          Browser engines (Stockfish, Lozza, tomitankChess) run in this page.
+          Download one to keep a copy on this device, so it loads faster and
+          works offline. Joke engines are built in and need no download.
+          Removing a download frees space only: the engine still loads from the
+          server when you use it online.
         </Typography>
 
         {!storageSupported && (
@@ -58,41 +60,48 @@ export default function ModelsTab() {
         ))}
       </Stack>
 
-      {reckless && (
-        <Stack spacing={1.5}>
-          <Typography variant="subtitle2">Reckless (native engine)</Typography>
-          <Typography variant="body2">
-            Reckless runs outside the browser through a small local bridge. The
-            bridge listens only on this computer and only accepts connections
-            from this app.
-          </Typography>
-          <Typography variant="body2">
-            To start it, double-click <b>start-reckless-bridge.bat</b>, or use
-            <b> start-chess.bat</b> to start the bridge and the app together.
-          </Typography>
-          <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
-            <Button
-              variant="outlined"
-              onClick={() => refresh()}
-              disabled={reckless.bridge === "checking"}
-            >
-              Check bridge
-            </Button>
-            <Typography
-              variant="body2"
-              sx={{ color: statusColor(describeModel(reckless).tone) }}
-            >
-              {describeModel(reckless).text}
-            </Typography>
-          </Stack>
-          <Typography variant="caption" sx={{ opacity: 0.75 }}>
-            Reckless is installed on this computer, so it cannot be downloaded
-            here. The bridge only starts when its engine file is present, so a
-            running bridge means Reckless is available. The bridge does not
-            report the file size.
-          </Typography>
+      <Stack spacing={1.5}>
+        <Typography variant="subtitle2">
+          Native engines (local bridge)
+        </Typography>
+        <Typography variant="body2">
+          Native engines run outside the browser through a small local bridge,
+          which listens only on this computer and only accepts this app. They
+          are the strongest option: they can use every core and lots of memory.
+        </Typography>
+        <Typography variant="body2">
+          Start the bridge with <b>start-reckless-bridge.bat</b>, or{" "}
+          <b>start-chess.bat</b> to start it with the app. To add an engine, put
+          its program in the <b>engines</b> folder and add an entry to{" "}
+          <b>engines/engines.json</b> (id, name, path, and optionally elo). Then
+          press Check bridge.
+        </Typography>
+        <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
+          <Button
+            variant="outlined"
+            onClick={() => refresh()}
+            disabled={bridge === "checking"}
+          >
+            Check bridge
+          </Button>
         </Stack>
-      )}
+        <Stack>
+          {natives.map((view) => {
+            const status = describeModel(view);
+            return (
+              <Stack key={view.model.name} py={1}>
+                <Typography variant="body1">{view.model.label.full}</Typography>
+                <Typography
+                  variant="caption"
+                  sx={{ color: statusColor(status.tone) }}
+                >
+                  {status.text}
+                </Typography>
+              </Stack>
+            );
+          })}
+        </Stack>
+      </Stack>
     </Stack>
   );
 }
@@ -125,7 +134,7 @@ function BrowserModelRow({
           startIcon={<Icon icon="mdi:delete-outline" height={18} />}
           disabled={downloading}
           onClick={onRemove}
-          aria-label={`Remove ${ENGINE_LABELS[view.model.name].full} from this device`}
+          aria-label={`Remove ${engineLabel(view.model.name).full} from this device`}
         >
           Remove
         </Button>
@@ -136,7 +145,7 @@ function BrowserModelRow({
           startIcon={<Icon icon="mdi:download" height={18} />}
           disabled={!canDownload || downloading}
           onClick={onDownload}
-          aria-label={`Download ${ENGINE_LABELS[view.model.name].full}`}
+          aria-label={`Download ${engineLabel(view.model.name).full}`}
         >
           {downloading ? "Downloading…" : view.error ? "Retry" : "Download"}
         </Button>

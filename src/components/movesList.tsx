@@ -4,11 +4,14 @@ import { useEffect, useRef } from "react";
 import { LineEval } from "@/types/eval";
 import { MoveClassification } from "@/types/enums";
 import { getLineEvalLabel } from "@/lib/chess";
+import { classificationName } from "@/lib/classificationLabels";
 import Image from "next/image";
+import { useWorkspacePageFlow } from "./boardWorkspace";
 
 interface MoveAnnotation {
   classification?: MoveClassification;
   evaluation?: LineEval;
+  status?: "error";
 }
 
 interface Props {
@@ -32,20 +35,29 @@ export default function MovesList({
   emptyText = "No moves yet",
   annotations,
 }: Props) {
+  const pageFlow = useWorkspacePageFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const offset = startsWithBlack ? 1 : 0;
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const list = containerRef.current;
+    // Never move the document (or create a nested scroller) to follow new moves.
+    if (!list || pageFlow) return;
+    const container =
+      maxHeight === "none"
+        ? (list.closest<HTMLElement>("[data-inspector-scroller]") ?? list)
+        : list;
 
-    const active = container.querySelector<HTMLElement>("[data-active='true']");
+    const active = list.querySelector<HTMLElement>("[data-active='true']");
     if (!active) {
       container.scrollTop = container.scrollHeight;
       return;
     }
 
-    const top = active.offsetTop - container.offsetTop;
+    const top =
+      active.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      container.scrollTop;
     if (top < container.scrollTop) container.scrollTop = top;
     else if (
       top + active.offsetHeight >
@@ -53,7 +65,7 @@ export default function MovesList({
     ) {
       container.scrollTop = top + active.offsetHeight - container.clientHeight;
     }
-  }, [currentPly, moves.length]);
+  }, [currentPly, moves.length, maxHeight, pageFlow]);
 
   if (!moves.length) {
     return (
@@ -80,7 +92,7 @@ export default function MovesList({
         onClick={() => onSelect?.(ply + 1)}
         aria-label={
           annotation
-            ? `${san}: ${annotation.classification ?? "analysis pending"}`
+            ? `${san}: ${annotation.classification ? classificationName(annotation.classification) : annotation.status === "error" ? "evaluation unavailable" : "analysis pending"}`
             : undefined
         }
         sx={{
@@ -114,7 +126,11 @@ export default function MovesList({
               />
             )}
             <Typography component="span" variant="caption">
-              {annotation.classification ?? "Pending"}
+              {annotation.classification
+                ? classificationName(annotation.classification)
+                : annotation.status === "error"
+                  ? "Unavailable"
+                  : "Pending"}
               {annotation.evaluation
                 ? ` · ${getLineEvalLabel(annotation.evaluation)}`
                 : ""}
@@ -128,7 +144,11 @@ export default function MovesList({
   return (
     <Box
       ref={containerRef}
-      sx={{ maxHeight, overflowY: "auto", position: "relative" }}
+      sx={{
+        maxHeight: pageFlow ? "none" : maxHeight,
+        overflowY: pageFlow || maxHeight === "none" ? "visible" : "auto",
+        position: "relative",
+      }}
     >
       {Array.from({ length: rowCount }).map((_, row) => {
         const whitePly = row * 2 - offset;

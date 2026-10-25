@@ -1,11 +1,5 @@
+import type { ArrowPalette } from "./palette";
 import type { ArrowSide, BoardArrow } from "./types";
-
-// Blue and orange stay apart for every common kind of colour blindness, which
-// red and green do not, and neither collides with the green and red of the
-// move grades drawn on the squares. Blue is the side to move; orange is the
-// other side.
-export const TO_MOVE_HUE = "#1B8FE0";
-export const OTHER_HUE = "#F2801F";
 
 /** How far a checker's second tone is lifted towards white. */
 const CHECKER_LIFT = 0.45;
@@ -22,14 +16,15 @@ export interface ArrowStyle {
 }
 
 /**
- * Who moves is the hue: the side to move is blue and the other side orange,
- * whichever way the board is turned. A move without a side counts as the side
- * to move.
+ * Who moves is the hue: the side to move takes the palette's first hue and the
+ * other side its second, whichever way the board is turned. A move without a
+ * side counts as the side to move.
  */
 export const ownerColor = (
   side: ArrowSide | undefined,
-  turn: ArrowSide
-): string => (!side || side === turn ? TO_MOVE_HUE : OTHER_HUE);
+  turn: ArrowSide,
+  palette: ArrowPalette
+): string => (!side || side === turn ? palette.toMove : palette.other);
 
 /** The second tone of a checker: the same hue, lifted towards white. */
 export const checkerTint = (hex: string): string => {
@@ -78,16 +73,32 @@ export const rankedStyle = (rank: number, color: string): ArrowStyle => {
 };
 
 /** Who moves is the hue, when it happens is the line style, and what it is shows in the width and opacity. */
-export const arrowStyle = (arrow: BoardArrow, turn: ArrowSide): ArrowStyle => {
-  const style = baseStyle(arrow, ownerColor(arrow.side, turn));
+export const arrowStyle = (
+  arrow: BoardArrow,
+  turn: ArrowSide,
+  palette: ArrowPalette
+): ArrowStyle => {
+  const ranks = [arrow, ...(arrow.roles ?? [])].flatMap((role) =>
+    role.kind === "best" ? [1] : role.rank ? [role.rank] : []
+  );
+  const style = baseStyle(
+    ranks.length ? { ...arrow, rank: Math.min(...ranks) } : arrow,
+    ownerColor(arrow.side, turn, palette),
+    palette
+  );
   return arrow.dimmed ? { ...style, opacity: style.opacity * DIMMED } : style;
 };
 
-const baseStyle = (arrow: BoardArrow, owner: string): ArrowStyle => {
+const baseStyle = (
+  arrow: BoardArrow,
+  owner: string,
+  palette: ArrowPalette
+): ArrowStyle => {
   switch (arrow.kind) {
     case "best":
-    case "planned":
       return rankedStyle(1, owner);
+    case "planned":
+      return rankedStyle(arrow.rank ?? 2, owner);
     case "candidate":
       return rankedStyle(arrow.rank ?? 2, owner);
     case "line":
@@ -98,7 +109,7 @@ const baseStyle = (arrow: BoardArrow, owner: string): ArrowStyle => {
     case "threat":
       return sized(0.16, owner, 0.95);
     case "content":
-      return sized(0.16, arrow.color ?? TO_MOVE_HUE, 0.9);
+      return sized(0.16, arrow.color ?? palette.toMove, 0.9);
     case "ink":
       return sized(0.12, arrow.color ?? "#3a9d5d", 1);
   }

@@ -1,4 +1,4 @@
-import { ENGINE_LABELS } from "@/constants";
+import { engineLabel } from "@/constants";
 import { useRecentGames } from "@/hooks/useGameDatabase";
 import { OPENING_LINES } from "@/data/openingLines";
 import { ENDGAMES } from "@/lib/endgames";
@@ -452,7 +452,7 @@ function EngineStatus() {
     <Stack direction="row" gap={1} flexWrap="wrap">
       <Chip
         icon={<Icon icon="mdi:chip" height={18} />}
-        label={`Analysis: ${ENGINE_LABELS[engineName].small}`}
+        label={`Analysis: ${engineLabel(engineName).small}`}
         variant="outlined"
         onClick={() => setSettingsOpen(true)}
       />

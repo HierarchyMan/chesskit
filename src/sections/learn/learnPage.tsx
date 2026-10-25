@@ -1,4 +1,5 @@
 import { moveStoryAtom } from "@/lib/moveStoryState";
+import { classificationName } from "@/lib/classificationLabels";
 import Panel from "@/components/panel";
 import { CLASSIFICATION_COLORS } from "@/constants";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
@@ -221,7 +222,7 @@ export default function LearnPage() {
                         </Typography>
                         <Chip
                           size="small"
-                          label={mistake.classification}
+                          label={classificationName(mistake.classification)}
                           sx={{
                             textTransform: "capitalize",
                             color: "#fff",

@@ -68,7 +68,7 @@ export default function Slider({
                 onMouseEnter={handleOpenPopover}
                 onMouseLeave={handleClosePopover}
                 sx={{ ml: 1, padding: 0 }}
-                aria-label="Help about number of threads"
+                aria-label={`Help about ${label}`}
               >
                 <Icon icon="mdi:info-outline" width="1.1rem" />
               </IconButton>

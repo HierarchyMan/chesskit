@@ -7,10 +7,10 @@ import {
 } from "@/lib/editorPosition";
 import { Box, Grid2 as Grid } from "@mui/material";
 import { useAtom, useAtomValue } from "jotai";
-import { useMemo } from "react";
-import { Chessboard } from "react-chessboard";
+import { useLayoutEffect, useMemo } from "react";
+import { useBoardStage } from "@/components/boardWorkspace";
+import Chessboard from "@/components/board/motionChessboard";
 import { Square } from "react-chessboard/dist/chessboard/types";
-import { useAnalysisBoardSize } from "../hooks/useAnalysisBoardSize";
 import {
   arrangeBrushAtom,
   boardOrientationAtom,
@@ -22,7 +22,12 @@ export const ARRANGE_BOARD_ID = "ArrangeBoard";
 type BoardPositionObject = Record<string, PieceCode>;
 
 export default function ArrangeBoard() {
-  const boardSize = useAnalysisBoardSize();
+  const stage = useBoardStage();
+  const boardSize = stage?.width;
+  const reportChrome = stage?.reportChrome;
+  useLayoutEffect(() => {
+    reportChrome?.(0, 0);
+  }, [reportChrome]);
   const orientation = useAtomValue(boardOrientationAtom);
   const [position, setPosition] = useAtom(editablePositionAtom);
   const brush = useAtomValue(arrangeBrushAtom);

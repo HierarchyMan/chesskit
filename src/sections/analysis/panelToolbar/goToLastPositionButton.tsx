@@ -13,7 +13,12 @@ export default function GoToLastPositionButton() {
     navigate("end");
   };
 
-  useKeyboardShortcut("ArrowUp", goToLastPosition);
+  useKeyboardShortcut("ArrowUp", (event) => {
+    if (!isButtonDisabled) {
+      event.preventDefault();
+      goToLastPosition();
+    }
+  });
 
   return (
     <ToolbarButton

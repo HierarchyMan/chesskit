@@ -2,19 +2,19 @@ import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { SideNamer, legendFor } from "@/lib/arrows/legend";
 import { mergeArrows } from "@/lib/arrows/merge";
 import { ArrowCapabilities, ArrowPrefs } from "@/lib/arrows/prefs";
-import { OTHER_HUE, TO_MOVE_HUE } from "@/lib/arrows/style";
+import { arrowPaletteAtom } from "@/lib/arrows/paletteAtom";
 import { ArrowFocus, ArrowSide, BoardArrow } from "@/lib/arrows/types";
+import { useAtomValue } from "jotai";
 import { Icon } from "@iconify/react";
 import {
   Box,
   Button,
-  Chip,
+  FormControlLabel,
+  Switch,
+  TextField,
   IconButton,
   Popover,
   Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import { ReactNode, useMemo, useState } from "react";
@@ -30,20 +30,13 @@ interface Props {
   /** What is drawn now, so the legend lists only the kinds that are really there. */
   arrows: readonly BoardArrow[];
   nameOf: SideNamer;
-  /** The side to move on the displayed board: blue. */
+  /** The side to move on the displayed board: the palette's first hue. */
   turn: ArrowSide;
   onFocus: (focus: ArrowFocus | null) => void;
   view: OverlayView;
   /** Anything else the panel keeps with these controls, such as board display switches. */
   extra?: ReactNode;
 }
-
-// A focused control would also answer the arrow keys that step through moves.
-const letGo = () => {
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur();
-  }
-};
 
 const countLabel = (count: number, word: string) =>
   `${count} ${word}${count === 1 ? "" : "s"}`;
@@ -83,33 +76,33 @@ function CountChoice({
 }) {
   const options = Array.from({ length: max + 1 }, (_, count) => count);
   return (
-    <Stack gap={0.5}>
+    <Stack
+      direction="row"
+      alignItems="center"
+      justifyContent="space-between"
+      gap={2}
+    >
       <Typography variant="body2" sx={{ opacity: disabled ? 0.5 : 1 }}>
         {label}
       </Typography>
-      <ToggleButtonGroup
-        exclusive
+      <TextField
+        select
         size="small"
         value={value}
         disabled={disabled}
-        aria-label={label}
-        onChange={(_, next: number | null) => {
-          if (next !== null) onChange(next);
-          letGo();
+        onChange={(event) => onChange(Number(event.target.value))}
+        slotProps={{
+          select: { native: true },
+          htmlInput: { "aria-label": label },
         }}
-        sx={{ flexWrap: "wrap" }}
+        sx={{ width: 84, "& select": { py: 0.75 } }}
       >
         {options.map((count) => (
-          <ToggleButton
-            key={count}
-            value={count}
-            aria-label={`${label} ${count}`}
-            sx={{ minWidth: 36, minHeight: 36, px: 1, fontSize: "0.9rem" }}
-          >
+          <option key={count} value={count}>
             {count}
-          </ToggleButton>
+          </option>
         ))}
-      </ToggleButtonGroup>
+      </TextField>
     </Stack>
   );
 }
@@ -126,18 +119,18 @@ function SwitchChip({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <Chip
-      clickable
-      label={label}
-      color={checked ? "primary" : "default"}
-      variant={checked ? "filled" : "outlined"}
-      disabled={disabled}
-      aria-pressed={checked}
-      onClick={(event) => {
-        onChange(!checked);
-        event.currentTarget.blur();
-      }}
-      sx={{ height: 36, fontSize: "0.9rem", borderRadius: 18 }}
+    <FormControlLabel
+      labelPlacement="start"
+      label={<Typography variant="body2">{label}</Typography>}
+      control={
+        <Switch
+          size="small"
+          checked={checked}
+          disabled={disabled}
+          onChange={(_, next) => onChange(next)}
+        />
+      }
+      sx={{ m: 0, minHeight: 34, justifyContent: "space-between", gap: 2 }}
     />
   );
 }
@@ -162,32 +155,17 @@ function Controls({
     [arrows, nameOf]
   );
   const other: ArrowSide = turn === "w" ? "b" : "w";
+  const palette = useAtomValue(arrowPaletteAtom);
   const { enabled } = prefs;
 
   return (
     <Stack spacing={1.5} sx={{ minWidth: 0 }}>
-      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-        <Tooltip title={`${enabled ? "Hide" : "Show"} engine arrows (A)`}>
-          <Chip
-            clickable
-            icon={
-              <Icon
-                icon={enabled ? "mdi:lightbulb-on" : "mdi:lightbulb-on-outline"}
-                height={18}
-              />
-            }
-            label="Engine arrows"
-            color={enabled ? "primary" : "default"}
-            variant={enabled ? "filled" : "outlined"}
-            aria-pressed={enabled}
-            onClick={(event) => {
-              onChange({ enabled: !enabled });
-              event.currentTarget.blur();
-            }}
-            sx={{ height: 36, fontSize: "0.9rem", borderRadius: 18 }}
-          />
-        </Tooltip>
-      </Stack>
+      <SwitchChip
+        label="Engine arrows"
+        checked={enabled}
+        disabled={false}
+        onChange={(next) => onChange({ enabled: next })}
+      />
 
       {capabilities.maxMoves > 0 && (
         <CountChoice
@@ -209,7 +187,7 @@ function Controls({
       )}
 
       {(capabilities.missed || capabilities.threats) && (
-        <Stack direction="row" gap={1} flexWrap="wrap">
+        <Stack gap={0}>
           {capabilities.missed && (
             <SwitchChip
               label="Missed"
@@ -232,11 +210,8 @@ function Controls({
       {legend.length > 0 && (
         <Stack gap={1} onMouseLeave={() => onFocus(null)}>
           <Stack direction="row" gap={2} flexWrap="wrap">
-            <KeyChip color={TO_MOVE_HUE} text={`${nameOf(turn)} move (blue)`} />
-            <KeyChip
-              color={OTHER_HUE}
-              text={`${nameOf(other)} move (orange)`}
-            />
+            <KeyChip color={palette.toMove} text={`${nameOf(turn)} move`} />
+            <KeyChip color={palette.other} text={`${nameOf(other)} move`} />
           </Stack>
           {legend.map((entry) => (
             <LegendRow
@@ -301,6 +276,13 @@ function LegendRow({
       onMouseEnter={() => onFocus(focus)}
       onFocus={() => onFocus(focus)}
       onBlur={() => onFocus(null)}
+      onClick={() => onFocus(focus)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onFocus(focus);
+        }
+      }}
       sx={{
         minHeight: 36,
         borderRadius: 1,
@@ -344,25 +326,50 @@ export default function ArrowOverlay({ view, ...rest }: Props) {
     capabilities.threats
   );
 
-  if (view === "inspector") return <Controls {...rest} />;
+  const close = () => {
+    setOpen(false);
+    rest.onFocus(null);
+  };
 
   return (
     <>
       <Button
         ref={setTrigger}
-        variant="outlined"
+        variant={view === "inspector" ? "text" : "outlined"}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(true)}
         startIcon={<Icon icon="mdi:arrow-top-right" height={18} />}
-        sx={{ minHeight: 40, textTransform: "none", fontSize: "0.9rem" }}
+        endIcon={
+          <Icon
+            icon={open ? "mdi:chevron-up" : "mdi:chevron-down"}
+            height={18}
+          />
+        }
+        sx={{
+          minHeight: 36,
+          width: view === "inspector" ? "100%" : undefined,
+          justifyContent: "flex-start",
+          color: "text.primary",
+          textTransform: "none",
+          fontSize: "0.85rem",
+          borderRadius: 1,
+          "& .MuiButton-endIcon": { ml: "auto" },
+        }}
       >
-        {overlaySummary(prefs, capabilities)}
+        <Box component="span" sx={{ textAlign: "left", minWidth: 0 }}>
+          <Box component="span" sx={{ display: "block", fontWeight: 600 }}>
+            Board overlays
+          </Box>
+          <Typography component="span" variant="caption" color="text.secondary">
+            {overlaySummary(prefs, capabilities)}
+          </Typography>
+        </Box>
       </Button>
       <Popover
         open={open}
         anchorEl={trigger}
-        onClose={() => setOpen(false)}
+        onClose={close}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         transformOrigin={{ vertical: "top", horizontal: "left" }}
         slotProps={{
@@ -389,10 +396,7 @@ export default function ArrowOverlay({ view, ...rest }: Props) {
           <Typography variant="subtitle1" fontWeight={600}>
             Board overlays
           </Typography>
-          <IconButton
-            aria-label="Close board overlays"
-            onClick={() => setOpen(false)}
-          >
+          <IconButton aria-label="Close board overlays" onClick={close}>
             <Icon icon="mdi:close" height={20} />
           </IconButton>
         </Stack>

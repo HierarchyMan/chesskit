@@ -27,7 +27,7 @@ export default function EngineLines(props: GridProps) {
 
   return (
     <Grid container justifyContent="center" alignItems="center" {...props}>
-      <List sx={{ width: "95%", padding: 0 }}>
+      <List sx={{ width: "100%", padding: 0 }}>
         {engineLines.map((line) => (
           <LineEvaluation key={line.multiPv} line={line} />
         ))}

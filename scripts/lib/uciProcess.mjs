@@ -6,10 +6,11 @@
 //   ENGINE=stockfish_17_lite,reckless   a comma list of engine names, or "all"
 //   ENGINE_PATH=...                     the binary, when a single engine is named
 //
-// Browser engines are the WebAssembly builds served with the app, run under
-// Node. Reckless is the native program next to the app.
+// Browser engines are the builds served with the app, run under Node (Lozza
+// through a Web Worker shim). Native engines are the programs listed in
+// ../engines/engines.json. Joke engines are not real engines and are skipped.
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENGINE_MODELS } from "../../src/lib/engine/models.ts";
@@ -18,32 +19,54 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../..");
 const STARTUP_MS = 30000;
 
+const enginesDir = path.resolve(root, "../engines");
+
+const nativeEntry = (id) => {
+  const manifest = path.join(enginesDir, "engines.json");
+  if (!existsSync(manifest)) return undefined;
+  return JSON.parse(readFileSync(manifest, "utf8")).engines?.find(
+    (entry) => entry.id === id
+  );
+};
+
 const locate = (name) => {
   const model = ENGINE_MODELS[name];
-  if (name === "reckless") {
+  if (model.source === "bridge") {
+    const entry = nativeEntry(model.script);
     return {
       command:
         process.env.ENGINE_PATH ??
-        path.resolve(root, "../engines/reckless-windows-avx2.exe"),
-      args: [],
+        path.resolve(enginesDir, entry?.path ?? `${model.script}.exe`),
+      args: entry?.args ?? [],
     };
   }
 
   const script =
     process.env.ENGINE_PATH ?? path.resolve(root, "public", model.script);
+  if (model.nodeRunner === "worker") {
+    return {
+      command: process.execPath,
+      args: [path.join(here, "workerShim.cjs"), script],
+      file: script,
+    };
+  }
   return { command: process.execPath, args: [script] };
 };
+
+const isRealEngine = (name) => ENGINE_MODELS[name].source !== "builtin";
 
 /** The engines the user asked for with ENGINE, or every engine of the app. */
 export const requestedEngines = () => {
   const spec = process.env.ENGINE ?? "all";
-  if (spec === "all") return Object.keys(ENGINE_MODELS);
+  if (spec === "all") return Object.keys(ENGINE_MODELS).filter(isRealEngine);
 
   const names = spec.split(",").map((entry) => entry.trim());
-  const unknown = names.filter((name) => !(name in ENGINE_MODELS));
+  const unknown = names.filter(
+    (name) => !(name in ENGINE_MODELS) || !isRealEngine(name)
+  );
   if (unknown.length) {
     console.error(
-      `Unknown engine ${unknown.join(", ")}. Choose from: ${Object.keys(ENGINE_MODELS).join(", ")}`
+      `Unknown engine ${unknown.join(", ")}. Choose from: ${Object.keys(ENGINE_MODELS).filter(isRealEngine).join(", ")}`
     );
     process.exit(2);
   }
@@ -52,8 +75,8 @@ export const requestedEngines = () => {
 
 /** An engine ready for UCI, or undefined (with the reason printed) if it cannot run here. */
 export const startEngine = async (name) => {
-  const { command, args } = locate(name);
-  const file = args[0] ?? command;
+  const { command, args, file: located } = locate(name);
+  const file = located ?? args[0] ?? command;
   if (!existsSync(file)) {
     console.log(`${name}: skipped, nothing at ${file}`);
     return undefined;
@@ -103,6 +126,8 @@ export const startEngine = async (name) => {
   try {
     send("uci");
     await collectUntil((line) => line === "uciok", STARTUP_MS);
+    // tomitankChess refuses to search before its first "ucinewgame".
+    send("ucinewgame");
     send("isready");
     await collectUntil((line) => line === "readyok", STARTUP_MS);
   } catch (error) {

@@ -36,9 +36,15 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { useCopyText } from "@/hooks/useCopyText";
+import {
+  arrangeHistoryAtom,
+  undoArrangeAtom,
+  redoArrangeAtom,
+} from "../sessionAtoms";
 import { SparePiece } from "react-chessboard";
 import {
   boardOrientationAtom,
@@ -59,7 +65,34 @@ export default function ArrangePanel() {
   const router = useRouter();
   const { finishArrange } = useArrangeMode();
   const [draft, setDraft] = useAtom(arrangeFenDraftAtom);
-  const [copied, setCopied] = useState(false);
+  const { copy, feedback } = useCopyText();
+  const history = useAtomValue(arrangeHistoryAtom);
+  const undo = useSetAtom(undoArrangeAtom);
+  const redo = useSetAtom(redoArrangeAtom);
+  useEffect(() => {
+    const handle = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (
+        !(event.ctrlKey || event.metaKey) ||
+        event.altKey ||
+        target.closest(
+          'input, textarea, select, [contenteditable="true"], [role="dialog"]'
+        )
+      )
+        return;
+      if (event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+      }
+      if (event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", handle);
+    return () => window.removeEventListener("keydown", handle);
+  }, [undo, redo]);
 
   const effective = draft === null ? position : parseFenLoose(draft);
   const validation = effective
@@ -96,16 +129,14 @@ export default function ArrangePanel() {
   };
 
   const copyFen = () => {
-    navigator.clipboard?.writeText?.(fen);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    void copy(fen, "Position FEN");
   };
 
   return (
     <Stack
       spacing={2.25}
       width="100%"
-      sx={{ overflowY: "auto", px: { xs: 0.5, sm: 1 } }}
+      sx={{ px: { xs: 0.5, sm: 1 }, userSelect: "none" }}
     >
       <Stack
         direction="row"
@@ -153,10 +184,17 @@ export default function ArrangePanel() {
             <Box
               key={code}
               role="button"
+              tabIndex={0}
               aria-label={`${code[0] === "w" ? "White" : "Black"} ${PIECE_NAMES[code[1]]}`}
               aria-pressed={brush === code}
               title="Drag onto the board, or click to pick it and then click squares"
               onClick={() => setBrush(brush === code ? "hand" : code)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setBrush(brush === code ? "hand" : code);
+                }
+              }}
               sx={{
                 display: "flex",
                 justifyContent: "center",
@@ -209,6 +247,24 @@ export default function ArrangePanel() {
           Position
         </Typography>
         <Stack direction="row" flexWrap="wrap" gap={0.75} mt={0.5}>
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={!history.past.length}
+            onClick={() => undo()}
+            startIcon={<Icon icon="mdi:undo" height={18} />}
+          >
+            Undo
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={!history.future.length}
+            onClick={() => redo()}
+            startIcon={<Icon icon="mdi:redo" height={18} />}
+          >
+            Redo
+          </Button>
           <ToolButton
             icon="mdi:delete-outline"
             label="Clear board"
@@ -374,22 +430,20 @@ export default function ArrangePanel() {
         helperText={
           draftInvalid
             ? "That is not a valid piece placement"
-            : "Paste a FEN and press Enter to load it"
+            : "Valid FEN changes appear on the board immediately"
         }
         slotProps={{
           input: {
             endAdornment: (
               <InputAdornment position="end">
-                <Tooltip title={copied ? "Copied!" : "Copy FEN"}>
+                <Tooltip title="Copy FEN">
                   <IconButton
                     size="small"
                     onClick={copyFen}
                     aria-label="Copy FEN"
+                    disabled={draftInvalid}
                   >
-                    <Icon
-                      icon={copied ? "mdi:check" : "mdi:content-copy"}
-                      height={18}
-                    />
+                    <Icon icon="mdi:content-copy" height={18} />
                   </IconButton>
                 </Tooltip>
               </InputAdornment>
@@ -442,6 +496,7 @@ export default function ArrangePanel() {
           </Button>
         </Stack>
       </Stack>
+      {feedback}
     </Stack>
   );
 }

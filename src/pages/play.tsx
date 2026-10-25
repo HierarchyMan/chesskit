@@ -1,5 +1,7 @@
 import { PageTitle } from "@/components/pageTitle";
-import { useBoardLayout } from "@/hooks/useBoardLayout";
+import BoardWorkspace from "@/components/boardWorkspace";
+import ArrowOverlay from "@/components/board/arrowOverlay";
+import { usePlayOverlay } from "@/sections/play/usePlayOverlay";
 import { useEngineState } from "@/hooks/useEngine";
 import { useHandoff } from "@/hooks/useHandoff";
 import Board from "@/sections/play/board";
@@ -17,8 +19,6 @@ import { useStartGame } from "@/sections/play/useStartGame";
 import { Box } from "@mui/material";
 import { useAtomValue, useSetAtom } from "jotai";
 
-const SIDE_PANEL_WIDTH = 440;
-
 export default function Play() {
   const engineName = useAtomValue(enginePlayNameAtom);
   const botEngine = useEngineState(engineName);
@@ -27,9 +27,7 @@ export default function Play() {
   const end = useAtomValue(gameEndAtom);
   const setStartingPosition = useSetAtom(startingPositionAtom);
   const { startChallenge } = useStartGame();
-  const { boardSize, sideBySide } = useBoardLayout({
-    sidePanelWidth: SIDE_PANEL_WIDTH,
-  });
+  const overlay = usePlayOverlay();
 
   useGameLifecycle();
 
@@ -41,32 +39,46 @@ export default function Play() {
   const hasGame = isInProgress || game.history().length > 0 || !!end;
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: { xs: "column", sm: sideBySide ? "row" : "column" },
-        justifyContent: "center",
-        alignItems: { xs: "center", sm: sideBySide ? "flex-start" : "center" },
-        gap: 4,
-      }}
-    >
+    <>
       <PageTitle title="Chesskit Play" />
-
-      <Board engine={botEngine.engine} boardSize={boardSize} />
-
-      <Box
-        sx={{
-          width: { xs: "100%", sm: sideBySide ? SIDE_PANEL_WIDTH : "100%" },
-          maxWidth: "100%",
-          mt: { xs: 0, sm: sideBySide ? "3.2rem" : 0 },
-        }}
-      >
-        {hasGame ? (
-          <GamePanel botEngine={botEngine} />
-        ) : (
-          <NewGamePanel botEngine={botEngine} />
-        )}
-      </Box>
-    </Box>
+      <BoardWorkspace
+        inspectorMinWidth={400}
+        inspectorLabel="Play controls"
+        board={
+          <Board engine={botEngine.engine} setup={!hasGame} overlay={overlay} />
+        }
+        inspector={
+          <Box
+            data-inspector-scroller
+            sx={{
+              minHeight: 0,
+              overflowY: "auto",
+              overscrollBehavior: "contain",
+              scrollbarGutter: "stable",
+            }}
+          >
+            {hasGame ? (
+              <>
+                <Box sx={{ p: 1.5, borderBottom: 1, borderColor: "divider" }}>
+                  <ArrowOverlay
+                    view="inspector"
+                    prefs={overlay.engine.prefs}
+                    capabilities={overlay.capabilities}
+                    onChange={overlay.engine.update}
+                    arrows={overlay.engine.arrows}
+                    nameOf={overlay.nameOf}
+                    turn={overlay.turn}
+                    onFocus={overlay.engine.setFocus}
+                  />
+                </Box>
+                <GamePanel botEngine={botEngine} coach={overlay.coach} />
+              </>
+            ) : (
+              <NewGamePanel botEngine={botEngine} />
+            )}
+          </Box>
+        }
+      />
+    </>
   );
 }

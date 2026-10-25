@@ -11,9 +11,26 @@ import { ARROW_PRIORITY, BoardArrow } from "./types";
 export const mergeArrows = (arrows: readonly BoardArrow[]): BoardArrow[] => {
   const winners = new Map<string, BoardArrow>();
   const labels = new Map<string, string[]>();
+  const roles = new Map<string, NonNullable<BoardArrow["roles"]>[number][]>();
 
   for (const arrow of arrows) {
     const key = `${arrow.from}-${arrow.to}`;
+    const meanings = roles.get(key) ?? [];
+    for (const role of [
+      { kind: arrow.kind, side: arrow.side, rank: arrow.rank },
+      ...(arrow.roles ?? []),
+    ]) {
+      if (
+        !meanings.some(
+          (meaning) =>
+            meaning.kind === role.kind &&
+            meaning.side === role.side &&
+            meaning.rank === role.rank
+        )
+      )
+        meanings.push(role);
+    }
+    roles.set(key, meanings);
     for (const label of [arrow.label, ...(arrow.alsoLabels ?? [])]) {
       if (label === undefined) continue;
       const list = labels.get(key) ?? [];
@@ -31,8 +48,19 @@ export const mergeArrows = (arrows: readonly BoardArrow[]): BoardArrow[] => {
     .map(([key, winner]) => {
       const all = labels.get(key) ?? [];
       const [label, ...alsoLabels] = all;
-      if (label === winner.label && alsoLabels.length === 0) return winner;
-      return { ...winner, label, alsoLabels };
+      const meanings = roles.get(key)!;
+      if (
+        label === winner.label &&
+        alsoLabels.length === 0 &&
+        meanings.length === 1
+      )
+        return winner;
+      return {
+        ...winner,
+        label,
+        alsoLabels,
+        ...(meanings.length > 1 ? { roles: meanings } : {}),
+      };
     })
     .sort((a, b) => ARROW_PRIORITY[a.kind] - ARROW_PRIORITY[b.kind]);
 };

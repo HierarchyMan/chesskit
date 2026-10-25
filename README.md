@@ -38,7 +38,7 @@ Chesskit lets you play, study, analyse and review chess with Stockfish on any de
 
 **Engine arrows**
 - A bar under the Analysis, Play and Arena boards: a master switch (`A`), **Moves** (how many of the engine's best moves to draw, `1`–`5`), **Ahead** (how many further moves of the engine's line to number), **Missed** (the better move after one of yours) and **Threats** (`X`). The bar lists only the kinds of arrow on the board; pointing at an entry puts the others in the background.
-- The hue says who moves (blue for the side at the bottom, or you in Play; vermilion for the other), the line style says when (dashed for a move not made, numbered for a later one), and the width says how strong. A threat is marked with "!".
+- The hue says who moves (by default blue for the side to move and orange for the other; both are set in Settings → Arrows), the line style says when (dashed for a move not made, numbered for a later one), and the width says how strong. A threat is marked with "!".
 - **Threats** are what the opponent would do if it were their move, kept only when it would gain them enough over the position as it stands, so a defended piece or a developing move is not drawn. Passing the turn is not possible in check, so there are none then.
 - Draw your own arrows by dragging with the right mouse button: green, red with Shift or Ctrl, blue with Alt, yellow with both. A left click clears them. They stay with their position.
 - **Settings → Arrows** sets how the engine arrows decide: the search depth to wait for, which grade of move earns a better-move arrow, how sensitive threats are, how many are shown and how deep their search goes. **Settings → Engine** lets threats, Play suggestions, the Play coach and the Arena evaluation each run on their own engine; each follows the analysis engine until you choose otherwise.
@@ -90,7 +90,7 @@ npm start
 
 Open [http://localhost:3000](http://localhost:3000). `npm start` builds a fresh static export when the source/configuration/assets change, then serves it on port 3000. On Windows, the repo's `start-chesskit.bat` installs missing dependencies and runs the same production path. Use `npm run dev` for hot-reload development.
 
-Stockfish runs in the browser as WebAssembly, so no engine install is needed.
+Stockfish runs in the browser as WebAssembly, so no engine install is needed. The engines' `.wasm` and `.nnue` files (about 480 MB) are not stored in git: `npm start`, `npm run dev` and `npm run build` download the missing ones on first use and check each against its SHA-256 hash, so a fresh clone works on any machine with internet access. Run `npm run engines` to fetch them by hand. See *Engine binaries* in `docs/engines.md`.
 
 ### Optional: the Reckless engine
 
@@ -106,6 +106,7 @@ npm start              # rebuild if needed, then serve for normal local use
 npm run serve          # serve an already-built export
 npm run dev            # hot-reload development server
 npm run icons          # rebuild the offline icon bundle after adding an icon
+npm run engines        # download missing engine binaries (-- --verify re-hashes them, -- --check never downloads)
 node --import ./tests/register.mjs scripts/verify-endgames.mjs   # check endgame positions with a UCI engine
 node scripts/fetch-offline-puzzles.mjs                          # refresh the offline puzzle set
 ```

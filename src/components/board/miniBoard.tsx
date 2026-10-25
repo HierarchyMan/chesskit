@@ -2,9 +2,12 @@ import { BoardArrow } from "@/lib/arrows/types";
 import { Color } from "@/types/enums";
 import { Box } from "@mui/material";
 import { CSSProperties, useId, useMemo } from "react";
-import { Chessboard } from "react-chessboard";
-import ArrowLayer, { useMaskSettling } from "./arrowLayer";
+import Chessboard from "./motionChessboard";
+import ArrowLayer from "./arrowLayer";
 import { useBoardAppearance } from "./appearance";
+import DrawBadges from "./drawBadges";
+import { getBoardDraw } from "@/lib/boardDraw";
+import { Chess } from "chess.js";
 
 interface Props {
   fen: string;
@@ -15,6 +18,8 @@ interface Props {
   squareStyles?: Record<string, CSSProperties>;
   animationDuration?: number;
   showCoordinates?: boolean;
+  game?: Chess;
+  recordedDraw?: boolean;
 }
 
 const LAST_MOVE_STYLE: CSSProperties = {
@@ -30,10 +35,15 @@ export default function MiniBoard({
   squareStyles: extraSquareStyles,
   animationDuration = 250,
   showCoordinates,
+  game,
+  recordedDraw,
 }: Props) {
   const appearance = useBoardAppearance();
   const id = useId();
-  const masking = useMaskSettling(fen, animationDuration + 30);
+  const drawResult = useMemo(
+    () => getBoardDraw(game?.fen() === fen ? game : fen, null, recordedDraw),
+    [game, fen, recordedDraw]
+  );
 
   const squareStyles = useMemo(
     () => ({
@@ -71,9 +81,13 @@ export default function MiniBoard({
           turn={fen.split(" ")[1] === "b" ? "b" : "w"}
           fen={fen}
           size={size}
-          masking={masking}
+          masking
         />
       )}
+      <DrawBadges
+        result={drawResult}
+        orientation={orientation === Color.White ? "white" : "black"}
+      />
     </Box>
   );
 }

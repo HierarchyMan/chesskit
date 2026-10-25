@@ -1,5 +1,5 @@
 import { LineEval } from "@/types/eval";
-import { ListItem, Skeleton, Typography } from "@mui/material";
+import { ButtonBase, ListItem, Skeleton, Typography } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { boardAtom } from "../../../states";
 import { getLineEvalLabel, moveLineUciToSan } from "@/lib/chess";
@@ -30,9 +30,8 @@ export default function LineEvaluation({ line }: Props) {
   };
 
   return (
-    <ListItem disablePadding>
+    <ListItem disablePadding sx={{ alignItems: "flex-start", py: 0.5, gap: 1 }}>
       <Typography
-        marginRight={1.5}
         marginY={0.3}
         paddingY={0.2}
         noWrap
@@ -40,8 +39,9 @@ export default function LineEvaluation({ line }: Props) {
         width="3.5em"
         minWidth="3.5em"
         textAlign="center"
-        fontSize="0.8rem"
+        fontSize="0.85rem"
         sx={{
+          flexShrink: 0,
           backgroundColor: isBlackCp ? "black" : "white",
           color: isBlackCp ? "white" : "black",
         }}
@@ -62,7 +62,12 @@ export default function LineEvaluation({ line }: Props) {
         )}
       </Typography>
 
-      <Typography noWrap fontSize="0.9rem">
+      <Typography
+        component="div"
+        fontSize="0.95rem"
+        lineHeight={1.8}
+        sx={{ minWidth: 0, flex: 1, overflowWrap: "anywhere" }}
+      >
         {showSkeleton ? (
           <Skeleton variant="rounded" animation="wave" width="20em" />
         ) : (
@@ -77,11 +82,22 @@ export default function LineEvaluation({ line }: Props) {
                 color={moveColor}
                 additionalText={i < line.pv.length - 1 ? "," : ""}
                 boxProps={{
+                  component: ButtonBase,
                   onClick: () => {
                     addMoves(line.pv.slice(0, i + 1), board);
                   },
                   sx: {
                     cursor: "pointer",
+                    border: 0,
+                    background: "none",
+                    color: "inherit",
+                    font: "inherit",
+                    p: 0,
+                    borderRadius: "3px",
+                    "&:focus-visible": {
+                      outline: "2px solid",
+                      outlineColor: "primary.main",
+                    },
                     ml: i ? 0.5 : 0,
                     transition: "opacity 0.2s ease-in-out",
                     "&:hover": {

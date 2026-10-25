@@ -1,4 +1,5 @@
 import { Chess, validateFen } from "chess.js";
+import { parseStudyPgn } from "@/lib/studyTree";
 
 export interface ParsedGame {
   index: number;
@@ -152,11 +153,12 @@ const headerValue = (value: string | null | undefined): string =>
 const parseSingleGame = (raw: string, index: number): ParsedGame => {
   try {
     const game = loadGameFromText(raw);
+    parseStudyPgn(normalizePgn(raw));
     const headers = game.getHeaders();
 
     return {
       index,
-      pgn: game.pgn(),
+      pgn: normalizePgn(raw),
       white: headerValue(headers.White) || "White",
       black: headerValue(headers.Black) || "Black",
       result: headerValue(headers.Result) || "*",

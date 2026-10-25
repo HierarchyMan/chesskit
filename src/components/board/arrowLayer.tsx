@@ -8,6 +8,8 @@ import {
 import { BADGE_GLYPHS } from "@/lib/arrows/glyphs";
 import { mergeArrows } from "@/lib/arrows/merge";
 import { withSources } from "@/lib/arrows/source";
+import { ArrowPalette } from "@/lib/arrows/palette";
+import { arrowPaletteAtom } from "@/lib/arrows/paletteAtom";
 import { ArrowStyle, arrowStyle, checkerTint } from "@/lib/arrows/style";
 import { ArrowSide, BoardArrow } from "@/lib/arrows/types";
 import { useAtomValue } from "jotai";
@@ -19,7 +21,14 @@ import {
   useReducer,
   useState,
 } from "react";
-import { pieceSetAtom } from "./states";
+import {
+  pieceSetAtom,
+  boardThemeAtom,
+  boardHueAtom,
+  BOARD_THEMES,
+} from "./states";
+import { readableArrowColor } from "@/lib/arrows/contrast";
+import tinycolor from "tinycolor2";
 
 interface Props {
   arrows: readonly BoardArrow[];
@@ -27,7 +36,7 @@ interface Props {
   ink?: readonly BoardArrow[];
   draft?: BoardArrow;
   orientation: Orientation;
-  /** The side to move on the displayed board. Its arrows are blue; the other side's are orange. */
+  /** The side to move on the displayed board. Its arrows take the palette's first hue; the other side's take its second. */
   turn: ArrowSide;
   /** The displayed position. Without it, no arrow passes behind a piece. */
   fen?: string;
@@ -143,15 +152,16 @@ interface Shared {
   turn: ArrowSide;
   pieceSet: string;
   masking: boolean;
+  palette: ArrowPalette;
 }
 
 const drawnArrow = (
   arrow: BoardArrow,
   key: string,
-  { orientation, turn, pieceSet, masking }: Shared,
+  { orientation, turn, pieceSet, masking, palette }: Shared,
   offset = 0
 ): Drawn | undefined => {
-  const style = arrowStyle(arrow, turn);
+  const style = arrowStyle(arrow, turn, palette);
   const shape = arrowOutline(arrow.from, arrow.to, orientation, {
     width: style.width,
     headLength: style.headLength,
@@ -256,7 +266,14 @@ function ArrowBody({
       }
       style={{ animation: "chesskit-arrow-in 140ms ease-out" }}
     >
-      <polygon points={polygon} fill={style.color} />
+      <polygon
+        points={polygon}
+        fill={
+          arrow.kind === "content" || arrow.kind === "ink"
+            ? style.color
+            : `url(#${uid}-tone-${style.color.slice(1)})`
+        }
+      />
       {checker && <polygon points={polygon} fill={checker} />}
       {showOrigin && (
         <circle
@@ -283,7 +300,21 @@ export default function ArrowLayer({
 }: Props) {
   const uid = safeId(useId());
   const pieceSet = useAtomValue(pieceSetAtom);
-  const shared: Shared = { orientation, turn, pieceSet, masking };
+  const boardTheme = useAtomValue(boardThemeAtom);
+  const boardHue = useAtomValue(boardHueAtom);
+  const squares = useMemo(
+    () => ({
+      light: tinycolor(BOARD_THEMES[boardTheme].light)
+        .spin(boardHue)
+        .toHexString(),
+      dark: tinycolor(BOARD_THEMES[boardTheme].dark)
+        .spin(boardHue)
+        .toHexString(),
+    }),
+    [boardTheme, boardHue]
+  );
+  const palette = useAtomValue(arrowPaletteAtom);
+  const shared: Shared = { orientation, turn, pieceSet, masking, palette };
 
   const merged = useMemo(() => mergeArrows(arrows), [arrows]);
   const sourced = useMemo(() => withSources(merged, fen), [merged, fen]);
@@ -372,11 +403,51 @@ export default function ArrowLayer({
         .map((drawn) => drawn.style.color)
     ),
   ];
+  const bodyColors = [
+    ...new Set(
+      [...shown, ...shownInk, ...(draftBody ? [draftBody] : [])]
+        .filter(
+          (drawn) =>
+            drawn.arrow.kind !== "content" && drawn.arrow.kind !== "ink"
+        )
+        .map((drawn) => drawn.style.color)
+    ),
+  ];
 
   return (
     <svg viewBox="0 0 8 8" aria-hidden style={layerStyle(size)}>
       <style>{FADE_IN}</style>
       <defs>
+        {bodyColors.map((color) => {
+          const tones = {
+            light: readableArrowColor(color, squares.light),
+            dark: readableArrowColor(color, squares.dark),
+          };
+          return (
+            <pattern
+              key={`tone-${color}`}
+              id={`${uid}-tone-${color.slice(1)}`}
+              patternUnits="userSpaceOnUse"
+              width={8}
+              height={8}
+            >
+              {Array.from({ length: 64 }, (_, index) => (
+                <rect
+                  key={index}
+                  x={index % 8}
+                  y={Math.floor(index / 8)}
+                  width={1}
+                  height={1}
+                  fill={
+                    ((index % 8) + Math.floor(index / 8)) % 2
+                      ? tones.dark
+                      : tones.light
+                  }
+                />
+              ))}
+            </pattern>
+          );
+        })}
         {masks.map((mask) => (
           <mask
             key={mask.square}
@@ -390,12 +461,17 @@ export default function ArrowLayer({
             <rect width={8} height={8} fill="#ffffff" />
             {/* The piece's own silhouette, in black, cuts the arrow away. */}
             <image
+              data-arrow-source={mask.square}
               href={mask.url}
               x={fixed(mask.x)}
               y={fixed(mask.y)}
               width={1}
               height={1}
-              style={{ filter: "brightness(0)" }}
+              style={{
+                filter: "brightness(0)",
+                transform: `translate(var(--piece-${mask.square}-x, 0px), var(--piece-${mask.square}-y, 0px))`,
+                opacity: `var(--piece-${mask.square}-opacity, 1)`,
+              }}
             />
           </mask>
         ))}
@@ -468,7 +544,8 @@ export function ArrowGlyph({
   turn: ArrowSide;
 }) {
   const uid = safeId(useId());
-  const style = arrowStyle({ ...arrow, dimmed: false }, turn);
+  const palette = useAtomValue(arrowPaletteAtom);
+  const style = arrowStyle({ ...arrow, dimmed: false }, turn, palette);
   const sample = arrowOutline("a4", "c4", "white", {
     width: style.width,
     headLength: style.headLength,

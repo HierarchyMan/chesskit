@@ -43,6 +43,7 @@ export interface StoryLine {
 }
 
 export interface MoveStory {
+  kind?: "continuation";
   fenBefore: string;
   mover: "w" | "b";
   playedSan: string;
@@ -299,6 +300,39 @@ export const buildMoveStory = ({
     winAfter,
     lossPawns,
     summary,
+  };
+};
+
+/** A preview of an existing PV, with the evaluation of its starting position.
+ * It does not pretend to have independently evaluated the positions after it. */
+export const buildContinuationStory = (
+  fenBefore: string,
+  line: LineEval
+): MoveStory => {
+  const mover = new Chess(fenBefore).turn();
+  const steps = buildSteps(
+    fenBefore,
+    line.pv.slice(0, 1 + MAX_CASCADE_PLIES),
+    mover
+  );
+  const win = toMoverPercentage(line, mover);
+  return {
+    kind: "continuation",
+    fenBefore,
+    mover,
+    playedSan: steps[1]?.san ?? "Continuation",
+    played: {
+      steps,
+      ...findCascadeEnd(steps, { lossPawns: 0 }),
+      evalLabel: humanEvalLabel(line),
+      moverWinPercentage: win,
+    },
+    winBefore: win,
+    winAfter: win,
+    lossPawns: 0,
+    summary: [
+      "Explore the engine's current top continuation. These moves are a forecast; either side can choose a different move.",
+    ],
   };
 };
 

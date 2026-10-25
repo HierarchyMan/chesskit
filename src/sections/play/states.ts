@@ -12,8 +12,8 @@ import { storedAtom } from "@/lib/storedAtom";
 import { chessPathKey } from "@/lib/chessHistory";
 import { createArrowPrefsAtom } from "@/lib/arrows/prefsAtom";
 import { createPositionArrowsAtom } from "@/lib/engine/topMoves";
-import { Color, EngineName } from "@/types/enums";
-import { CurrentPosition } from "@/types/eval";
+import { Color, EngineId } from "@/types/enums";
+import { isEngineId } from "@/lib/engine/models";
 import { Chess } from "chess.js";
 import { atom } from "jotai";
 
@@ -26,7 +26,6 @@ export interface TimeControl {
 }
 
 export const gameAtom = atom(new Chess());
-export const gameDataAtom = atom<CurrentPosition>({});
 export const playerColorAtom = atom<Color>(Color.White);
 export const isGameInProgressAtom = atom(false);
 export const gameIdAtom = atom(0);
@@ -45,9 +44,6 @@ export const playArrowPrefsAtom = createArrowPrefsAtom("play");
 export const botThinkingAtom = atom(false);
 export const challengeIdAtom = atom<string | null>(null);
 export const challengeStatusAtom = atom<ChallengeStatus>("active");
-
-const isEngineName = (value: unknown): value is EngineName =>
-  Object.values(EngineName).includes(value as EngineName);
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -85,10 +81,10 @@ const initialStrength = (): BotStrength => {
   };
 };
 
-export const enginePlayNameAtom = storedAtom<EngineName>(
+export const enginePlayNameAtom = storedAtom<EngineId>(
   "engine-play-name",
   DEFAULT_ENGINE,
-  isEngineName
+  isEngineId
 );
 
 export const botStrengthAtom = storedAtom<BotStrength>(

@@ -1,6 +1,6 @@
 import { useBoardAppearance } from "@/components/board/appearance";
 import Panel from "@/components/panel";
-import { useBoardLayout } from "@/hooks/useBoardLayout";
+import BoardWorkspace, { SquareBoardStage } from "@/components/boardWorkspace";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import ArrowLayer from "@/components/board/arrowLayer";
 import { BoardArrow } from "@/lib/arrows/types";
@@ -19,7 +19,7 @@ import {
   FormControlLabel,
 } from "@mui/material";
 import { useMemo } from "react";
-import { Chessboard } from "react-chessboard";
+import Chessboard from "@/components/board/motionChessboard";
 import {
   CustomSquareStyles,
   Square,
@@ -128,10 +128,6 @@ const buildBoard = (trainer: VisionTrainer) => {
 export default function VisionPage() {
   const trainer = useVisionTrainer();
   const appearance = useBoardAppearance();
-  const { boardSize, sideBySide } = useBoardLayout({
-    sidePanelWidth: SIDE_PANEL_WIDTH,
-    extraWidth: 40,
-  });
 
   const { styles, arrows, position } = useMemo(
     () => buildBoard(trainer),
@@ -158,151 +154,165 @@ export default function VisionPage() {
   );
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: { xs: "column", sm: sideBySide ? "row" : "column" },
-        justifyContent: "center",
-        alignItems: { xs: "center", sm: sideBySide ? "flex-start" : "center" },
-        gap: 4,
-      }}
-    >
-      <Box sx={{ width: boardSize, maxWidth: "100%", position: "relative" }}>
-        <Chessboard
-          id="VisionBoard"
-          boardWidth={boardSize}
-          position={position}
-          boardOrientation={trainer.orientation}
-          arePiecesDraggable={false}
-          areArrowsAllowed={false}
-          animationDuration={150}
-          onSquareClick={(square) => trainer.clickSquare(square)}
-          customSquareStyles={styles}
-          customBoardStyle={appearance.customBoardStyle}
-          customDarkSquareStyle={appearance.customDarkSquareStyle}
-          customLightSquareStyle={appearance.customLightSquareStyle}
-          customPieces={appearance.customPieces}
-          showBoardNotation={labelsAllowed && trainer.showLabels}
-        />
-        <ArrowLayer
-          arrows={arrows}
-          orientation={trainer.orientation}
-          turn="w"
-          size={boardSize}
-        />
-      </Box>
-
-      <Stack
-        spacing={2}
-        sx={{
-          width: { xs: "100%", sm: sideBySide ? SIDE_PANEL_WIDTH : "100%" },
-        }}
-      >
-        <Panel>
-          <Stack spacing={1.5}>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={trainer.mode}
-              onChange={(_, value: VisionMode | null) =>
-                value && trainer.setMode(value)
-              }
-            >
-              {MODES.map(({ id, label, icon }) => (
-                <ToggleButton key={id} value={id} sx={{ gap: 0.75, py: 0.75 }}>
-                  <Icon icon={icon} height={16} />
-                  {label}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>
-              {MODES.find(({ id }) => id === trainer.mode)?.text}
-            </Typography>
-
-            <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+    <BoardWorkspace
+      inspectorMinWidth={SIDE_PANEL_WIDTH}
+      inspectorLabel="Vision trainer controls"
+      board={
+        <SquareBoardStage>
+          {(boardSize) => (
+            <>
+              <Chessboard
+                id="VisionBoard"
+                boardWidth={boardSize}
+                position={position}
+                boardOrientation={trainer.orientation}
+                arePiecesDraggable={false}
+                areArrowsAllowed={false}
+                animationDuration={150}
+                onSquareClick={(square) => trainer.clickSquare(square)}
+                customSquareStyles={styles}
+                customBoardStyle={appearance.customBoardStyle}
+                customDarkSquareStyle={appearance.customDarkSquareStyle}
+                customLightSquareStyle={appearance.customLightSquareStyle}
+                customPieces={appearance.customPieces}
+                showBoardNotation={labelsAllowed && trainer.showLabels}
+              />
+              <ArrowLayer
+                arrows={arrows}
+                orientation={trainer.orientation}
+                turn="w"
+                size={boardSize}
+              />
+            </>
+          )}
+        </SquareBoardStage>
+      }
+      inspector={
+        <Stack
+          spacing={2}
+          data-inspector-scroller
+          sx={{
+            minHeight: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            scrollbarGutter: "stable",
+          }}
+        >
+          <Panel>
+            <Stack spacing={1.5}>
               <ToggleButtonGroup
                 exclusive
+                fullWidth
                 size="small"
-                value={trainer.orientationChoice}
-                onChange={(_, value: OrientationChoice | null) =>
-                  value && trainer.setOrientationChoice(value)
+                value={trainer.mode}
+                onChange={(_, value: VisionMode | null) =>
+                  value && trainer.setMode(value)
                 }
               >
-                <ToggleButton value="white">White side</ToggleButton>
-                <ToggleButton value="black">Black side</ToggleButton>
-                <ToggleButton value="random">Random</ToggleButton>
+                {MODES.map(({ id, label, icon }) => (
+                  <ToggleButton
+                    key={id}
+                    value={id}
+                    sx={{ gap: 0.75, py: 0.75 }}
+                  >
+                    <Icon icon={icon} height={16} />
+                    {label}
+                  </ToggleButton>
+                ))}
               </ToggleButtonGroup>
 
-              {labelsAllowed && (
-                <FormControlLabel
-                  sx={{ ml: 0.5 }}
-                  control={
-                    <Switch
-                      size="small"
-                      checked={trainer.showLabels}
-                      onChange={(event) =>
-                        trainer.setShowLabels(event.target.checked)
-                      }
-                    />
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                {MODES.find(({ id }) => id === trainer.mode)?.text}
+              </Typography>
+
+              <Stack
+                direction="row"
+                gap={1}
+                alignItems="center"
+                flexWrap="wrap"
+              >
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={trainer.orientationChoice}
+                  onChange={(_, value: OrientationChoice | null) =>
+                    value && trainer.setOrientationChoice(value)
                   }
-                  label="Show labels"
-                />
+                >
+                  <ToggleButton value="white">White side</ToggleButton>
+                  <ToggleButton value="black">Black side</ToggleButton>
+                  <ToggleButton value="random">Random</ToggleButton>
+                </ToggleButtonGroup>
+
+                {labelsAllowed && (
+                  <FormControlLabel
+                    sx={{ ml: 0.5 }}
+                    control={
+                      <Switch
+                        size="small"
+                        checked={trainer.showLabels}
+                        onChange={(event) =>
+                          trainer.setShowLabels(event.target.checked)
+                        }
+                      />
+                    }
+                    label="Show labels"
+                  />
+                )}
+              </Stack>
+
+              {trainer.mode === "knight" && (
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={trainer.difficulty}
+                  onChange={(_, value: Difficulty | null) =>
+                    value && trainer.setDifficulty(value)
+                  }
+                >
+                  {(Object.keys(DIFFICULTY_RANGE) as Difficulty[]).map(
+                    (level) => (
+                      <ToggleButton key={level} value={level}>
+                        {level} ({DIFFICULTY_RANGE[level].join("–")})
+                      </ToggleButton>
+                    )
+                  )}
+                </ToggleButtonGroup>
               )}
             </Stack>
+          </Panel>
 
-            {trainer.mode === "knight" && (
-              <ToggleButtonGroup
-                exclusive
-                size="small"
-                value={trainer.difficulty}
-                onChange={(_, value: Difficulty | null) =>
-                  value && trainer.setDifficulty(value)
-                }
-              >
-                {(Object.keys(DIFFICULTY_RANGE) as Difficulty[]).map(
-                  (level) => (
-                    <ToggleButton key={level} value={level}>
-                      {level} ({DIFFICULTY_RANGE[level].join("–")})
-                    </ToggleButton>
-                  )
-                )}
-              </ToggleButtonGroup>
+          <Panel>
+            {trainer.mode === "knight" ? (
+              <KnightPanel trainer={trainer} />
+            ) : (
+              <TimedPanel trainer={trainer} />
             )}
-          </Stack>
-        </Panel>
+          </Panel>
 
-        <Panel>
-          {trainer.mode === "knight" ? (
-            <KnightPanel trainer={trainer} />
-          ) : (
-            <TimedPanel trainer={trainer} />
-          )}
-        </Panel>
-
-        <Panel>
-          <Stack
-            direction="row"
-            justifyContent="space-around"
-            textAlign="center"
-          >
-            <Box>
-              <Typography fontWeight={700}>{trainer.bestScore}</Typography>
-              <Typography variant="caption" sx={{ opacity: 0.65 }}>
-                Best round
-              </Typography>
-            </Box>
-            <Box>
-              <Typography fontWeight={700}>{trainer.sessions}</Typography>
-              <Typography variant="caption" sx={{ opacity: 0.65 }}>
-                Rounds played
-              </Typography>
-            </Box>
-          </Stack>
-        </Panel>
-      </Stack>
-    </Box>
+          <Panel>
+            <Stack
+              direction="row"
+              justifyContent="space-around"
+              textAlign="center"
+            >
+              <Box>
+                <Typography fontWeight={700}>{trainer.bestScore}</Typography>
+                <Typography variant="caption" sx={{ opacity: 0.65 }}>
+                  Best round
+                </Typography>
+              </Box>
+              <Box>
+                <Typography fontWeight={700}>{trainer.sessions}</Typography>
+                <Typography variant="caption" sx={{ opacity: 0.65 }}>
+                  Rounds played
+                </Typography>
+              </Box>
+            </Stack>
+          </Panel>
+        </Stack>
+      }
+    />
   );
 }
 

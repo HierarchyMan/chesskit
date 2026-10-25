@@ -2,7 +2,8 @@ import { DEFAULT_ENGINE } from "@/constants";
 import { createAnalysisOptionAtoms } from "@/lib/analysisOptions";
 import { createArrowPrefsAtom } from "@/lib/arrows/prefsAtom";
 import { storedAtom } from "@/lib/storedAtom";
-import { EngineName } from "@/types/enums";
+import { EngineId } from "@/types/enums";
+import { isAnalysisEngineId } from "@/lib/engine/models";
 import { SavedEvals } from "@/types/eval";
 import { PieceCode } from "@/lib/editorPosition";
 import { atom } from "jotai";
@@ -31,9 +32,6 @@ export type ArrangeBrush = "hand" | "erase" | PieceCode;
 export const arrangeBrushAtom = atom<ArrangeBrush>("hand");
 export const arrangeStartFenAtom = atom<string | null>(null);
 
-const isEngineName = (value: unknown): value is EngineName =>
-  Object.values(EngineName).includes(value as EngineName);
-
 const isNumberBetween =
   (min: number, max: number) =>
   (value: unknown): value is number =>
@@ -53,10 +51,10 @@ export const analysisOptionAtoms = createAnalysisOptionAtoms(
 
 export const analysisArrowPrefsAtom = createArrowPrefsAtom("analysis");
 
-export const engineNameAtom = storedAtom<EngineName>(
+export const engineNameAtom = storedAtom<EngineId>(
   "engine-name",
   DEFAULT_ENGINE,
-  isEngineName
+  isAnalysisEngineId
 );
 export const engineDepthAtom = storedAtom(
   "engine-depth",

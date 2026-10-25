@@ -18,7 +18,7 @@ self.onmessage = (
           ? parseGames(input as string)
           : task === "records"
             ? (input as string[]).map((pgn) =>
-                formatGameToDatabase(loadGameFromText(pgn))
+                formatGameToDatabase(loadGameFromText(pgn), pgn)
               )
             : collectMistakes(input as ProcessingTasks["mistakes"]["input"]);
     self.postMessage({ result });

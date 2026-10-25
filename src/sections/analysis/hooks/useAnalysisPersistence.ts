@@ -1,9 +1,11 @@
 import {
   newAnalysisSession,
+  sameAnalysisContent,
+  AnalysisSession,
   validateAnalysisSession,
 } from "@/lib/analysisSession";
 import {
-  getGameDatabase,
+  getAnalysisSession,
   listAnalysisSessions,
   saveAnalysisSession,
 } from "@/lib/gameDatabase";
@@ -11,6 +13,7 @@ import { useAtom, useSetAtom } from "jotai";
 import { useEffect, useRef } from "react";
 import {
   analysisReadyAtom,
+  analysisSourceErrorAtom,
   analysisSessionAtom,
   analysisSaveRequestAtom,
   analysisSaveStateAtom,
@@ -32,12 +35,16 @@ export function useAnalysisPersistence() {
   const [state, setState] = useAtom(analysisSaveStateAtom);
   const [request, setRequest] = useAtom(analysisSaveRequestAtom);
   const restore = useSetAtom(restoreAnalysisSessionAtom);
+  const setSourceError = useSetAtom(analysisSourceErrorAtom);
   const setRevision = useSetAtom(analysisSessionsRevisionAtom);
-  const [orientation, setOrientation] = useAtom(boardOrientationAtom);
-  const [arrange, setArrange] = useAtom(arrangeModeAtom);
-  const [position, setPosition] = useAtom(editablePositionAtom);
+  const [orientation] = useAtom(boardOrientationAtom);
+  const [arrange] = useAtom(arrangeModeAtom);
+  const [position] = useAtom(editablePositionAtom);
   const [draftInput] = useAtom(arrangeFenDraftAtom);
   const latest = useRef(session);
+  const queued = useRef<
+    { session: AnalysisSession; contentToken: string } | undefined
+  >(undefined);
   latest.current = session;
 
   useEffect(() => {
@@ -48,7 +55,6 @@ export function useAnalysisPersistence() {
     }
     setState({ status: "loading" });
     void (async () => {
-      const db = await getGameDatabase();
       let activeId: string | null = null;
       try {
         activeId = localStorage.getItem(ACTIVE_SESSION_KEY);
@@ -56,16 +62,19 @@ export function useAnalysisPersistence() {
         /* IndexedDB remains authoritative. */
       }
       const saved = activeId
-        ? await db.get("analysisSessions", activeId)
+        ? await getAnalysisSession(activeId).catch((reason) => {
+            if (current)
+              setSourceError(
+                `The last session could not be opened. Its stored backup remains available under Sessions. ${reason instanceof Error ? reason.message : String(reason)}`
+              );
+            return undefined;
+          })
         : undefined;
       const recovered =
         saved ?? (await listAnalysisSessions())[0] ?? newAnalysisSession();
       validateAnalysisSession(recovered);
       if (!current || latest.current) return;
       restore(recovered);
-      setOrientation(recovered.orientation);
-      setArrange(!!recovered.draft);
-      if (recovered.draft) setPosition(recovered.draft);
       setReady(true);
     })().catch((error) => {
       if (current)
@@ -80,15 +89,7 @@ export function useAnalysisPersistence() {
     return () => {
       current = false;
     };
-  }, [
-    request,
-    restore,
-    setReady,
-    setState,
-    setOrientation,
-    setArrange,
-    setPosition,
-  ]);
+  }, [request, restore, setReady, setState, setSourceError]);
 
   useEffect(() => {
     if (!ready || !session) return;
@@ -112,7 +113,14 @@ export function useAnalysisPersistence() {
     if (!ready || !session) return;
     let current = true;
     setState({ status: "saving" });
-    void saveAnalysisSession(session)
+    const previous = queued.current;
+    const stateOnly =
+      !!previous && sameAnalysisContent(previous.session, session);
+    const contentToken = stateOnly
+      ? previous!.contentToken
+      : crypto.randomUUID();
+    queued.current = { session, contentToken };
+    void saveAnalysisSession(session, { contentToken, stateOnly })
       .then(() => {
         if (!current) return;
         try {

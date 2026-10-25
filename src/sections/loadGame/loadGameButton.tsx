@@ -1,27 +1,32 @@
-import { Button, Typography } from "@mui/material";
+import { Button } from "@mui/material";
 import { useState } from "react";
 import NewGameDialog from "./loadGameDialog";
 import { Chess } from "chess.js";
 
 interface Props {
-  setGame?: (game: Chess) => Promise<void>;
+  setGame?: (game: Chess, pgn?: string) => Promise<void>;
   label?: string;
   size?: "small" | "medium" | "large";
+  variant?: "text" | "outlined" | "contained";
 }
 
-export default function LoadGameButton({ setGame, label, size }: Props) {
+export default function LoadGameButton({
+  setGame,
+  label,
+  size,
+  variant = "contained",
+}: Props) {
   const [openDialog, setOpenDialog] = useState(false);
 
   return (
     <>
       <Button
-        variant="contained"
+        variant={variant}
         onClick={() => setOpenDialog(true)}
         size={size}
+        sx={{ minHeight: 36, borderRadius: "6px", whiteSpace: "nowrap" }}
       >
-        <Typography fontSize="0.9em" fontWeight="500" lineHeight="1.4em">
-          {label || "Add game"}
-        </Typography>
+        {label || "Add game"}
       </Button>
 
       <NewGameDialog

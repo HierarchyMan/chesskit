@@ -22,19 +22,26 @@ export default function BoardNavigation() {
 
   const boardHistory = board.history();
 
-  useKeyboardShortcut("ArrowLeft", () => {
-    if (boardHistory.length) undoBoardMove();
+  useKeyboardShortcut("ArrowLeft", (event) => {
+    if (boardHistory.length) {
+      event.preventDefault();
+      undoBoardMove();
+    }
   });
-  useKeyboardShortcut("ArrowDown", () => {
-    if (boardHistory.length) resetBoard();
+  useKeyboardShortcut("ArrowDown", (event) => {
+    if (boardHistory.length) {
+      event.preventDefault();
+      resetBoard();
+    }
   });
 
   return (
     <Stack
+      data-board-shortcuts
       direction="row"
       justifyContent="center"
       alignItems="center"
-      gap={{ xs: 0, sm: 1.5 }}
+      gap={0.5}
       width="100%"
     >
       <ToolbarButton

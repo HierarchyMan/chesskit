@@ -1,30 +1,28 @@
 import { Icon } from "@iconify/react";
-import {
-  Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Stack, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { useArrangeMode } from "./useArrangeMode";
+import { useRouter } from "next/router";
 
 export default function ModeSwitch() {
-  const { arrange, enterArrange, finishArrange, validation } = useArrangeMode();
+  const { arrange, enterArrange, leaveArrange } = useArrangeMode();
+  const router = useRouter();
 
   const handleChange = (_: unknown, value: "play" | "arrange" | null) => {
     if (!value) return;
     if (value === "arrange" && !arrange) enterArrange();
-    if (value === "play" && arrange) finishArrange();
+    if (value === "play" && arrange) {
+      leaveArrange();
+      if (router.pathname === "/editor")
+        void router.replace("/analysis", undefined, { scroll: false });
+    }
   };
-
-  const playBlocked = arrange && !validation.ok;
 
   return (
     <Stack
       direction="row"
       alignItems="center"
       justifyContent="center"
-      gap={1.5}
+      gap={1}
       width="100%"
     >
       <ToggleButtonGroup
@@ -33,24 +31,33 @@ export default function ModeSwitch() {
         value={arrange ? "arrange" : "play"}
         onChange={handleChange}
         aria-label="Board mode"
+        fullWidth
+        sx={{
+          "& .MuiToggleButton-root": {
+            borderRadius: 1,
+            py: 0.6,
+            minHeight: 34,
+            textTransform: "none",
+          },
+        }}
       >
-        <ToggleButton value="play" disabled={playBlocked} sx={{ px: 2 }}>
+        <ToggleButton
+          value="play"
+          title={
+            arrange
+              ? "Return to the study without applying this arrangement"
+              : undefined
+          }
+          sx={{ px: 2 }}
+        >
           <Icon icon="mdi:chess-pawn" height={18} />
-          &nbsp;Play moves
+          &nbsp;Analyze
         </ToggleButton>
         <ToggleButton value="arrange" sx={{ px: 2 }}>
           <Icon icon="mdi:pencil-ruler" height={18} />
           &nbsp;Arrange pieces
         </ToggleButton>
       </ToggleButtonGroup>
-
-      {playBlocked && (
-        <Tooltip title={validation.problems.join(" ")}>
-          <Typography variant="caption" color="error">
-            Fix the position to continue
-          </Typography>
-        </Tooltip>
-      )}
     </Stack>
   );
 }

@@ -1,4 +1,5 @@
 import MiniBoard from "@/components/board/miniBoard";
+import { classificationName } from "@/lib/classificationLabels";
 import PrettyMoveSan from "@/components/prettyMoveSan";
 import { CLASSIFICATION_COLORS } from "@/constants";
 import {
@@ -46,11 +47,19 @@ export default function MoveStoryDialog() {
   const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const { story } = state;
 
-  const close = () => setState((prev) => ({ ...prev, open: false }));
+  const close = () => {
+    setState((prev) => ({ ...prev, open: false }));
+    const trigger = state.trigger;
+    if (trigger)
+      requestAnimationFrame(() => {
+        if (trigger.isConnected) trigger.focus();
+      });
+  };
 
   return (
     <Dialog
       open={state.open}
+      disableRestoreFocus={!!state.trigger}
       onClose={close}
       fullWidth
       maxWidth="md"
@@ -116,7 +125,7 @@ function Header({
         {classification && (
           <Chip
             size="small"
-            label={classification}
+            label={classificationName(classification)}
             icon={
               <Image
                 src={`/icons/${classification}.png`}
@@ -325,8 +334,12 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
         </Stack>
 
         <Typography variant="body2" sx={{ opacity: 0.8, textAlign: "center" }}>
-          {lineKey === "played" ? "After your move" : "With the better move"}:{" "}
-          <b>{line.evalLabel}</b> · {moverWinPercentage}% win chance for{" "}
+          {story.kind === "continuation"
+            ? "Evaluation at the starting position"
+            : lineKey === "played"
+              ? "After the played move"
+              : "With the better move"}
+          : <b>{line.evalLabel}</b> · {moverWinPercentage}% win chance for{" "}
           {story.mover === "w" ? "White" : "Black"}
         </Typography>
       </Stack>

@@ -3,8 +3,8 @@ import { Game, Player } from "@/types/game";
 import { Chess, PieceSymbol, Square } from "chess.js";
 import { getPositionWinPercentage } from "./engine/helpers/winPercentage";
 import { Color } from "@/types/enums";
-import { Piece } from "react-chessboard/dist/chessboard/types";
-import { loadGameFromText } from "./pgn";
+import { loadGameFromText, normalizePgn } from "./pgn";
+import { parseStudyPgn, studyNodePath } from "./studyTree";
 import { chessPathKey } from "./chessHistory";
 import { terminalEvaluation } from "./engine/terminalEvaluation";
 
@@ -30,11 +30,28 @@ export const getGameFromPgn = (pgn: string): Chess => loadGameFromText(pgn);
 
 export const getGameSignature = chessPathKey;
 
-export const formatGameToDatabase = (game: Chess): Omit<Game, "id"> => {
+export const formatGameToDatabase = (
+  game: Chess,
+  originalPgn?: string
+): Omit<Game, "id"> => {
   const headers: Record<string, string | undefined> = game.getHeaders();
+  const pgn =
+    originalPgn === undefined ? game.pgn() : normalizePgn(originalPgn);
+  if (originalPgn !== undefined) {
+    const study = parseStudyPgn(pgn);
+    const path = studyNodePath(study.tree, study.main.endpoint).map(
+      (node) => node.uci
+    );
+    const history = game.history({ verbose: true });
+    if (
+      (history[0]?.before ?? game.fen()) !== study.tree.rootFen ||
+      path.join(",") !== history.map((move) => move.lan).join(",")
+    )
+      throw new Error("The imported PGN does not match its game.");
+  }
 
   return {
-    pgn: game.pgn(),
+    pgn,
     event: headers.Event,
     site: headers.Site,
     date: headers.Date,
@@ -345,58 +362,23 @@ export const getThreatenedPieces = (game: Chess, color: Color): Square[] => {
   return threatened;
 };
 
+/** Captures come from this game's moves, not missing starting material.
+ * Custom roots, promotions and en passant make a FEN-only inventory ambiguous. */
 export const getCapturedPieces = (
-  fen: string,
+  game: Chess,
   color: Color
 ): {
   piece: string;
   count: number;
 }[] => {
-  const capturedPieces =
-    color === Color.White
-      ? [
-          { piece: "p", count: 8 },
-          { piece: "b", count: 2 },
-          { piece: "n", count: 2 },
-          { piece: "r", count: 2 },
-          { piece: "q", count: 1 },
-        ]
-      : [
-          { piece: "P", count: 8 },
-          { piece: "B", count: 2 },
-          { piece: "N", count: 2 },
-          { piece: "R", count: 2 },
-          { piece: "Q", count: 1 },
-        ];
-
-  const fenPiecePlacement = fen.split(" ")[0];
-
-  return capturedPieces.map(({ piece, count }) => {
-    const piecesLeftCount = fenPiecePlacement.match(
-      new RegExp(piece, "g")
-    )?.length;
-    const newPiece = pieceFenToSymbol[piece] ?? piece;
-
-    return {
-      piece: newPiece,
-      count: Math.max(0, count - (piecesLeftCount ?? 0)),
-    };
-  });
-};
-
-const pieceFenToSymbol: Record<string, Piece | undefined> = {
-  p: "bP",
-  b: "bB",
-  n: "bN",
-  r: "bR",
-  q: "bQ",
-  k: "bK",
-  P: "wP",
-  B: "wB",
-  N: "wN",
-  R: "wR",
-  Q: "wQ",
-  K: "wK",
+  const captures = game
+    .history({ verbose: true })
+    .filter((move) => move.color === color && move.captured);
+  const opponent = color === Color.White ? "b" : "w";
+  return ["p", "b", "n", "r", "q"].map((piece) => ({
+    piece: `${opponent}${piece.toUpperCase()}`,
+    count: captures.filter((move) => move.captured === piece).length,
+  }));
 };
 
 export const getLineEvalLabel = (

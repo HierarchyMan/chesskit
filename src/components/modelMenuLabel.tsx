@@ -1,4 +1,4 @@
-import { ENGINE_LABELS } from "@/constants";
+import { engineLabel } from "@/constants";
 import { ModelView, StatusTone, describeModel } from "@/lib/engine/modelStatus";
 import { Box, Typography } from "@mui/material";
 
@@ -15,7 +15,7 @@ export default function ModelMenuLabel({ view }: { view: ModelView }) {
   return (
     <Box sx={{ minWidth: 0 }}>
       <Typography variant="body1">
-        {ENGINE_LABELS[view.model.name].full}
+        {engineLabel(view.model.name).full}
       </Typography>
       <Typography
         variant="caption"

@@ -12,11 +12,15 @@ import { useAtomValue } from "jotai";
 import { useRouter } from "next/router";
 import { useState } from "react";
 import { boardAtom } from "../states";
-import { displayedAnalysisGameAtom } from "../sessionAtoms";
+import { displayedAnalysisPgnAtom, analysisSessionAtom } from "../sessionAtoms";
+import { exportAnalysisStudy } from "@/lib/analysisSession";
+import { useCopyText } from "@/hooks/useCopyText";
 
 export default function MoreMenu() {
-  const sourceGame = useAtomValue(displayedAnalysisGameAtom);
+  const pgn = useAtomValue(displayedAnalysisPgnAtom);
   const board = useAtomValue(boardAtom);
+  const session = useAtomValue(analysisSessionAtom);
+  const { copy, feedback } = useCopyText();
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
@@ -30,7 +34,7 @@ export default function MoreMenu() {
 
   const downloadPgn = () => {
     close();
-    const blob = new Blob([sourceGame.pgn()], {
+    const blob = new Blob([pgn], {
       type: "application/x-chess-pgn",
     });
     const url = URL.createObjectURL(blob);
@@ -47,10 +51,22 @@ export default function MoreMenu() {
       label: "Copy position (FEN)",
       onClick: () => {
         close();
-        navigator.clipboard?.writeText?.(board.fen());
+        void copy(board.fen(), "Position FEN");
       },
     },
-    { icon: "mdi:download", label: "Download PGN", onClick: downloadPgn },
+    { icon: "mdi:download", label: "Download line PGN", onClick: downloadPgn },
+    ...(session
+      ? [
+          {
+            icon: "mdi:file-tree",
+            label: "Copy study PGN (all variations)",
+            onClick: () => {
+              close();
+              void copy(exportAnalysisStudy(session), "Study PGN");
+            },
+          },
+        ]
+      : []),
     {
       icon: "mdi:pencil-ruler",
       label: "Edit this position",
@@ -75,9 +91,10 @@ export default function MoreMenu() {
           onClick={(event) => setAnchorEl(event.currentTarget)}
           aria-label="More actions"
           sx={{
-            paddingX: { xs: "8px", sm: "20px" },
-            borderRadius: "8px",
-            height: "46px",
+            padding: "8px",
+            borderRadius: "6px",
+            width: "40px",
+            height: "40px",
           }}
         >
           <Icon icon="mdi:dots-horizontal" height={24} />
@@ -93,6 +110,7 @@ export default function MoreMenu() {
           </MenuItem>
         ))}
       </Menu>
+      {feedback}
     </>
   );
 }

@@ -4,13 +4,14 @@ import { BotStrength } from "@/lib/engine/strength";
 import { storedAtom } from "@/lib/storedAtom";
 import { chessPathKey } from "@/lib/chessHistory";
 import { createPositionArrowsAtom } from "@/lib/engine/topMoves";
-import { EngineName } from "@/types/enums";
+import { EngineId, EngineName } from "@/types/enums";
+import { isEngineId } from "@/lib/engine/models";
 import { CurrentPosition } from "@/types/eval";
 import { Chess } from "chess.js";
 import { atom } from "jotai";
 
 export interface ArenaSide {
-  engine: EngineName;
+  engine: EngineId;
   strength: BotStrength;
 }
 
@@ -25,7 +26,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 const isArenaSide = (value: unknown): value is ArenaSide =>
   isObject(value) &&
-  Object.values(EngineName).includes(value.engine as EngineName) &&
+  isEngineId(value.engine) &&
   isObject(value.strength) &&
   typeof value.strength.elo === "number" &&
   typeof value.strength.depth === "number";

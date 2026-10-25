@@ -17,71 +17,8 @@ export const CLASSIFICATION_COLORS: Record<MoveClassification, string> = {
 };
 
 export const DEFAULT_ENGINE: EngineName = EngineName.Stockfish18Lite;
-export const STRONGEST_ENGINE: EngineName = EngineName.Stockfish18;
 
-export const ENGINE_LABELS: Record<
-  EngineName,
-  { small: string; full: string }
-> = {
-  [EngineName.Reckless]: {
-    full: "Reckless 0.9.0 (local bridge)",
-    small: "Reckless",
-  },
-  [EngineName.Stockfish18]: {
-    full: "Stockfish 18",
-    small: "Stockfish 18",
-  },
-  [EngineName.Stockfish18Lite]: {
-    full: "Stockfish 18 Lite",
-    small: "Stockfish 18 Lite",
-  },
-  [EngineName.Stockfish17_1]: {
-    full: "Stockfish 17.1",
-    small: "Stockfish 17.1",
-  },
-  [EngineName.Stockfish17_1Lite]: {
-    full: "Stockfish 17.1 Lite",
-    small: "Stockfish 17.1 Lite",
-  },
-  [EngineName.Stockfish17]: {
-    full: "Stockfish 17",
-    small: "Stockfish 17",
-  },
-  [EngineName.Stockfish17Lite]: {
-    full: "Stockfish 17 Lite",
-    small: "Stockfish 17 Lite",
-  },
-  [EngineName.Stockfish16_1]: {
-    full: "Stockfish 16.1",
-    small: "Stockfish 16.1",
-  },
-  [EngineName.Stockfish16_1Lite]: {
-    full: "Stockfish 16.1 Lite",
-    small: "Stockfish 16.1 Lite",
-  },
-  [EngineName.Stockfish16NNUE]: {
-    full: "Stockfish 16",
-    small: "Stockfish 16",
-  },
-  [EngineName.Stockfish16]: {
-    full: "Stockfish 16 Lite (HCE)",
-    small: "Stockfish 16 Lite",
-  },
-  [EngineName.Stockfish11]: {
-    full: "Stockfish 11 (HCE)",
-    small: "Stockfish 11",
-  },
-};
-
-// Stockfish 11 only offers "Skill Level" (checked by sending it "uci"), and
-// Reckless has no UCI_Elo either, so both use the emulated strength model.
-const ENGINES_WITHOUT_NATIVE_ELO_LIMIT = new Set<EngineName>([
-  EngineName.Reckless,
-  EngineName.Stockfish11,
-]);
-
-export const hasNativeEloLimit = (engine: EngineName): boolean =>
-  !ENGINES_WITHOUT_NATIVE_ELO_LIMIT.has(engine);
+export { engineLabel, hasNativeEloLimit } from "./lib/engine/models";
 
 export const PIECE_SETS = [
   "alpha",

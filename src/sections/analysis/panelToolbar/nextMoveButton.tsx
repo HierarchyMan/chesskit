@@ -15,7 +15,12 @@ export const useNextMove = () => {
 export default function NextMoveButton() {
   const { canGoNext, goNext } = useNextMove();
 
-  useKeyboardShortcut("ArrowRight", goNext);
+  useKeyboardShortcut("ArrowRight", (event) => {
+    if (canGoNext) {
+      event.preventDefault();
+      goNext();
+    }
+  });
 
   return (
     <ToolbarButton

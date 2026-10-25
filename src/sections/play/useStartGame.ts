@@ -1,10 +1,10 @@
-import { ENGINE_LABELS } from "@/constants";
+import { engineLabel } from "@/constants";
 import { useChessActions } from "@/hooks/useChessActions";
 import { getEndgame } from "@/lib/endgames";
 import { BotStrength, CHALLENGE_STRENGTH } from "@/lib/engine/strength";
-import { Odds, getOddsFen } from "@/lib/odds";
-import { loadGameFromText, normalizeFen } from "@/lib/pgn";
-import { Color, EngineName } from "@/types/enums";
+import { effectiveStrength } from "@/lib/engine/botMove";
+import { playSetupPosition } from "@/lib/setupPosition";
+import { Color, EngineId } from "@/types/enums";
 import { Chess } from "chess.js";
 import { useStore } from "jotai";
 import { useCallback } from "react";
@@ -30,30 +30,13 @@ import {
   startingPositionAtom,
 } from "./states";
 
-const botLabel = (engine: EngineName, strength: BotStrength): string => {
-  const name = ENGINE_LABELS[engine].small;
+const botLabel = (engine: EngineId, chosen: BotStrength): string => {
+  const name = engineLabel(engine).small;
+  const strength = effectiveStrength(engine, chosen);
+  if (!strength) return name;
   if (strength.mode === "depth") return `${name} (depth ${strength.depth})`;
   if (strength.mode === "max") return `${name} (max)`;
   return name;
-};
-
-const resolveStartFen = (
-  startingText: string,
-  odds: Odds,
-  botColor: Color
-): string | undefined => {
-  if (odds !== "none") return getOddsFen(odds, botColor);
-
-  const input = startingText.trim();
-  if (!input) return undefined;
-
-  if (input.startsWith("[") || /(^|\s)1\s*\./.test(input)) {
-    return loadGameFromText(input).fen();
-  }
-
-  const fen = normalizeFen(input);
-  if (!fen) throw new Error("That is not a valid FEN or PGN");
-  return fen;
 };
 
 export const useStartGame = () => {
@@ -80,11 +63,7 @@ export const useStartGame = () => {
             : Color.Black
           : store.get(colorChoiceAtom));
       const playerColor =
-        choice === "random"
-          ? Math.random() < 0.5
-            ? Color.White
-            : Color.Black
-          : choice;
+        choice === "random" ? store.get(playerColorAtom) : choice;
       const botColor = playerColor === Color.White ? Color.Black : Color.White;
 
       const engineName = store.get(enginePlayNameAtom);
@@ -94,13 +73,13 @@ export const useStartGame = () => {
 
       let startFen: string | undefined;
       try {
-        startFen = challenge
-          ? challenge.fen
-          : resolveStartFen(
-              store.get(startingPositionAtom),
-              store.get(oddsAtom),
-              botColor
-            );
+        const setup = playSetupPosition(
+          store.get(startingPositionAtom),
+          store.get(oddsAtom),
+          botColor
+        );
+        if (!challenge && setup.error) return setup.error;
+        startFen = challenge ? challenge.fen : setup.fen;
         if (startFen && new Chess(startFen).isGameOver()) {
           return "That position is already finished.";
         }
@@ -112,7 +91,10 @@ export const useStartGame = () => {
 
       const bot = {
         name: botLabel(engineName, strength),
-        rating: strength.mode === "elo" ? strength.elo : undefined,
+        rating:
+          effectiveStrength(engineName, strength)?.mode === "elo"
+            ? strength.elo
+            : undefined,
       };
       const human = { name: "You" };
 

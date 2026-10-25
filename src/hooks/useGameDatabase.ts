@@ -177,11 +177,11 @@ export const useGameDatabase = (shouldFetchGames?: boolean) => {
   }, [shouldFetchGames, store]);
 
   const addGame = useCallback(
-    async (game: Chess) => {
+    async (game: Chess, originalPgn?: string) => {
       if (!db) throw new Error("Database not initialized");
 
       await beforeMutation(store);
-      const gameToAdd = formatGameToDatabase(game);
+      const gameToAdd = formatGameToDatabase(game, originalPgn);
       const gameId = await addGameRecord(db, gameToAdd);
 
       mergeGames(store, [{ ...gameToAdd, id: gameId }]);

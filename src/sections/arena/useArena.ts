@@ -1,12 +1,15 @@
-import { ENGINE_LABELS } from "@/constants";
+import { engineLabel } from "@/constants";
 import { useChessActions } from "@/hooks/useChessActions";
 import { EngineState, useEngineState } from "@/hooks/useEngine";
 import { setGameHeaders, uciMoveParams } from "@/lib/chess";
 import { BotChoice, getBotChoice } from "@/lib/engine/botChoice";
+import { effectiveStrength } from "@/lib/engine/botMove";
 import { BotStrength } from "@/lib/engine/strength";
 import { getGameResult } from "@/lib/gameResult";
 import { Chess } from "chess.js";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { setupPosition } from "@/lib/setupPosition";
+import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
+import { fullStrengthMsAtom } from "@/lib/engine/engineSettings";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArenaSide,
@@ -32,15 +35,17 @@ export type Proposal =
   | { status: "error"; message: string };
 
 export const sideLabel = (side: ArenaSide): string => {
-  const name = ENGINE_LABELS[side.engine].small;
-  const { strength } = side;
+  const name = engineLabel(side.engine).small;
+  const strength = effectiveStrength(side.engine, side.strength);
 
+  if (!strength) return name;
   if (strength.mode === "elo") return `${name} (${strength.elo})`;
   if (strength.mode === "depth") return `${name} (depth ${strength.depth})`;
   return name;
 };
 
 export const useArena = () => {
+  const store = useStore();
   const game = useAtomValue(arenaGameAtom);
   const setData = useSetAtom(arenaDataAtom);
   const [white, setWhiteSide] = useAtom(arenaWhiteAtom);
@@ -100,6 +105,7 @@ export const useArena = () => {
     getBotChoice(moverEngine, fen, strengthRef.current, {
       candidateCount: 4,
       variety: varietyRef.current,
+      fullStrengthMs: store.get(fullStrengthMsAtom),
     })
       .then((choice) => {
         if (cancelled) return;
@@ -127,6 +133,7 @@ export const useArena = () => {
     moverState.status,
     moverState.error,
     strengthKey,
+    store,
   ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -210,7 +217,11 @@ export const useArena = () => {
   );
 
   const start = useCallback(
-    (fromFen?: string) => beginMatch(white, black, fromFen ?? startFen),
+    (fromFen?: string) => {
+      const position = setupPosition(fromFen ?? startFen);
+      if (position.error) return;
+      beginMatch(white, black, position.fen);
+    },
     [beginMatch, white, black, startFen]
   );
 
@@ -218,7 +229,7 @@ export const useArena = () => {
     setRunning(false);
     setStarted(false);
     setEditingPlayers(false);
-    reset({ fen: startFen, noHeaders: true });
+    reset({ fen: setupPosition(startFen).fen, noHeaders: true });
   }, [startFen, reset, setRunning, setStarted, setEditingPlayers]);
 
   const takeBack = useCallback(() => {

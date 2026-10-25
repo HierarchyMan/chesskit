@@ -1,39 +1,61 @@
-import { hasNativeEloLimit } from "@/constants";
+import { fullStrengthMsAtom } from "@/lib/engine/engineSettings";
+import { engineMaxElo, getEngineModel } from "@/lib/engine/models";
 import {
   BotStrength,
   MAX_BOT_DEPTH,
-  MAX_BOT_ELO,
   MIN_BOT_DEPTH,
   MIN_BOT_ELO,
   STRENGTH_PRESETS,
   StrengthMode,
   describeStrength,
 } from "@/lib/engine/strength";
-import { EngineName } from "@/types/enums";
+import { EngineId } from "@/types/enums";
 import {
+  Alert,
   Box,
   Chip,
+  Link,
   Slider,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import { useAtomValue } from "jotai";
+import { useState } from "react";
+import MaxStrengthGuide from "./maxStrengthGuide";
 
 interface Props {
   value: BotStrength;
   onChange: (value: BotStrength) => void;
-  engineName: EngineName;
+  engineName: EngineId;
 }
-
-const MARKS = STRENGTH_PRESETS.map(({ elo }) => ({ value: elo }));
 
 export default function StrengthControl({
   value,
   onChange,
   engineName,
 }: Props) {
-  const nativeSupported = hasNativeEloLimit(engineName);
+  const model = getEngineModel(engineName);
+  const fullStrengthMs = useAtomValue(fullStrengthMsAtom);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const maxElo = engineMaxElo(engineName);
+  const profile = { nativeElo: model.nativeElo, maxElo, fullStrengthMs };
+  const presets = STRENGTH_PRESETS.filter((preset) => preset.elo < maxElo);
+  const marks = [
+    ...presets.map(({ elo }) => ({ value: elo })),
+    { value: maxElo, label: "Full" },
+  ];
+  const elo = Math.min(value.elo, maxElo);
+
+  if (model.playsOwnMoves) {
+    return (
+      <Alert severity="info" variant="outlined">
+        {model.label.small} plays its own way, so strength settings do not
+        apply.
+      </Alert>
+    );
+  }
 
   return (
     <Stack spacing={1.5}>
@@ -55,27 +77,36 @@ export default function StrengthControl({
       {value.mode === "elo" && (
         <>
           <Stack direction="row" flexWrap="wrap" gap={0.75}>
-            {STRENGTH_PRESETS.map((preset) => (
+            {presets.map((preset) => (
               <Chip
                 key={preset.label}
                 size="small"
                 label={`${preset.label} ${preset.elo}`}
-                color={value.elo === preset.elo ? "primary" : "default"}
-                variant={value.elo === preset.elo ? "filled" : "outlined"}
+                color={elo === preset.elo ? "primary" : "default"}
+                variant={elo === preset.elo ? "filled" : "outlined"}
                 onClick={() => onChange({ ...value, elo: preset.elo })}
               />
             ))}
+            <Chip
+              size="small"
+              label={`Full ${maxElo}`}
+              color={elo >= maxElo ? "primary" : "default"}
+              variant={elo >= maxElo ? "filled" : "outlined"}
+              onClick={() => onChange({ ...value, elo: maxElo })}
+            />
           </Stack>
 
           <Box px={1}>
             <Slider
-              value={value.elo}
+              value={elo}
               min={MIN_BOT_ELO}
-              max={MAX_BOT_ELO}
-              step={50}
-              marks={MARKS}
+              max={maxElo}
+              step={10}
+              marks={marks}
               valueLabelDisplay="on"
-              onChange={(_, elo) => onChange({ ...value, elo: elo as number })}
+              onChange={(_, next) =>
+                onChange({ ...value, elo: next as number })
+              }
               aria-label="Bot Elo"
               sx={{ mt: 3 }}
             />
@@ -101,10 +132,23 @@ export default function StrengthControl({
       )}
 
       <Typography variant="body2" sx={{ opacity: 0.75 }}>
-        {describeStrength(value, nativeSupported)}
+        {describeStrength({ ...value, elo }, profile)}
         {value.mode === "elo" &&
-          " Engine Elo is an estimate against other engines, so it won't match your Lichess or Chess.com rating exactly."}
+          (model.rating
+            ? ` The top of the slider is ${model.label.small}'s own rating (${model.rating.source === "ccrl" ? "CCRL Blitz" : "its author's estimate"}), measured against other engines on a native build, so it is not a human rating.`
+            : " This engine has no published rating, so the slider tops out at 3200, where it plays at full strength.")}{" "}
+        <Link
+          component="button"
+          type="button"
+          variant="body2"
+          onClick={() => setGuideOpen(true)}
+          sx={{ verticalAlign: "baseline" }}
+        >
+          How to get maximum strength
+        </Link>
       </Typography>
+
+      <MaxStrengthGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </Stack>
   );
 }

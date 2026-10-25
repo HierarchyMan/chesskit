@@ -17,10 +17,8 @@ export default function MovesClassificationsRecap() {
       justifyContent="center"
       alignItems="center"
       rowGap={0.7}
-      sx={{ scrollbarWidth: "thin", overflowY: "auto" }}
-      height="100%"
-      maxHeight="22rem"
-      size={6}
+      sx={{ minWidth: 0, mt: 2 }}
+      size={12}
     >
       <Grid
         container
@@ -29,13 +27,23 @@ export default function MovesClassificationsRecap() {
         wrap="nowrap"
         size={12}
       >
-        <Typography width="12rem" align="center" noWrap fontSize="0.9rem">
+        <Typography
+          sx={{ flex: 1, minWidth: 0 }}
+          align="center"
+          noWrap
+          fontSize="0.9rem"
+        >
           {white.name}
         </Typography>
 
         <Typography width="7rem" />
 
-        <Typography width="12rem" align="center" noWrap fontSize="0.9rem">
+        <Typography
+          sx={{ flex: 1, minWidth: 0 }}
+          align="center"
+          noWrap
+          fontSize="0.9rem"
+        >
           {black.name}
         </Typography>
       </Grid>

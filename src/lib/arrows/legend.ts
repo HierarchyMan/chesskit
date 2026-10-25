@@ -73,7 +73,10 @@ export const legendFor = (
 ): LegendEntry[] => {
   const entries = new Map<string, LegendEntry>();
 
-  for (const arrow of arrows) {
+  for (const arrow of arrows.flatMap((drawn) => [
+    drawn,
+    ...(drawn.roles ?? []).map((role) => ({ ...drawn, ...role })),
+  ])) {
     if (!ORDER.includes(arrow.kind)) continue;
 
     const owned = PER_OWNER.includes(arrow.kind);

@@ -1,5 +1,5 @@
 import { useAtomValue } from "jotai";
-import { Grid2 as Grid, Skeleton, Typography } from "@mui/material";
+import { Grid2 as Grid, Typography } from "@mui/material";
 import { currentPositionAtom } from "../../states";
 
 export default function Opening() {
@@ -10,26 +10,11 @@ export default function Opening() {
 
   const opening = position?.eval?.opening || position.opening;
 
-  if (!opening) {
-    return (
-      <Grid justifyItems="center" alignContent="center">
-        <Skeleton
-          variant="rounded"
-          animation="wave"
-          width={"12em"}
-          sx={{ color: "transparent", maxWidth: "7vw", maxHeight: "3.5vw" }}
-        >
-          <Typography align="center" fontSize="0.9rem">
-            placeholder
-          </Typography>
-        </Skeleton>
-      </Grid>
-    );
-  }
+  if (!opening) return null;
 
   return (
     <Grid>
-      <Typography align="center" fontSize="0.9rem" maxWidth="20rem">
+      <Typography fontSize="0.9rem" color="text.secondary">
         {opening}
       </Typography>
     </Grid>
