@@ -20,6 +20,7 @@ import {
 } from "@mui/material";
 import { useMemo } from "react";
 import Chessboard from "@/components/board/motionChessboard";
+import { PIECE_SLIDE_MS } from "@/lib/pieceMotion";
 import {
   CustomSquareStyles,
   Square,
@@ -168,7 +169,7 @@ export default function VisionPage() {
                 boardOrientation={trainer.orientation}
                 arePiecesDraggable={false}
                 areArrowsAllowed={false}
-                animationDuration={150}
+                animationDuration={PIECE_SLIDE_MS}
                 onSquareClick={(square) => trainer.clickSquare(square)}
                 customSquareStyles={styles}
                 customBoardStyle={appearance.customBoardStyle}
@@ -198,6 +199,16 @@ export default function VisionPage() {
             scrollbarGutter: "stable",
           }}
         >
+          {/* The round comes first: its answer buttons are tapped every second,
+              the settings above them would push them off a tall screen. */}
+          <Panel>
+            {trainer.mode === "knight" ? (
+              <KnightPanel trainer={trainer} />
+            ) : (
+              <TimedPanel trainer={trainer} />
+            )}
+          </Panel>
+
           <Panel>
             <Stack spacing={1.5}>
               <ToggleButtonGroup
@@ -280,14 +291,6 @@ export default function VisionPage() {
                 </ToggleButtonGroup>
               )}
             </Stack>
-          </Panel>
-
-          <Panel>
-            {trainer.mode === "knight" ? (
-              <KnightPanel trainer={trainer} />
-            ) : (
-              <TimedPanel trainer={trainer} />
-            )}
           </Panel>
 
           <Panel>

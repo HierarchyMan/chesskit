@@ -1,4 +1,9 @@
 import { PIECE_SETS } from "@/constants";
+import {
+  DEFAULT_PIECE_MOTION,
+  PieceMotion,
+  isPieceMotion,
+} from "@/lib/pieceMotion";
 import { storedAtom } from "@/lib/storedAtom";
 import { atomWithStorage } from "jotai/utils";
 
@@ -30,6 +35,12 @@ export const showCoordinatesAtom = storedAtom<boolean>(
   "showCoordinates",
   true,
   (value): value is boolean => typeof value === "boolean"
+);
+
+export const pieceMotionAtom = storedAtom<PieceMotion>(
+  "pieceMotion",
+  DEFAULT_PIECE_MOTION,
+  isPieceMotion
 );
 
 export const soundEnabledAtom = storedAtom<boolean>(

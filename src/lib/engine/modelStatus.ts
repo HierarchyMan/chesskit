@@ -1,19 +1,22 @@
-import { EngineModel, getModelFiles } from "./models";
+import { EngineModel, getDownloadFiles } from "./models";
+import { DownloadState, StoredFile, downloadStateOf } from "./modelStorage";
 
 export type BridgeStatus = "unknown" | "checking" | "up" | "down";
 
 export interface ModelProgress {
-  done: number;
-  total: number;
+  receivedBytes: number;
+  totalBytes: number;
 }
 
 export type StatusTone = "success" | "error" | "default";
 
 export interface ModelState {
-  // Files kept on this device, mapped to their size in bytes.
-  stored: ReadonlyMap<string, number>;
+  // Downloaded files kept in this browser.
+  stored: ReadonlyMap<string, StoredFile>;
+  // Whether this browser can keep downloads at all (HTTPS or localhost, Cache Storage).
+  storageSupported: boolean;
   // Live engine instances in this tab.
-  loaded: number;
+  running: number;
   progress?: ModelProgress;
   error?: string;
   bridge: BridgeStatus;
@@ -25,34 +28,41 @@ export interface ModelState {
 export interface ModelView {
   model: EngineModel;
   supported: boolean;
-  // Always false for bridge models: they are installed on the computer, not downloaded.
-  downloaded: boolean;
+  // Browser engines only: bundled with the app, or downloaded (current or out of date) or not.
+  download?: DownloadState;
+  storageSupported: boolean;
   storedBytes: number;
-  loaded: boolean;
+  running: boolean;
   progress?: ModelProgress;
   error?: string;
   bridge: BridgeStatus;
   bridgeEngine?: { available: boolean; error?: string };
+  // The engine can start right now.
   available: boolean;
+  // A download would make it available (missing or out of date, and this browser can store it).
+  canDownload: boolean;
 }
 
 export const buildModelView = (
   model: EngineModel,
   state: ModelState
 ): ModelView => {
-  const files = getModelFiles(model);
+  const download =
+    model.source === "browser"
+      ? downloadStateOf(model, state.stored)
+      : undefined;
+  const ready = download === "bundled" || download === "downloaded";
 
   return {
     model,
     supported: state.supported,
-    downloaded:
-      model.source === "browser" &&
-      files.every((file) => state.stored.has(file)),
-    storedBytes: files.reduce(
-      (total, file) => total + (state.stored.get(file) ?? 0),
+    download,
+    storageSupported: state.storageSupported,
+    storedBytes: getDownloadFiles(model).reduce(
+      (total, file) => total + (state.stored.get(file)?.bytes ?? 0),
       0
     ),
-    loaded: state.loaded > 0,
+    running: state.running > 0,
     progress: state.progress,
     error: state.error,
     bridge: state.bridge,
@@ -60,7 +70,12 @@ export const buildModelView = (
     available:
       model.source === "bridge"
         ? state.bridge === "up" && state.bridgeEngine?.available !== false
-        : state.supported,
+        : state.supported && (model.source === "builtin" || ready),
+    canDownload:
+      state.supported &&
+      state.storageSupported &&
+      !state.progress &&
+      (download === "missing" || download === "outdated"),
   };
 };
 
@@ -78,16 +93,22 @@ const BRIDGE_LINES: Record<BridgeStatus, { text: string; tone: StatusTone }> = {
   down: { text: "Bridge not running", tone: "error" },
 };
 
+// "In use": an instance of this engine runs in this tab right now.
+const withRunning = (
+  view: ModelView,
+  line: { text: string; tone: StatusTone }
+) => (view.running ? { ...line, text: `${line.text} · In use` } : line);
+
 export const describeModel = (
   view: ModelView
 ): { text: string; tone: StatusTone } => {
   if (view.model.source === "builtin") {
-    return {
+    return withRunning(view, {
       text: view.model.needsAdvisor
         ? "Built in · asks the advisor engine"
         : "Built in · instant",
       tone: "success",
-    };
+    });
   }
 
   if (view.model.source === "bridge") {
@@ -97,8 +118,7 @@ export const describeModel = (
         tone: "error",
       };
     }
-    const line = BRIDGE_LINES[view.bridge];
-    return view.loaded ? { ...line, text: `${line.text} · Loaded` } : line;
+    return withRunning(view, BRIDGE_LINES[view.bridge]);
   }
 
   if (!view.supported) {
@@ -110,7 +130,7 @@ export const describeModel = (
 
   if (view.progress) {
     return {
-      text: `Downloading ${view.progress.done} of ${view.progress.total} files…`,
+      text: `Downloading ${formatModelSize(view.progress.receivedBytes)} of ${formatModelSize(view.progress.totalBytes)}…`,
       tone: "default",
     };
   }
@@ -119,13 +139,32 @@ export const describeModel = (
     return { text: `Download failed: ${view.error}`, tone: "error" };
   }
 
-  const parts = view.downloaded
-    ? [`Downloaded · ${formatModelSize(view.storedBytes)}`]
-    : [`Not downloaded · about ${view.model.sizeMb} MB`];
-  if (view.loaded) parts.push("Loaded");
-
-  return {
-    text: parts.join(" · "),
-    tone: view.downloaded ? "success" : "default",
-  };
+  switch (view.download) {
+    case "bundled":
+      return withRunning(view, {
+        text: `Comes with the app · ${view.model.sizeMb} MB`,
+        tone: "success",
+      });
+    case "downloaded":
+      return withRunning(view, {
+        text: `Downloaded · ${formatModelSize(view.storedBytes)}`,
+        tone: "success",
+      });
+    default:
+      if (!view.storageSupported) {
+        return {
+          text: "Needs a download, which this browser cannot keep (HTTPS or localhost only)",
+          tone: "error",
+        };
+      }
+      return view.download === "outdated"
+        ? {
+            text: `Downloaded copy is out of date · ${view.model.sizeMb} MB to update`,
+            tone: "error",
+          }
+        : {
+            text: `Not downloaded · ${view.model.sizeMb} MB`,
+            tone: "default",
+          };
+  }
 };

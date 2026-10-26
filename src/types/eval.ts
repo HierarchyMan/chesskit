@@ -14,6 +14,8 @@ export interface LineEval {
   mate?: number;
   depth: number;
   multiPv: number;
+  // Only a bound from an unfinished search, not an exact score.
+  bound?: boolean;
 }
 
 export interface Accuracy {

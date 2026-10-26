@@ -8,6 +8,8 @@ export const OFFLINE_PUZZLES: Puzzle[] = (
     solution: string[];
     rating: number;
     themes: string[];
+    setupFen?: string;
+    lastMove?: string;
   }[]
 ).map((puzzle) => ({ ...puzzle, source: "offline" as const }));
 

@@ -5,6 +5,7 @@ import { getEvaluationBarValue } from "@/lib/chess";
 import { Color } from "@/types/enums";
 import { CurrentPosition } from "@/types/eval";
 import { positionFor } from "@/lib/currentPosition";
+import { useMotionScale } from "@/hooks/useMotionScale";
 
 const noPositionAtom = atom<CurrentPosition>({});
 
@@ -28,6 +29,8 @@ export default function EvaluationBar({
     label: "0.0",
   });
   const position = positionFor(useAtomValue(currentPositionAtom), fen);
+  const motion = useMotionScale();
+  const slide = motion ? `height ${motion}s` : "none";
 
   useEffect(() => {
     const bestLine = position?.eval?.lines[0];
@@ -61,7 +64,7 @@ export default function EvaluationBar({
         sx={{
           backgroundColor:
             boardOrientation === Color.White ? "#424242" : "white",
-          transition: "height 1s",
+          transition: slide,
         }}
         height={`${
           boardOrientation === Color.White
@@ -94,7 +97,7 @@ export default function EvaluationBar({
         sx={{
           backgroundColor:
             boardOrientation === Color.White ? "white" : "#424242",
-          transition: "height 1s",
+          transition: slide,
         }}
         height={`${
           boardOrientation === Color.White

@@ -11,7 +11,9 @@
    "mateIn1",
    "master",
    "middlegame"
-  ]
+  ],
+  "setupFen": "2r5/1p3b2/1p3kp1/5nN1/3n1PP1/P2B4/1P3K2/4R3 b - - 0 33",
+  "lastMove": "f5g7"
  },
  {
   "id": "iIYgv",
@@ -25,7 +27,9 @@
    "oneMove",
    "mateIn1",
    "pin"
-  ]
+  ],
+  "setupFen": "2k3r1/ppb2p2/2n4r/1Q1bP3/P2B4/2P4q/1P3RB1/R3N1K1 w - - 3 27",
+  "lastMove": "b5d5"
  },
  {
   "id": "ClYKQ",
@@ -41,7 +45,9 @@
    "sacrifice",
    "endgame",
    "mateIn2"
-  ]
+  ],
+  "setupFen": "4r2k/6p1/4q2p/p4p1Q/1P1p4/P1p5/2P1r3/2K3RR b - - 1 39",
+  "lastMove": "e6a2"
  },
  {
   "id": "DdW3I",
@@ -57,7 +63,9 @@
    "middlegame",
    "short",
    "kingsideAttack"
-  ]
+  ],
+  "setupFen": "r4rk1/pp3p1p/2ppb3/5P1n/1PP5/2N5/P1Q1BqPP/1RB4K w - - 2 20",
+  "lastMove": "f5e6"
  },
  {
   "id": "MqmHl",
@@ -74,7 +82,9 @@
    "endgame",
    "long",
    "mateIn3"
-  ]
+  ],
+  "setupFen": "3r3r/1p3p2/p6p/6p1/1B1bk3/8/PPB3PP/5R1K b - - 1 29",
+  "lastMove": "e4e3"
  },
  {
   "id": "DUwT5",
@@ -92,7 +102,9 @@
    "advantage",
    "fork",
    "long"
-  ]
+  ],
+  "setupFen": "2kr3r/pp1q1ppp/2pb1n2/3p4/5PP1/1P1BP1Q1/P1PP2P1/RN2K2R b KQ - 0 14",
+  "lastMove": "d7g4"
  },
  {
   "id": "gmDFZ",
@@ -111,7 +123,9 @@
    "fork",
    "long",
    "sacrifice"
-  ]
+  ],
+  "setupFen": "2r3k1/4qpp1/p4n1p/1p1P4/3R4/P2P3P/BP3QPB/2r2NK1 w - - 3 26",
+  "lastMove": "d5d6"
  },
  {
   "id": "XsD1Z",
@@ -126,7 +140,9 @@
    "pin",
    "mateIn1",
    "kingsideAttack"
-  ]
+  ],
+  "setupFen": "r4rk1/pbp3p1/8/2b1N3/6p1/8/PPPPQ1qP/RNB2R1K w - - 0 15",
+  "lastMove": "e2g2"
  },
  {
   "id": "HR7qx",
@@ -144,7 +160,9 @@
    "crushing",
    "skewer",
    "long"
-  ]
+  ],
+  "setupFen": "7r/2p5/pp3k2/6p1/2Pp1pB1/5P2/P3K1b1/6B1 b - - 0 36",
+  "lastMove": "g2h3"
  },
  {
   "id": "4bb6y",
@@ -160,7 +178,9 @@
    "short",
    "advantage",
    "discoveredAttack"
-  ]
+  ],
+  "setupFen": "1r2r1k1/pP2bpNp/8/2p1p3/2P5/3q4/PP1B1PPP/R2Q2K1 b - - 0 18",
+  "lastMove": "g8g7"
  },
  {
   "id": "pwfln",
@@ -176,7 +196,9 @@
    "short",
    "advantage",
    "hangingPiece"
-  ]
+  ],
+  "setupFen": "4r1k1/2n3p1/p3p1Qp/1p1pP3/2pR3P/2P1Pq2/PP3P2/2K4R w - - 0 24",
+  "lastMove": "g6g3"
  },
  {
   "id": "iTeZX",
@@ -193,7 +215,9 @@
    "opening",
    "hangingPiece",
    "defensiveMove"
-  ]
+  ],
+  "setupFen": "rnbq1rk1/ppp1nppp/3p4/4P3/3P1B2/2PB1N2/P1P3PP/R2QK2R w KQ - 0 10",
+  "lastMove": "d3h7"
  },
  {
   "id": "GvyTV",
@@ -212,7 +236,9 @@
    "mateIn3",
    "sacrifice",
    "backRankMate"
-  ]
+  ],
+  "setupFen": "4r1k1/1Q4pp/2n2q2/p1Bp4/P5P1/7P/1P6/5RK1 b - - 2 32",
+  "lastMove": "f6e5"
  },
  {
   "id": "CnO1h",
@@ -231,7 +257,9 @@
    "fork",
    "long",
    "sacrifice"
-  ]
+  ],
+  "setupFen": "2k3r1/1pp4p/p1q5/3p1p2/1P1Pn3/2P2N2/P3Q1PP/2R3K1 b - - 1 25",
+  "lastMove": "e4c3"
  },
  {
   "id": "7jBvO",
@@ -246,7 +274,9 @@
    "short",
    "advantage",
    "endgame"
-  ]
+  ],
+  "setupFen": "2r3k1/4b1pp/8/1p1RBp2/8/6P1/rp2PP1P/1R4K1 w - - 0 28",
+  "lastMove": "d5b5"
  },
  {
   "id": "1cFYC",
@@ -264,7 +294,9 @@
    "endgame",
    "long",
    "mateIn3"
-  ]
+  ],
+  "setupFen": "1r2kr2/6p1/2q4p/3P4/6QB/3p4/5PPP/5RK1 b - - 0 32",
+  "lastMove": "c6d5"
  },
  {
   "id": "mjJJA",
@@ -280,7 +312,9 @@
    "short",
    "opening",
    "kingsideAttack"
-  ]
+  ],
+  "setupFen": "r1b2rk1/ppp2p2/3q1B1P/3pp2Q/2Bnn3/8/PPP3PP/RN3RK1 b - - 2 13",
+  "lastMove": "e4f6"
  },
  {
   "id": "YEsYg",
@@ -297,7 +331,9 @@
    "short",
    "crushing",
    "pawnEndgame"
-  ]
+  ],
+  "setupFen": "8/8/6k1/ppp5/6K1/PPP3P1/8/8 w - - 0 48",
+  "lastMove": "a3a4"
  },
  {
   "id": "0a1Ah",
@@ -312,6 +348,8 @@
    "middlegame",
    "short",
    "advantage"
-  ]
+  ],
+  "setupFen": "5rk1/1pr3b1/pNn1p2p/2NpP1pq/1P1P4/P2Q1pP1/2R2P1P/2R3K1 w - - 1 27",
+  "lastMove": "c5e6"
  }
 ]

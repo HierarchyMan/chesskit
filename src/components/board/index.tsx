@@ -35,12 +35,12 @@ import QualityIcon, { useQualityMark } from "./moveQuality";
 import DrawBadges from "./drawBadges";
 import { getBoardDraw } from "@/lib/boardDraw";
 import { GameEnd } from "@/lib/gameResult";
+import { PIECE_SLIDE_MS } from "@/lib/pieceMotion";
+import { BoardCues, LastMoveCue, VerdictCue } from "./cues";
+import VerdictMark from "./verdictMark";
 
 const noPositionAtom = atom<CurrentPosition>({});
 const NO_ARROWS: readonly BoardArrow[] = [];
-
-/** How long a move takes to slide, in milliseconds. */
-export const MOVE_ANIMATION_MS = 200;
 
 export interface Props {
   id: string;
@@ -63,6 +63,18 @@ export interface Props {
   previewFen?: string;
   gameEnd?: GameEnd | null;
   recordedDraw?: boolean;
+  /**
+   * The move to mark as the last one. By default it is the game's own last
+   * move, so every board shows where the previous move went; a page sets it
+   * for a move the game does not hold, or to tint it.
+   */
+  lastMove?: LastMoveCue;
+  /** A square to ring, such as the piece a hint points at. */
+  hintSquare?: Square;
+  /** A tick or cross on the square the user's move went to. */
+  verdict?: VerdictCue;
+  /** Names the position shown; a change means a different position, not a move. */
+  motionKey?: string;
 }
 
 /** The board's width in pixels, measured as it changes. */
@@ -99,6 +111,10 @@ export default function Board({
   previewFen,
   gameEnd,
   recordedDraw,
+  lastMove,
+  hintSquare,
+  verdict,
+  motionKey,
 }: Props) {
   const stage = useBoardStage();
   const boardSize = stage?.width ?? suppliedBoardSize;
@@ -149,6 +165,26 @@ export default function Board({
   );
 
   const gameFen = previewFen ?? game.fen();
+  const gameLastMove = useMemo<LastMoveCue | undefined>(() => {
+    if (previewFen) return undefined;
+    const move = game.history({ verbose: true }).at(-1);
+    return move ? { from: move.from, to: move.to } : undefined;
+  }, [game, previewFen]);
+  const shownLastMove = lastMove ?? gameLastMove;
+  const cuesAtom = useMemo(() => atom<BoardCues>({}), []);
+  const setCues = useSetAtom(cuesAtom);
+  const lastFrom = shownLastMove?.from;
+  const lastTo = shownLastMove?.to;
+  const lastTone = shownLastMove?.tone;
+  useLayoutEffect(() => {
+    setCues({
+      lastMove:
+        lastFrom && lastTo
+          ? { from: lastFrom, to: lastTo, tone: lastTone }
+          : undefined,
+      hint: hintSquare,
+    });
+  }, [lastFrom, lastTo, lastTone, hintSquare, setCues]);
   const drawResult = useMemo(
     () =>
       getBoardDraw(
@@ -363,6 +399,7 @@ export default function Board({
       playableSquaresAtom,
       checkedKingAtom,
       threatenedSquaresAtom,
+      cuesAtom,
     });
   }, [
     currentPositionAtom,
@@ -370,6 +407,7 @@ export default function Board({
     playableSquaresAtom,
     checkedKingAtom,
     threatenedSquaresAtom,
+    cuesAtom,
   ]);
 
   return (
@@ -460,7 +498,8 @@ export default function Board({
             onPromotionPieceSelect={onPromotionPieceSelect}
             showPromotionDialog={showPromotionDialog}
             promotionToSquare={moveClickTo}
-            animationDuration={MOVE_ANIMATION_MS}
+            animationDuration={PIECE_SLIDE_MS}
+            motionKey={motionKey}
             customPieces={appearance.customPieces}
           />
           <ArrowLayer
@@ -472,8 +511,11 @@ export default function Board({
             fen={gameFen}
             size={pixels}
             masking
-            qualityMarkedSquare={qualityMark?.square}
+            qualityMarkedSquare={qualityMark?.square ?? verdict?.square}
           />
+          {verdict && !qualityMark && (
+            <VerdictMark verdict={verdict} orientation={orientation} />
+          )}
           {qualityMark &&
             !drawResult?.kings.some(
               (king) => king.square === qualityMark.square

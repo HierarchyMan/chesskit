@@ -1,4 +1,5 @@
 import { useEngineState } from "@/hooks/useEngine";
+import { engineFeatureLabel } from "@/lib/engine/featureEngines";
 import { getBestMoveSuggestion } from "@/lib/bestMoveHint";
 import {
   ARENA_ANALYSIS_DEPTH,
@@ -28,7 +29,10 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
   const showArrows = arrowsOn && arrowMoves > 0;
   const engineName = useFeatureEngineName("evaluator");
   const enabled = started && (showEvaluation || showAnnotations || showArrows);
-  const engineState = useEngineState(enabled ? engineName : undefined);
+  const engineState = useEngineState(
+    enabled ? engineName : undefined,
+    engineFeatureLabel("evaluator")
+  );
   const [update, setUpdate] = useState<
     ArenaAnalysisUpdate & { source?: UciEngine }
   >({

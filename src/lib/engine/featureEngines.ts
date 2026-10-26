@@ -49,6 +49,9 @@ export const ENGINE_FEATURES: {
   },
 ];
 
+export const engineFeatureLabel = (feature: EngineFeature): string =>
+  ENGINE_FEATURES.find((entry) => entry.id === feature)?.label ?? feature;
+
 export const isEngineChoice = (value: unknown): value is EngineChoice =>
   value === "analysis" || isReliableEngineId(value);
 

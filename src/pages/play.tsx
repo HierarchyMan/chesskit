@@ -21,7 +21,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 
 export default function Play() {
   const engineName = useAtomValue(enginePlayNameAtom);
-  const botEngine = useEngineState(engineName);
+  const botEngine = useEngineState(engineName, "Bot opponent");
   const isInProgress = useAtomValue(isGameInProgressAtom);
   const game = useAtomValue(gameAtom);
   const end = useAtomValue(gameEndAtom);
@@ -59,7 +59,9 @@ export default function Play() {
           >
             {hasGame ? (
               <>
-                <Box sx={{ p: 1.5, borderBottom: 1, borderColor: "divider" }}>
+                {/* Opening the overlays panel must not push the game controls down. */}
+                <GamePanel botEngine={botEngine} coach={overlay.coach} />
+                <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
                   <ArrowOverlay
                     view="inspector"
                     prefs={overlay.engine.prefs}
@@ -71,7 +73,6 @@ export default function Play() {
                     onFocus={overlay.engine.setFocus}
                   />
                 </Box>
-                <GamePanel botEngine={botEngine} coach={overlay.coach} />
               </>
             ) : (
               <NewGamePanel botEngine={botEngine} />

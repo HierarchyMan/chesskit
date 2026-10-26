@@ -13,6 +13,9 @@ export interface MistakeEntry {
   san: string;
   classification: MoveClassification;
   fenBefore: string;
+  /** The move before this one, and the position it was played from. */
+  previousFen?: string;
+  previousUci?: string;
   playedUci: string;
   bestUci?: string;
   beforeLines: LineEval[];
@@ -69,6 +72,8 @@ export const extractMistakes = (
     if (!classification || !levels.includes(classification)) return;
     if (!before.lines.length || !after.lines.length) return;
 
+    const previous = history[index - 1];
+
     entries.push({
       gameId: game.id,
       gameLabel: label,
@@ -78,6 +83,10 @@ export const extractMistakes = (
       san: move.san,
       classification,
       fenBefore: move.before,
+      previousFen: previous?.before,
+      previousUci: previous
+        ? previous.from + previous.to + (previous.promotion ?? "")
+        : undefined,
       playedUci: move.from + move.to + (move.promotion ?? ""),
       bestUci: before.bestMove ?? before.lines[0]?.pv[0],
       beforeLines: before.lines,

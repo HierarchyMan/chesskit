@@ -8,6 +8,7 @@ import { useBoardAppearance } from "./appearance";
 import DrawBadges from "./drawBadges";
 import { getBoardDraw } from "@/lib/boardDraw";
 import { Chess } from "chess.js";
+import { PIECE_SLIDE_MS } from "@/lib/pieceMotion";
 
 interface Props {
   fen: string;
@@ -33,7 +34,7 @@ export default function MiniBoard({
   arrows,
   lastMove,
   squareStyles: extraSquareStyles,
-  animationDuration = 250,
+  animationDuration = PIECE_SLIDE_MS,
   showCoordinates,
   game,
   recordedDraw,

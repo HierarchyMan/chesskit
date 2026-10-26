@@ -1,5 +1,5 @@
 import { engineDepthAtom } from "@/sections/analysis/states";
-import { EngineFeature } from "@/lib/engine/featureEngines";
+import { EngineFeature, engineFeatureLabel } from "@/lib/engine/featureEngines";
 import { CurrentPosition } from "@/types/eval";
 import { Chess } from "chess.js";
 import { useAtomValue } from "jotai";
@@ -38,7 +38,10 @@ export const usePositionEval = ({
 }): CurrentPosition => {
   const engineName = useFeatureEngineName(feature);
   const depth = useAtomValue(engineDepthAtom);
-  const engine = useEngineState(enabled ? engineName : undefined).engine;
+  const engine = useEngineState(
+    enabled ? engineName : undefined,
+    engineFeatureLabel(feature)
+  ).engine;
   const [snapshot, setSnapshot] = useState<CurrentPosition>({});
 
   useEffect(() => {

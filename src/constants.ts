@@ -16,7 +16,8 @@ export const CLASSIFICATION_COLORS: Record<MoveClassification, string> = {
   [MoveClassification.Blunder]: "#df5353",
 };
 
-export const DEFAULT_ENGINE: EngineName = EngineName.Stockfish18Lite;
+// Must be bundled (engineFiles.json): it is the engine that works without any download.
+export const DEFAULT_ENGINE: EngineName = EngineName.Stockfish19Lite;
 
 export { engineLabel, hasNativeEloLimit } from "./lib/engine/models";
 

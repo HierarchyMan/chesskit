@@ -15,6 +15,7 @@ import {
 } from "./sessionAtoms";
 
 const FALLBACK: EngineState = {
+  wanted: undefined,
   engine: null,
   status: "idle",
   retry: () => undefined,
@@ -25,7 +26,7 @@ const AnalysisEngineContext = createContext<EngineState>(FALLBACK);
 export function AnalysisEngineProvider({ children }: PropsWithChildren) {
   const arranging = useAtomValue(arrangeModeAtom);
   const engineName = useAtomValue(engineNameAtom);
-  const engineState = useEngineState(engineName);
+  const engineState = useEngineState(engineName, "Analysis");
   const session = useAtomValue(analysisSessionAtom);
   const game = useAtomValue(gameAtom);
   const [request, setRequest] = useAtom(analysisFullRequestAtom);

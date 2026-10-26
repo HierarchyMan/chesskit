@@ -26,6 +26,8 @@ cdk.context.json
 # Local performance verification artefacts
 .performance/
 
-# Engine binaries, restored by `npm run engines` from scripts/engine-binaries.json
+# Engine binaries, restored by `npm run engines` from src/lib/engine/engineFiles.json
 public/engines/**/*.wasm
 public/engines/**/*.nnue
+# Engines the app does not serve, for the Node scripts only (`npm run engines -- --all`)
+engine-files/

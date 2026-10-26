@@ -9,7 +9,10 @@ export interface Puzzle {
   rating?: number;
   themes: string[];
   source: "lichess" | "mistake" | "offline";
+  /** The opponent's move that led to `fen`, in UCI. */
   lastMove?: string;
+  /** The position before `lastMove`, so the board can play that move for the solver to see. */
+  setupFen?: string;
   url?: string;
   description?: string;
   alternatives?: string[];
@@ -63,16 +66,31 @@ export const puzzleFromLichess = (response: LichessPuzzleResponse): Puzzle => {
 
   let fen = puzzle.fen;
   let lastMove = puzzle.lastMove;
+  let setupFen: string | undefined;
 
-  if (!fen) {
+  // The game is replayed even when the service names the position, because
+  // only the game knows the position before the opponent's last move.
+  try {
     const replay = new Chess();
     const history = loadGameFromText(game.pgn).history({ verbose: true });
     const played = history.slice(0, puzzle.initialPly + 1);
     for (const move of played) replay.move(move.san);
 
-    fen = replay.fen();
     const last = played.at(-1);
-    lastMove = last ? last.from + last.to + (last.promotion ?? "") : undefined;
+    const replayedMove = last
+      ? last.from + last.to + (last.promotion ?? "")
+      : undefined;
+
+    if (!fen) {
+      fen = replay.fen();
+      lastMove = replayedMove;
+    }
+    if (last && placement(replay.fen()) === placement(fen)) {
+      setupFen = last.before;
+      lastMove ??= replayedMove;
+    }
+  } catch {
+    if (!fen) throw new Error("The puzzle's game could not be replayed.");
   }
 
   return {
@@ -83,8 +101,35 @@ export const puzzleFromLichess = (response: LichessPuzzleResponse): Puzzle => {
     themes: puzzle.themes,
     source: "lichess",
     lastMove,
+    setupFen,
     url: `https://lichess.org/training/${puzzle.id}`,
   };
+};
+
+const placement = (fen: string) => fen.split(" ")[0];
+
+/**
+ * The position and move to show before the solver's turn, or nothing when the
+ * puzzle does not know its setup move or the move does not lead to its start.
+ */
+export const puzzleSetup = (
+  puzzle: Puzzle
+): { fen: string; uci: string } | undefined => {
+  if (!puzzle.setupFen || !puzzle.lastMove) return undefined;
+
+  try {
+    const game = new Chess(puzzle.setupFen);
+    game.move({
+      from: puzzle.lastMove.slice(0, 2),
+      to: puzzle.lastMove.slice(2, 4),
+      promotion: puzzle.lastMove.slice(4, 5) || undefined,
+    });
+    if (placement(game.fen()) !== placement(puzzle.fen)) return undefined;
+  } catch {
+    return undefined;
+  }
+
+  return { fen: puzzle.setupFen, uci: puzzle.lastMove };
 };
 
 export const checkPuzzleMove = (
@@ -189,6 +234,8 @@ export const mistakeToPuzzle = (entry: MistakeEntry): Puzzle | undefined => {
     alternatives: alternativeMoves(entry),
     themes: ["Your mistake"],
     source: "mistake",
+    setupFen: entry.previousFen,
+    lastMove: entry.previousUci,
     description: `In ${entry.gameLabel} you played ${entry.san}, which was a ${entry.classification}. Find the better move.`,
   };
 };

@@ -6,28 +6,40 @@ import type {
 } from "react-chessboard/dist/chessboard/types";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useAtomValue } from "jotai";
-import { pieceSetAtom } from "./states";
+import { pieceMotionAtom, pieceSetAtom } from "./states";
 import { parseFenLoose, START_FEN } from "@/lib/editorPosition";
 import {
   matchMotionPieces,
   MotionPiece,
   pieceSquarePoint,
 } from "@/lib/boardMotion";
+import { PIECE_SLIDE_MS, scaledMotionMs } from "@/lib/pieceMotion";
 
 interface DrawnPiece extends MotionPiece {
   element: HTMLDivElement;
   exiting?: boolean;
 }
 
+interface MotionProps extends Omit<ChessboardProps, "ref"> {
+  /**
+   * Names the position being shown. When it changes, the new position is a
+   * different one rather than a move, so pieces appear where they are instead
+   * of sliding there from the old position.
+   */
+  motionKey?: string;
+}
+
 /** The rules/drag board commits immediately. An independent presentation layer
  * retargets from the currently visible pose, including interrupted undo/redo. */
-export default function MotionChessboard(props: Omit<ChessboardProps, "ref">) {
+export default function MotionChessboard({ motionKey, ...props }: MotionProps) {
   const {
     position = "start",
     boardOrientation = "white",
-    animationDuration = 200,
+    animationDuration = PIECE_SLIDE_MS,
     customPieces,
   } = props;
+  const motionMode = useAtomValue(pieceMotionAtom);
+  const previousKey = useRef(motionKey);
   const layer = useRef<HTMLDivElement>(null);
   const pieces = useRef<DrawnPiece[]>([]);
   const serial = useRef(0);
@@ -88,12 +100,17 @@ export default function MotionChessboard(props: Omit<ChessboardProps, "ref">) {
     );
     const rect = host.getBoundingClientRect();
     const cell = rect.width / 8;
+    const jumped = previousKey.current !== motionKey;
     const duration =
-      previousOrientation.current !== boardOrientation ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      previousOrientation.current !== boardOrientation || jumped
         ? 0
-        : animationDuration;
+        : scaledMotionMs(
+            animationDuration,
+            motionMode,
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          );
     previousOrientation.current = boardOrientation;
+    previousKey.current = motionKey;
     const initial = !initialized.current;
     initialized.current = true;
     const moving: DrawnPiece[] = [];
@@ -268,7 +285,14 @@ export default function MotionChessboard(props: Omit<ChessboardProps, "ref">) {
       active = false;
       cancelAnimationFrame(frame.current);
     };
-  }, [placement, boardOrientation, animationDuration, pieceSet]);
+  }, [
+    placement,
+    boardOrientation,
+    animationDuration,
+    pieceSet,
+    motionKey,
+    motionMode,
+  ]);
 
   useLayoutEffect(
     () => () => {

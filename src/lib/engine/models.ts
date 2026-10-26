@@ -1,12 +1,14 @@
 import { EngineId, EngineName, NativeEngineId } from "@/types/enums";
+import engineFiles from "./engineFiles.json";
 
 /**
  * Every engine the app knows, in one place. Labels, pickers, support checks,
  * downloads and the factory that starts an engine all read this registry, so
- * adding an engine is one entry here (plus its files under public/engines).
+ * adding an engine is one entry here plus its files in engineFiles.json.
  */
 
-// "browser": static files served with the app, run in a Web Worker.
+// "browser": a JavaScript/WebAssembly build run in a Web Worker. The bundled one
+// is served by the app; every other one is downloaded by the user into the browser.
 // "bridge": a native program on this computer, reached through the local bridge.
 // "builtin": written in this app and run in the page (the joke engines).
 export type EngineSource = "browser" | "bridge" | "builtin";
@@ -29,10 +31,12 @@ export interface EngineModel {
   source: EngineSource;
   // File under public/ that the worker starts, the bridge route, or the builtin id.
   script: string;
-  // Other files under public/ that the script loads: WebAssembly binaries, parts and nets.
+  // Other files that the script loads: WebAssembly binaries, parts and nets.
   assets: string[];
-  // Approximate size in MB, shown before the model is downloaded.
+  // Total size of the files in MB, from engineFiles.json. 0 for bridge and builtin engines.
   sizeMb: number;
+  // Served by the app itself, so it needs no download. Only browser engines can be.
+  bundled: boolean;
   rating?: EngineRating;
   // Where the engine can be picked. Analysis shows its lines and evaluation.
   roles: { analysis: boolean; play: boolean };
@@ -66,7 +70,8 @@ const LOZZA_HOME = "https://github.com/op12no2/lozza";
 const BROWSER_ROLES = { analysis: true, play: true };
 const SF_ELO = { min: 1320, max: 3190 };
 
-type Entry = Omit<EngineModel, "name">;
+// Size and the bundled flag come from engineFiles.json, never from an entry.
+type Entry = Omit<EngineModel, "name" | "sizeMb" | "bundled">;
 
 const stockfish = (entry: Partial<Entry> & Pick<Entry, "label">): Entry => ({
   family: "Stockfish",
@@ -75,7 +80,6 @@ const stockfish = (entry: Partial<Entry> & Pick<Entry, "label">): Entry => ({
   source: "browser",
   script: "",
   assets: [],
-  sizeMb: 0,
   roles: BROWSER_ROLES,
   reliableEval: true,
   needsWasm: true,
@@ -91,7 +95,6 @@ const stockfish = (entry: Partial<Entry> & Pick<Entry, "label">): Entry => ({
 const lozza = (
   build: string,
   elo: number,
-  sizeMb: number,
   description: string,
   extra: Partial<Entry> = {}
 ): Entry => ({
@@ -102,7 +105,6 @@ const lozza = (
   source: "browser",
   script: `engines/lozza/lozza${build}.js`,
   assets: [],
-  sizeMb,
   rating: { elo, source: "author" },
   roles: BROWSER_ROLES,
   reliableEval: true,
@@ -127,7 +129,6 @@ const joke = (
   source: "builtin",
   script: "",
   assets: [],
-  sizeMb: 0,
   roles: BROWSER_ROLES,
   reliableEval: false,
   needsWasm: false,
@@ -147,7 +148,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     source: "bridge",
     script: "reckless",
     assets: [],
-    sizeMb: 0,
     rating: { elo: 3766, source: "ccrl" },
     roles: BROWSER_ROLES,
     reliableEval: true,
@@ -162,7 +162,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     description: "The newest Stockfish with its full neural network.",
     script: "engines/stockfish-19/stockfish-19-single.js",
     assets: ["engines/stockfish-19/stockfish-19-single.wasm"],
-    sizeMb: 95,
     rating: { elo: 3792, source: "ccrl" },
     tags: ["NNUE"],
   }),
@@ -172,7 +171,6 @@ const ENTRIES: Record<EngineName, Entry> = {
       "Stockfish 19 with a small network: loads in seconds, a little weaker.",
     script: "engines/stockfish-19/stockfish-19-lite-single.js",
     assets: ["engines/stockfish-19/stockfish-19-lite-single.wasm"],
-    sizeMb: 2,
     tags: ["NNUE", "Small"],
   }),
   [EngineName.Stockfish19Asm]: stockfish({
@@ -183,7 +181,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     description:
       "Stockfish 19 Lite in plain JavaScript. Runs where WebAssembly is blocked, about 15 times slower.",
     script: "engines/stockfish-19/stockfish-19-asm.js",
-    sizeMb: 3,
     needsWasm: false,
     tags: ["No WebAssembly"],
   }),
@@ -192,16 +189,14 @@ const ENTRIES: Record<EngineName, Entry> = {
     description: "Stockfish 18 with its full neural network.",
     script: "engines/stockfish-18/stockfish-18-single-6563532.js",
     assets: partFiles("engines/stockfish-18/stockfish-18-single-6563532"),
-    sizeMb: 108,
     rating: { elo: 3771, source: "ccrl" },
     tags: ["NNUE"],
   }),
   [EngineName.Stockfish18Lite]: stockfish({
     label: { full: "Stockfish 18 Lite", small: "Stockfish 18 Lite" },
-    description: "Stockfish 18 with a small network. The app's default.",
+    description: "Stockfish 18 with a small network.",
     script: "engines/stockfish-18/stockfish-18-lite-single.js",
     assets: ["engines/stockfish-18/stockfish-18-lite-single.wasm"],
-    sizeMb: 7,
     tags: ["NNUE", "Small"],
   }),
   [EngineName.Stockfish17_1]: stockfish({
@@ -209,7 +204,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     description: "Stockfish 17.1 with its full neural network.",
     script: "engines/stockfish-17.1/stockfish-17.1-single.js",
     assets: partFiles("engines/stockfish-17.1/stockfish-17.1-single"),
-    sizeMb: 75,
     rating: { elo: 3770, source: "ccrl" },
     tags: ["NNUE"],
   }),
@@ -218,7 +212,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     description: "Stockfish 17.1 with a small network.",
     script: "engines/stockfish-17.1/stockfish-17.1-lite-single.js",
     assets: ["engines/stockfish-17.1/stockfish-17.1-lite-single.wasm"],
-    sizeMb: 7,
     tags: ["NNUE", "Small"],
   }),
   [EngineName.Stockfish17]: stockfish({
@@ -226,7 +219,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     description: "Stockfish 17 with its full neural network.",
     script: "engines/stockfish-17/stockfish-17-single.js",
     assets: partFiles("engines/stockfish-17/stockfish-17-single"),
-    sizeMb: 66,
     rating: { elo: 3775, source: "ccrl" },
     tags: ["NNUE"],
   }),
@@ -235,7 +227,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     description: "Stockfish 17 with a small network.",
     script: "engines/stockfish-17/stockfish-17-lite-single.js",
     assets: ["engines/stockfish-17/stockfish-17-lite-single.wasm"],
-    sizeMb: 7,
     tags: ["NNUE", "Small"],
   }),
   [EngineName.Stockfish16_1]: stockfish({
@@ -243,7 +234,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     description: "Stockfish 16.1 with its full neural network.",
     script: "engines/stockfish-16.1/stockfish-16.1-single.js",
     assets: ["engines/stockfish-16.1/stockfish-16.1-single.wasm"],
-    sizeMb: 66,
     rating: { elo: 3762, source: "ccrl" },
     tags: ["NNUE"],
   }),
@@ -252,7 +242,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     description: "Stockfish 16.1 with a small network.",
     script: "engines/stockfish-16.1/stockfish-16.1-lite-single.js",
     assets: ["engines/stockfish-16.1/stockfish-16.1-lite-single.wasm"],
-    sizeMb: 7,
     tags: ["NNUE", "Small"],
   }),
   // Stockfish 16 and Stockfish 16 Lite (HCE) share the script and the WebAssembly file.
@@ -264,7 +253,6 @@ const ENTRIES: Record<EngineName, Entry> = {
       "engines/stockfish-16/stockfish-nnue-16-single.wasm",
       "engines/stockfish-16/nn-5af11540bbfe.nnue",
     ],
-    sizeMb: 39,
     rating: { elo: 3760, source: "ccrl" },
     init: ["setoption name Use NNUE value true"],
     tags: ["NNUE"],
@@ -276,7 +264,6 @@ const ENTRIES: Record<EngineName, Entry> = {
       "Stockfish 16 with its network switched off: the last hand-written evaluation.",
     script: "engines/stockfish-16/stockfish-nnue-16-single.js",
     assets: ["engines/stockfish-16/stockfish-nnue-16-single.wasm"],
-    sizeMb: 1,
     init: ["setoption name Use NNUE value false"],
     tags: ["Hand-written eval", "Small"],
     maxMultiPv: 500,
@@ -286,7 +273,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     description:
       "The last Stockfish before neural networks, in plain JavaScript.",
     script: "engines/stockfish-11.js",
-    sizeMb: 1,
     rating: { elo: 3563, source: "ccrl" },
     needsWasm: false,
     // Stockfish 11 only offers "Skill Level", not UCI_Elo.
@@ -297,32 +283,27 @@ const ENTRIES: Record<EngineName, Entry> = {
   [EngineName.LozzaNNUE]: lozza(
     "NNUE",
     3100,
-    0.4,
     "A JavaScript engine by Colin Jenkins with a neural network. Strong and tiny."
   ),
   [EngineName.LozzaMini]: lozza(
     "Mini",
     2800,
-    0.2,
     "Lozza with a very small network written out as readable boards."
   ),
   [EngineName.LozzaHCE]: lozza(
     "HCE",
     2750,
-    0.1,
     "Lozza with a classic hand-written evaluation."
   ),
   [EngineName.LozzaMat]: lozza(
     "Mat",
     2050,
-    0.1,
     "Lozza that only counts material: tactically sharp, no positional sense.",
     { tags: ["Pure JavaScript", "Material only"] }
   ),
   [EngineName.LozzaBeal]: lozza(
     "Beal",
     1200,
-    0.1,
     "Lozza with random leaf scores. It still searches, so it drifts toward active positions (the Beal effect). Its evaluations are random, so do not trust them.",
     { reliableEval: false, tags: ["Pure JavaScript", "Random eval"] }
   ),
@@ -335,7 +316,6 @@ const ENTRIES: Record<EngineName, Entry> = {
     source: "browser",
     script: "engines/tomitank/tomitankChess.js",
     assets: [],
-    sizeMb: 0.4,
     rating: { elo: 3045, source: "ccrl" },
     roles: BROWSER_ROLES,
     reliableEval: true,
@@ -392,8 +372,51 @@ const ENTRIES: Record<EngineName, Entry> = {
   ),
 };
 
+/** A browser engine file: its size, SHA-256 and the pinned URL users download it from. */
+export interface EngineFile {
+  bytes: number;
+  sha256: string;
+  url: string;
+}
+
+const FILES: Record<string, EngineFile> = engineFiles.files;
+const BUNDLED_FILES = new Set<string>(engineFiles.bundled);
+
+export const getEngineFile = (path: string): EngineFile => {
+  const file = FILES[path];
+  if (!file) throw new Error(`${path} is not listed in engineFiles.json`);
+  return file;
+};
+
+/** Whether the app serves this file itself (public/engines), so it is never downloaded. */
+export const isBundledFile = (path: string): boolean => BUNDLED_FILES.has(path);
+
+const browserFiles = (entry: Entry): string[] =>
+  entry.source === "browser" ? [entry.script, ...entry.assets] : [];
+
+// Rounded like formatModelSize: one decimal below 10 MB, whole numbers above.
+const sizeInMb = (paths: string[]): number => {
+  const megabytes =
+    paths.reduce((total, path) => total + getEngineFile(path).bytes, 0) /
+    (1024 * 1024);
+  return megabytes < 10
+    ? Math.round(megabytes * 10) / 10
+    : Math.round(megabytes);
+};
+
 export const ENGINE_MODELS = Object.fromEntries(
-  Object.entries(ENTRIES).map(([name, entry]) => [name, { name, ...entry }])
+  Object.entries(ENTRIES).map(([name, entry]) => {
+    const paths = browserFiles(entry);
+    return [
+      name,
+      {
+        name,
+        ...entry,
+        sizeMb: sizeInMb(paths),
+        bundled: paths.length > 0 && paths.every(isBundledFile),
+      },
+    ];
+  })
 ) as Record<EngineName, EngineModel>;
 
 export const BUILTIN_ENGINE_NAMES = Object.values(EngineName);
@@ -446,6 +469,7 @@ export const nativeModelFromInfo = (info: NativeEngineInfo): EngineModel => {
     script: info.id,
     assets: [],
     sizeMb: 0,
+    bundled: false,
     rating: info.elo ? { elo: info.elo, source: "author" } : undefined,
     roles: BROWSER_ROLES,
     reliableEval: true,
@@ -500,15 +524,27 @@ export const engineMaxElo = (name: EngineId): number =>
 export const getModelFiles = (model: EngineModel): string[] =>
   model.source === "browser" ? [model.script, ...model.assets] : [];
 
-export const getAllModelFiles = (): string[] => [
-  ...new Set(Object.values(ENGINE_MODELS).flatMap(getModelFiles)),
+/** The files a user downloads for this engine: all of a browser engine's files except bundled ones. */
+export const getDownloadFiles = (model: EngineModel): string[] =>
+  getModelFiles(model).filter((file) => !isBundledFile(file));
+
+/** The hosts an engine downloads from, for telling the user where its files come from. */
+export const getDownloadHosts = (model: EngineModel): string[] => [
+  ...new Set(
+    getDownloadFiles(model).map((file) => new URL(getEngineFile(file).url).host)
+  ),
+];
+
+/** Every file any engine can download, each once. */
+export const getAllDownloadFiles = (): string[] => [
+  ...new Set(Object.values(ENGINE_MODELS).flatMap(getDownloadFiles)),
 ];
 
 // Only files that no other model still has stored are removable. Stockfish 16
 // and its Lite (HCE) build share files, so removing one must not break the other.
 export const getRemovableFiles = (
   name: EngineId,
-  stored: ReadonlyMap<string, number>
+  stored: ReadonlyMap<string, unknown>
 ): string[] => {
   const kept = new Set(
     Object.values(ENGINE_MODELS)

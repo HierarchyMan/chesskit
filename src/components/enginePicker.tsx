@@ -1,7 +1,12 @@
 import { statusColor } from "@/components/modelMenuLabel";
 import { useModels } from "@/hooks/useModels";
 import { ModelView, describeModel } from "@/lib/engine/modelStatus";
-import { EngineGroup, EngineModel, engineLabel } from "@/lib/engine/models";
+import {
+  EngineGroup,
+  EngineModel,
+  engineLabel,
+  getDownloadHosts,
+} from "@/lib/engine/models";
 import { EngineId } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
@@ -33,17 +38,20 @@ const GROUPS: { id: EngineGroup; title: string; blurb: string }[] = [
   {
     id: "native",
     title: "On this computer",
-    blurb: "Native programs through the local bridge: the strongest option.",
+    blurb:
+      "Native programs that you run on this computer through the local bridge: the strongest option.",
   },
   {
     id: "stockfish",
     title: "Stockfish",
-    blurb: "Every Stockfish build, in the browser.",
+    blurb:
+      "Every Stockfish build, in the browser. One comes with the app; download any other to use it.",
   },
   {
     id: "other",
     title: "Other engines",
-    blurb: "Different authors, different styles, all in the browser.",
+    blurb:
+      "Different authors, different styles, all in the browser. Download one to use it.",
   },
   {
     id: "joke",
@@ -132,11 +140,6 @@ function EngineRow({
 }) {
   const { model } = view;
   const status = describeModel(view);
-  const canDownload =
-    model.source === "browser" &&
-    view.supported &&
-    !view.downloaded &&
-    !view.progress;
 
   return (
     <ListItemButton
@@ -223,9 +226,9 @@ function EngineRow({
       </Box>
       <Stack alignItems="flex-end" gap={0.5}>
         <RatingBadge model={model} />
-        {canDownload && (
+        {view.canDownload && (
           <Tooltip
-            title={`Keep a copy for offline use (about ${model.sizeMb} MB)`}
+            title={`Download ${model.sizeMb} MB from ${getDownloadHosts(model).join(" and ")} into this browser`}
           >
             <IconButton
               size="small"

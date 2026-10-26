@@ -1,0 +1,239 @@
+{
+  "_help": "Every browser engine file: its size, SHA-256 and a pinned URL that browsers may download from (CORS). The files listed in bundled are the only ones the app serves (public/engines); every other engine is downloaded by the user, from its URL, into the browser. scripts/fetch-engines.mjs reads this file too.",
+  "bundled": [
+    "engines/stockfish-19/stockfish-19-lite-single.js",
+    "engines/stockfish-19/stockfish-19-lite-single.wasm"
+  ],
+  "files": {
+    "engines/lozza/lozzaBeal.js": {
+      "bytes": 64060,
+      "sha256": "1b583485d06802ff6af33f79759a9ed6d06b329d1ec5fdfda1d89c3aa2ee8899",
+      "url": "https://raw.githubusercontent.com/op12no2/lozza/dc5bae6f7f71a5efd22307a56b0b13c3a4f6bf9d/lozzaBeal.js"
+    },
+    "engines/lozza/lozzaHCE.js": {
+      "bytes": 103146,
+      "sha256": "49d59a859d1a4fc72c2be2397e00d64c8855b27d71968b39c40ab24ef57882a8",
+      "url": "https://raw.githubusercontent.com/op12no2/lozza/dc5bae6f7f71a5efd22307a56b0b13c3a4f6bf9d/lozzaHCE.js"
+    },
+    "engines/lozza/lozzaMat.js": {
+      "bytes": 67909,
+      "sha256": "bca4118c1d6ab224d42ec9ae98b8280e0be4f9e244dd5d407f962e11e4cdc93b",
+      "url": "https://raw.githubusercontent.com/op12no2/lozza/dc5bae6f7f71a5efd22307a56b0b13c3a4f6bf9d/lozzaMat.js"
+    },
+    "engines/lozza/lozzaMini.js": {
+      "bytes": 199141,
+      "sha256": "3a518f8f0f04bb6dada7e21a2c393e5bf0fdd2a2e72d0904769ed6b4b8e53659",
+      "url": "https://raw.githubusercontent.com/op12no2/lozza/dc5bae6f7f71a5efd22307a56b0b13c3a4f6bf9d/lozzaMini.js"
+    },
+    "engines/lozza/lozzaNNUE.js": {
+      "bytes": 375483,
+      "sha256": "f444199911c2501f5e91653027bb9f62a7c8a75bc392ed6027e7e1acb11e35c1",
+      "url": "https://raw.githubusercontent.com/op12no2/lozza/dc5bae6f7f71a5efd22307a56b0b13c3a4f6bf9d/lozzaNNUE.js"
+    },
+    "engines/stockfish-11.js": {
+      "bytes": 1335754,
+      "sha256": "39d33ac9daf84fc8a0c6952bd0ee7a94af79ab9db7dcebad1058cf994914d590",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-11.js"
+    },
+    "engines/stockfish-16.1/stockfish-16.1-lite-single.js": {
+      "bytes": 20183,
+      "sha256": "8f43669b56239aaeb96c0fe0b9ac9cc033bcab2a1ce101ddeafdeae115df2b85",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-16.1/stockfish-16.1-lite-single.js"
+    },
+    "engines/stockfish-16.1/stockfish-16.1-lite-single.wasm": {
+      "bytes": 7157593,
+      "sha256": "1313432744224014a1a98604f34ee71b34187af9980e2336fc2d4f5c6747ebfb",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-16.1/stockfish-16.1-lite-single.wasm"
+    },
+    "engines/stockfish-16.1/stockfish-16.1-single.js": {
+      "bytes": 20080,
+      "sha256": "0a34209a600f088afe3a093358602e13919a1687bd4cea38a28aa9d90503eb0c",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-16.1/stockfish-16.1-single.js"
+    },
+    "engines/stockfish-16.1/stockfish-16.1-single.wasm": {
+      "bytes": 69434982,
+      "sha256": "0355a696e707da817928568863e3feca0b938c52131f984379504748f5be07ca",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-16.1/stockfish-16.1-single.wasm"
+    },
+    "engines/stockfish-16/nn-5af11540bbfe.nnue": {
+      "bytes": 40119326,
+      "sha256": "5af11540bbfefcb54e38c5dd000cab4b469dfa7599a1d55be5d2722c20a8929b",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-16/nn-5af11540bbfe.nnue"
+    },
+    "engines/stockfish-16/stockfish-nnue-16-single.js": {
+      "bytes": 25594,
+      "sha256": "e2958bb89fc6ee0faedde87284bbb7e14da2ab224f06ca1bd82e62eaca87d00b",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-16/stockfish-nnue-16-single.js"
+    },
+    "engines/stockfish-16/stockfish-nnue-16-single.wasm": {
+      "bytes": 575029,
+      "sha256": "a7acf7f20cb81d755b39b3dd42a4bdfd6e8c8d3d203d9fbdc525e40e1f68df08",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-16/stockfish-nnue-16-single.wasm"
+    },
+    "engines/stockfish-17.1/stockfish-17.1-lite-single.js": {
+      "bytes": 20672,
+      "sha256": "1c8265e52fdaef797684b4979b42c5dcfe0350df3e11a87e48e4ec5f86e0ca5c",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17.1/stockfish-17.1-lite-single.js"
+    },
+    "engines/stockfish-17.1/stockfish-17.1-lite-single.wasm": {
+      "bytes": 7280741,
+      "sha256": "7ca31bedd166148931a1cc84dbd8dd9cf001744e9994caf23a3c6ff4988d7086",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17.1/stockfish-17.1-lite-single.wasm"
+    },
+    "engines/stockfish-17.1/stockfish-17.1-single-part-0.wasm": {
+      "bytes": 13175551,
+      "sha256": "c31da0e4486d44f96d6a36787e21350552bbfaff45cb92ed42c325db0d8b3b1e",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17.1/stockfish-17.1-single-part-0.wasm"
+    },
+    "engines/stockfish-17.1/stockfish-17.1-single-part-1.wasm": {
+      "bytes": 13175551,
+      "sha256": "a72af33113066c20b383159d9658e3cefa69c216af56be7ce475a9fe1ac88ed2",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17.1/stockfish-17.1-single-part-1.wasm"
+    },
+    "engines/stockfish-17.1/stockfish-17.1-single-part-2.wasm": {
+      "bytes": 13175551,
+      "sha256": "1f1fa6a4ddd6d3fffa2eb07522f830465b4dea1f860ea8a66f14832069a27d14",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17.1/stockfish-17.1-single-part-2.wasm"
+    },
+    "engines/stockfish-17.1/stockfish-17.1-single-part-3.wasm": {
+      "bytes": 13175551,
+      "sha256": "01fdc89fe79d53d7194bb9947279da43021e3762f6f20def5f5c2bd7fc791864",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17.1/stockfish-17.1-single-part-3.wasm"
+    },
+    "engines/stockfish-17.1/stockfish-17.1-single-part-4.wasm": {
+      "bytes": 13175551,
+      "sha256": "dacae3ba1bc2af5035e8c887bd2f4431a9013db009cfe7f12e3ffebb6d31b8ec",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17.1/stockfish-17.1-single-part-4.wasm"
+    },
+    "engines/stockfish-17.1/stockfish-17.1-single-part-5.wasm": {
+      "bytes": 13175551,
+      "sha256": "eb0c62461e6d19c169aaf576a459f7d3feeb2b483e4533140514bf85f3a5c1a9",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17.1/stockfish-17.1-single-part-5.wasm"
+    },
+    "engines/stockfish-17.1/stockfish-17.1-single.js": {
+      "bytes": 20593,
+      "sha256": "562a55d9189ad013f6c6c55b8d347a37f490ce9542a34abdb06ef56a72f9d1db",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17.1/stockfish-17.1-single.js"
+    },
+    "engines/stockfish-17/stockfish-17-lite-single.js": {
+      "bytes": 20181,
+      "sha256": "ef06615dc8cf5974e9f3e73d1663b9ca87f2bd59b97e661af0b22e80801b6409",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17/stockfish-17-lite-single.js"
+    },
+    "engines/stockfish-17/stockfish-17-lite-single.wasm": {
+      "bytes": 7157593,
+      "sha256": "8e7d58fd36242f9163fb4881781cbb59b73c2b00067e6f4b02d31a48c58e5fe8",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17/stockfish-17-lite-single.wasm"
+    },
+    "engines/stockfish-17/stockfish-17-single-part-0.wasm": {
+      "bytes": 11572497,
+      "sha256": "d7121653f2c9d262d9c74375a6db1925605f5761d2eec9f506f9f5c26956964e",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17/stockfish-17-single-part-0.wasm"
+    },
+    "engines/stockfish-17/stockfish-17-single-part-1.wasm": {
+      "bytes": 11572497,
+      "sha256": "5099262b8f790cfd6892d2ad10f0759b9e92fd1a15509ce188f7723a5331add7",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17/stockfish-17-single-part-1.wasm"
+    },
+    "engines/stockfish-17/stockfish-17-single-part-2.wasm": {
+      "bytes": 11572497,
+      "sha256": "cb00d0c79af01ccb063afbea84f23d244f8d1372f607085f997eb39a9baf5c6b",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17/stockfish-17-single-part-2.wasm"
+    },
+    "engines/stockfish-17/stockfish-17-single-part-3.wasm": {
+      "bytes": 11572497,
+      "sha256": "932c38cdfebaac2b79da1900a73b5748362e6832132344030d90adcb1567738d",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17/stockfish-17-single-part-3.wasm"
+    },
+    "engines/stockfish-17/stockfish-17-single-part-4.wasm": {
+      "bytes": 11572497,
+      "sha256": "f0fdff063d5b1a5e63b707563a8b7ba3dd9dabfa145b2f2cbf7d3dba6f82bcbf",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17/stockfish-17-single-part-4.wasm"
+    },
+    "engines/stockfish-17/stockfish-17-single-part-5.wasm": {
+      "bytes": 11572497,
+      "sha256": "42158df20ca6d60c70f13f8295c7c378f9704441019351296675ce8170cca611",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17/stockfish-17-single-part-5.wasm"
+    },
+    "engines/stockfish-17/stockfish-17-single.js": {
+      "bytes": 20101,
+      "sha256": "0b05724f3e65825e6321cd88f99613f61313716aaee225604c22e8203e4b67f1",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-17/stockfish-17-single.js"
+    },
+    "engines/stockfish-18/stockfish-18-lite-single.js": {
+      "bytes": 20670,
+      "sha256": "2278005057f381491f1c9bb3e44c9f5920b3a00bef9759e33cc6582769a1f1fe",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-18/stockfish-18-lite-single.js"
+    },
+    "engines/stockfish-18/stockfish-18-lite-single.wasm": {
+      "bytes": 7295411,
+      "sha256": "a8fbc05ec6920b56d7485826dcb02c5ffd2826bcbf751cf973046f237a9096f1",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-18/stockfish-18-lite-single.wasm"
+    },
+    "engines/stockfish-18/stockfish-18-single-6563532-part-0.wasm": {
+      "bytes": 18832077,
+      "sha256": "c0acea1506a0398d14ee646782d7b40941d208724ab555e5c15140bb79cc498a",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-18/stockfish-18-single-6563532-part-0.wasm"
+    },
+    "engines/stockfish-18/stockfish-18-single-6563532-part-1.wasm": {
+      "bytes": 18832077,
+      "sha256": "16eb0d1da1de6ac094bd6128ef0220d3ac0e4d856176f3c3a781aeef1ed547ed",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-18/stockfish-18-single-6563532-part-1.wasm"
+    },
+    "engines/stockfish-18/stockfish-18-single-6563532-part-2.wasm": {
+      "bytes": 18832077,
+      "sha256": "0c68b16736471bb7b9d997ec16ff6d6bd13373bc67592a356d61ab5ec3afb8d4",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-18/stockfish-18-single-6563532-part-2.wasm"
+    },
+    "engines/stockfish-18/stockfish-18-single-6563532-part-3.wasm": {
+      "bytes": 18832077,
+      "sha256": "19e39d35375834f6ffd3ecfd417b86c9d07f85e26325f42ad192efd117693999",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-18/stockfish-18-single-6563532-part-3.wasm"
+    },
+    "engines/stockfish-18/stockfish-18-single-6563532-part-4.wasm": {
+      "bytes": 18832077,
+      "sha256": "775acf1d972d677a75c5c9cd07fe1edd3821bc1c63b1bcaef4dd2456e39c4696",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-18/stockfish-18-single-6563532-part-4.wasm"
+    },
+    "engines/stockfish-18/stockfish-18-single-6563532-part-5.wasm": {
+      "bytes": 18832074,
+      "sha256": "d62251222b92fb9800d05b9d35aa97709f884cab3dac02b7cea5a6d39905a01a",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-18/stockfish-18-single-6563532-part-5.wasm"
+    },
+    "engines/stockfish-18/stockfish-18-single-6563532.js": {
+      "bytes": 20592,
+      "sha256": "77a1b51a42a54915cdeeb638b66609fba65d22948c8b626602f4671a6dd570e5",
+      "url": "https://raw.githubusercontent.com/GuillaumeSD/Chesskit/9622d502ab9fc84fc1486e22310a7df229a37e93/public/engines/stockfish-18/stockfish-18-single-6563532.js"
+    },
+    "engines/stockfish-19/stockfish-19-asm.js": {
+      "bytes": 3155627,
+      "sha256": "c07dad9a00a89f4b1dcba3971d58d8078715556eac0212368e4aab510e1e27c9",
+      "url": "https://unpkg.com/stockfish@19.0.1/bin/stockfish-19-asm.js"
+    },
+    "engines/stockfish-19/stockfish-19-lite-single.js": {
+      "bytes": 28230,
+      "sha256": "ccb130d7ff29408531c47d859a49f91d59d4f482d05a53eb1a3231a4f624c91a",
+      "url": "https://unpkg.com/stockfish@19.0.1/bin/stockfish-19-lite-single.js"
+    },
+    "engines/stockfish-19/stockfish-19-lite-single.wasm": {
+      "bytes": 1845971,
+      "sha256": "ee4f115bdb2d32cadf96cada104a05b5ec257d7ad6f57582190b49bc71f096de",
+      "url": "https://unpkg.com/stockfish@19.0.1/bin/stockfish-19-lite-single.wasm"
+    },
+    "engines/stockfish-19/stockfish-19-single.js": {
+      "bytes": 28130,
+      "sha256": "8071dee87312f74805a859de933e1a1ef465579ab1a51fbd597388cdce9d444d",
+      "url": "https://unpkg.com/stockfish@19.0.1/bin/stockfish-19-single.js"
+    },
+    "engines/stockfish-19/stockfish-19-single.wasm": {
+      "bytes": 99169054,
+      "sha256": "991bede2f253ebb08ff01fcc48270f4b9c8e66b12d5bd5f8d6f52eb3e3b3a740",
+      "url": "https://unpkg.com/stockfish@19.0.1/bin/stockfish-19-single.wasm"
+    },
+    "engines/tomitank/tomitankChess.js": {
+      "bytes": 407214,
+      "sha256": "6f77194ecb25fcf45812ff251d748b9a4eb344f9c64924fcc90a0cf5efbe5ace",
+      "url": "https://raw.githubusercontent.com/tomitank/tomitankChess/543dffa8bc873736a01621db59424f1bbfec4dbe/tomitankChess.js"
+    }
+  }
+}

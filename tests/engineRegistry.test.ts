@@ -178,6 +178,39 @@ describe("evaluation parser across engines", () => {
     );
     assert.equal(result.lines[0].cp, 20);
   });
+
+  it("never lets a bound from the next depth replace an exact line", () => {
+    // Reckless prints these while it re-searches one move; the move in them is
+    // a refuted one whose score is only the edge of the search window.
+    const result = parseEvaluationResults(
+      [
+        "info depth 26 multipv 3 score cp -165 pv e7e6 f1e2",
+        "info depth 27 multipv 3 score cp -181 upperbound pv c8a6 b5a6",
+      ],
+      "rnbqkb1r/p2ppppp/5n2/1Pp5/8/4PN2/PP1P1PPP/RNBQKB1R b KQkq - 0 4"
+    );
+    assert.equal(result.lines.length, 1);
+    assert.equal(result.lines[0].pv[0], "e7e6");
+    assert.equal(result.lines[0].bound, undefined);
+  });
+
+  it("marks a bound that fills an empty slot, and an exact line replaces it", () => {
+    const bounded = parseEvaluationResults(
+      ["info depth 5 multipv 1 score cp 40 lowerbound pv e2e4"],
+      START
+    );
+    assert.equal(bounded.lines[0].bound, true);
+
+    const exact = parseEvaluationResults(
+      [
+        "info depth 5 multipv 1 score cp 40 lowerbound pv e2e4",
+        "info depth 4 multipv 1 score cp 25 pv d2d4",
+      ],
+      START
+    );
+    assert.equal(exact.lines[0].pv[0], "d2d4");
+    assert.equal(exact.lines[0].bound, undefined);
+  });
 });
 
 describe("joke strategies", () => {

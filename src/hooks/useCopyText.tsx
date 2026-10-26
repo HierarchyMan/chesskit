@@ -9,6 +9,7 @@ import {
   TextField,
 } from "@mui/material";
 import { useState } from "react";
+import { copyToClipboard } from "@/lib/clipboard";
 
 /** Clipboard writes can be unavailable or denied. Keep the requested text copyable. */
 export function useCopyText() {
@@ -18,14 +19,8 @@ export function useCopyText() {
     text: string;
   } | null>(null);
   const copy = async (text: string, label: string) => {
-    try {
-      if (!navigator.clipboard?.writeText)
-        throw new Error("Clipboard unavailable");
-      await navigator.clipboard.writeText(text);
-      setNotice(`${label} copied`);
-    } catch {
-      setFallback({ label, text });
-    }
+    if (await copyToClipboard(text)) setNotice(`${label} copied`);
+    else setFallback({ label, text });
   };
   const feedback = (
     <>

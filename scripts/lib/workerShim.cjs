@@ -2,7 +2,7 @@
 // command-line UCI engine: stdin lines become worker messages, and the
 // worker's messages are printed on stdout.
 //
-//   node scripts/lib/workerShim.cjs public/engines/lozza/lozzaNNUE.js
+//   node scripts/lib/workerShim.cjs engine-files/engines/lozza/lozzaNNUE.js
 const path = require("node:path");
 const readline = require("node:readline");
 const { Worker } = require("node:worker_threads");

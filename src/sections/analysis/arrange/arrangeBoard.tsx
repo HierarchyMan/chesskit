@@ -10,6 +10,7 @@ import { useAtom, useAtomValue } from "jotai";
 import { useLayoutEffect, useMemo } from "react";
 import { useBoardStage } from "@/components/boardWorkspace";
 import Chessboard from "@/components/board/motionChessboard";
+import { PIECE_SLIDE_MS } from "@/lib/pieceMotion";
 import { Square } from "react-chessboard/dist/chessboard/types";
 import {
   arrangeBrushAtom,
@@ -68,7 +69,7 @@ export default function ArrangeBoard() {
           position={position.pieces as BoardPositionObject}
           boardOrientation={orientation ? "white" : "black"}
           areArrowsAllowed={false}
-          animationDuration={120}
+          animationDuration={PIECE_SLIDE_MS}
           dropOffBoardAction="trash"
           onPromotionCheck={() => false}
           onPieceDrop={(source, target) => {

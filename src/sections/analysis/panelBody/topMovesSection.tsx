@@ -43,7 +43,7 @@ function TopMovesBody({ onClose }: { onClose: () => void }) {
     [setArrows, positionKey]
   );
   const { playMove } = useChessActions(boardAtom);
-  const engine = useEngineState(engineName);
+  const engine = useEngineState(engineName, "Top moves");
 
   return (
     <Panel
@@ -65,9 +65,7 @@ function TopMovesBody({ onClose }: { onClose: () => void }) {
         fen={fen}
         positionKey={positionKey}
         engine={engine.engine}
-        engineStatus={engine.status}
-        engineError={engine.error}
-        onRetryEngine={engine.retry}
+        engineState={engine}
         side={side}
         onSideChange={(value) => {
           setArrows([]);

@@ -28,6 +28,7 @@ import {
   BOARD_THEMES,
 } from "./states";
 import { readableArrowColor } from "@/lib/arrows/contrast";
+import { useMotionScale } from "@/hooks/useMotionScale";
 import tinycolor from "tinycolor2";
 
 interface Props {
@@ -48,8 +49,9 @@ interface Props {
   qualityMarkedSquare?: string;
 }
 
-const FADE_IN =
-  "@media (prefers-reduced-motion: no-preference){@keyframes chesskit-arrow-in{from{opacity:0}to{opacity:1}}}";
+const FADE_IN = "@keyframes chesskit-arrow-in{from{opacity:0}to{opacity:1}}";
+/** How long an arrow takes to fade in, before the user's motion choice scales it. */
+const ARROW_FADE_MS = 140;
 
 const layerStyle = (size?: number): CSSProperties => ({
   position: "absolute",
@@ -242,11 +244,13 @@ function ArrowBody({
   uid,
   masked,
   faded,
+  fadeMs,
 }: {
   drawn: Drawn;
   uid: string;
   masked: boolean;
   faded: boolean;
+  fadeMs: number;
 }) {
   const { arrow, style, shape } = drawn;
   const polygon = toPoints(shape.outline);
@@ -264,7 +268,9 @@ function ArrowBody({
           ? `url(#${uid}-src-${drawn.maskSquare})`
           : undefined
       }
-      style={{ animation: "chesskit-arrow-in 140ms ease-out" }}
+      style={{
+        animation: fadeMs ? `chesskit-arrow-in ${fadeMs}ms ease-out` : "none",
+      }}
     >
       <polygon
         points={polygon}
@@ -299,6 +305,7 @@ export default function ArrowLayer({
   qualityMarkedSquare,
 }: Props) {
   const uid = safeId(useId());
+  const fadeMs = Math.round(ARROW_FADE_MS * useMotionScale());
   const pieceSet = useAtomValue(pieceSetAtom);
   const boardTheme = useAtomValue(boardThemeAtom);
   const boardHue = useAtomValue(boardHueAtom);
@@ -506,6 +513,7 @@ export default function ArrowLayer({
           uid={uid}
           masked={!!drawn.maskUrl}
           faded={false}
+          fadeMs={fadeMs}
         />
       ))}
       {shownInk.map((drawn) => (
@@ -515,10 +523,17 @@ export default function ArrowLayer({
           uid={uid}
           masked={!!drawn.maskUrl}
           faded={false}
+          fadeMs={fadeMs}
         />
       ))}
       {draftBody && (
-        <ArrowBody drawn={draftBody} uid={uid} masked={false} faded />
+        <ArrowBody
+          drawn={draftBody}
+          uid={uid}
+          masked={false}
+          faded
+          fadeMs={fadeMs}
+        />
       )}
 
       {/* Every label comes after every body, so no arrow can cover a number. */}

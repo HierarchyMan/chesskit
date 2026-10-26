@@ -60,8 +60,8 @@ export const useArena = () => {
     useChessActions(arenaGameAtom);
   const analysis = useArenaAnalysis(game, started);
 
-  const whiteEngine = useEngineState(white.engine);
-  const blackEngine = useEngineState(black.engine);
+  const whiteEngine = useEngineState(white.engine, "Arena: White");
+  const blackEngine = useEngineState(black.engine, "Arena: Black");
   const [proposal, setProposal] = useState<Proposal>({ status: "idle" });
 
   const fen = game.fen();

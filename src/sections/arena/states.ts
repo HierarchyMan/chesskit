@@ -1,3 +1,4 @@
+import { DEFAULT_ENGINE } from "@/constants";
 import { createAnalysisOptionAtoms } from "@/lib/analysisOptions";
 import { createArrowPrefsAtom } from "@/lib/arrows/prefsAtom";
 import { BotStrength } from "@/lib/engine/strength";
@@ -34,7 +35,7 @@ const isArenaSide = (value: unknown): value is ArenaSide =>
 export const arenaWhiteAtom = storedAtom<ArenaSide>(
   "arena-white",
   {
-    engine: EngineName.Stockfish18Lite,
+    engine: DEFAULT_ENGINE,
     strength: { mode: "max", elo: 2500, depth: 12 },
   },
   isArenaSide

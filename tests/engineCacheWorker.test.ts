@@ -8,7 +8,8 @@ const SOURCE = readFileSync(
   "utf8"
 );
 const ORIGIN = "http://localhost:3000";
-const CURRENT_CACHE = "chesskit-engine-models-v1";
+const CURRENT_CACHE = "chesskit-engine-models-v2";
+const LEGACY_CACHE = "chesskit-engine-models-v1";
 const ENGINE_URL = `${ORIGIN}/engines/stockfish-18/stockfish-18-lite-single.wasm`;
 
 interface FakeRequest {
@@ -30,6 +31,7 @@ const createWorker = (
   const cachedResponse = { source: "cache" };
   const networkResponse = { source: "network" };
   let skipWaitingCalled = false;
+  let claims = 0;
 
   for (const name of [CURRENT_CACHE, ...cacheNames]) {
     storage.set(name, new Map());
@@ -59,7 +61,11 @@ const createWorker = (
     skipWaiting: () => {
       skipWaitingCalled = true;
     },
-    clients: { claim: async () => undefined },
+    clients: {
+      claim: async () => {
+        claims += 1;
+      },
+    },
   };
 
   vm.runInNewContext(
@@ -94,6 +100,17 @@ const createWorker = (
     networkResponse,
     storage,
     skipWaitingCalled: () => skipWaitingCalled,
+    claims: () => claims,
+    message: async (data: unknown) => {
+      let pending: Promise<unknown> | undefined;
+      listeners.get("message")?.({
+        data,
+        waitUntil: (value: Promise<unknown>) => {
+          pending = value;
+        },
+      });
+      await pending;
+    },
     install: () => listeners.get("install")?.({}),
     activate: async () => {
       let pending: Promise<unknown> | undefined;
@@ -121,7 +138,7 @@ describe("engine cache service worker", () => {
     assert.deepEqual(worker.networkRequests, []);
   });
 
-  it("falls back to the network for engine files that are not stored", async () => {
+  it("falls back to the network for engine files that are not stored (only the bundled engine is there)", async () => {
     const worker = createWorker();
 
     assert.equal(await worker.respond(get(ENGINE_URL)), worker.networkResponse);
@@ -160,13 +177,22 @@ describe("engine cache service worker", () => {
     );
   });
 
-  it("lets a download that asks for a fresh copy reach the server", () => {
+  it("answers a downloaded engine from the cache even on a reload", async () => {
     const worker = createWorker([ENGINE_URL]);
 
     assert.equal(
-      worker.respond({ url: ENGINE_URL, method: "GET", cache: "reload" }),
-      undefined
+      await worker.respond({ url: ENGINE_URL, method: "GET", cache: "reload" }),
+      worker.cachedResponse
     );
+    assert.deepEqual(worker.networkRequests, []);
+  });
+
+  it("claims the page when asked, for a page opened with a hard reload", async () => {
+    const worker = createWorker();
+
+    await worker.message({ type: "claim" });
+    await worker.message({ type: "other" });
+    assert.equal(worker.claims(), 1);
   });
 
   it("skips the waiting period on install", () => {
@@ -176,15 +202,16 @@ describe("engine cache service worker", () => {
     assert.equal(worker.skipWaitingCalled(), true);
   });
 
-  it("deletes old model caches on activate and keeps the current one and unrelated caches", async () => {
+  it("deletes old model caches on activate and keeps the current one, the v1 cache the page migrates, and unrelated caches", async () => {
     const worker = createWorker(
       [],
-      ["chesskit-engine-models-v0", "unrelated-cache"]
+      ["chesskit-engine-models-v0", LEGACY_CACHE, "unrelated-cache"]
     );
 
     await worker.activate();
 
     assert.deepEqual([...worker.storage.keys()].sort(), [
+      LEGACY_CACHE,
       CURRENT_CACHE,
       "unrelated-cache",
     ]);

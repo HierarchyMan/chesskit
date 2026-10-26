@@ -10,6 +10,7 @@ import { CLASSIFICATION_COLORS } from "@/constants";
 import { boardHueAtom } from "./states";
 import { areObjectsEqual, isObject } from "@/lib/object";
 import { CheckedKing } from "@/lib/chess";
+import { BoardCues } from "./cues";
 
 /** A square the selected piece can move to. */
 export interface MoveTarget {
@@ -24,6 +25,8 @@ export interface Props {
   playableSquaresAtom: PrimitiveAtom<MoveTarget[]>;
   checkedKingAtom: Atom<CheckedKing | null>;
   threatenedSquaresAtom: Atom<Square[]>;
+  /** The last move and hint a page asked for, used where the position carries none. */
+  cuesAtom: Atom<BoardCues>;
 }
 
 /**
@@ -38,6 +41,7 @@ export function getSquareRenderer({
   playableSquaresAtom,
   checkedKingAtom,
   threatenedSquaresAtom,
+  cuesAtom,
 }: Props) {
   const squareRenderer = memo(
     forwardRef<HTMLDivElement, CustomSquareProps>((props, ref) => {
@@ -115,14 +119,38 @@ export function getSquareRenderer({
         )
       );
 
+      // A graded position colours its last move by the grade; any other
+      // position falls back to the move the page or the game itself names.
+      const cuedMove = useAtomValue(
+        useMemo(
+          () =>
+            atom((get) => {
+              const move = get(cuesAtom).lastMove;
+              if (!move || (move.from !== square && move.to !== square)) {
+                return undefined;
+              }
+              return move.tone ?? "neutral";
+            }),
+          [square]
+        )
+      );
+
+      const isHinted = useAtomValue(
+        useMemo(() => atom((get) => get(cuesAtom).hint === square), [square])
+      );
+
       const highlightSquareStyle: CSSProperties | undefined = useMemo(
         () =>
           isClicked
             ? rightClickSquareStyle
             : isFromSquare || isToSquare
               ? previousMoveSquareStyle(moveClassification)
-              : undefined,
-        [isClicked, isFromSquare, isToSquare, moveClassification]
+              : cuedMove === "bad"
+                ? wrongMoveSquareStyle
+                : cuedMove
+                  ? previousMoveSquareStyle()
+                  : undefined,
+        [isClicked, isFromSquare, isToSquare, moveClassification, cuedMove]
       );
 
       return (
@@ -140,6 +168,7 @@ export function getSquareRenderer({
           {children}
           {isMatedKing && <div style={checkmateMarkStyle}>#</div>}
           {highlightSquareStyle && <div style={highlightSquareStyle} />}
+          {isHinted && <div style={hintSquareStyle} />}
           {isPlayable && (
             <div
               style={isCapture ? captureSquareStyles : playableSquareStyles}
@@ -174,6 +203,25 @@ const rightClickSquareStyle: CSSProperties = {
   height: "100%",
   backgroundColor: "#eb6150",
   opacity: "0.8",
+};
+
+const wrongMoveSquareStyle: CSSProperties = {
+  position: "absolute",
+  width: "100%",
+  height: "100%",
+  backgroundColor: "#e0453a",
+  opacity: 0.6,
+};
+
+/** A ring around the piece a hint points at, with a faint wash inside it. */
+const hintSquareStyle: CSSProperties = {
+  position: "absolute",
+  width: "100%",
+  height: "100%",
+  boxSizing: "border-box",
+  border: "4px solid rgba(60, 140, 255, 0.95)",
+  backgroundColor: "rgba(60, 140, 255, 0.22)",
+  pointerEvents: "none",
 };
 
 const checkedKingStyle: CSSProperties = {

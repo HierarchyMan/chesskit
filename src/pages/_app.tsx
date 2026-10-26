@@ -5,7 +5,7 @@ import "@fontsource/roboto/700.css";
 import "@/lib/icons";
 import { AppProps } from "next/app";
 import Layout from "@/sections/layout";
-import { registerModelCacheWorker } from "@/lib/engine/modelStorage";
+import { startModelStorage } from "@/hooks/useModels";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ChessboardDnDProvider } from "react-chessboard";
@@ -17,7 +17,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   // in the browser.
   const [inBrowser, setInBrowser] = useState(false);
   useEffect(() => {
-    registerModelCacheWorker();
+    void startModelStorage();
     setInBrowser(true);
   }, []);
 

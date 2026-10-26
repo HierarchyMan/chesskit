@@ -1,6 +1,7 @@
 import { THREAT_GAIN } from "@/lib/arrows/tuning";
 import { arrowTuningAtom } from "@/lib/arrows/tuningAtom";
 import { BoardArrow } from "@/lib/arrows/types";
+import { engineFeatureLabel } from "@/lib/engine/featureEngines";
 import {
   findThreats,
   positionForThreats,
@@ -36,7 +37,10 @@ export const useThreats = ({ fen, main, enabled }: Options): BoardArrow[] => {
   // Without an evaluation of the position there is nothing to measure against,
   // such as on a bot's turn, so no search is started for it.
   const hasMain = main !== undefined;
-  const engine = useEngineState(enabled ? engineName : undefined).engine;
+  const engine = useEngineState(
+    enabled ? engineName : undefined,
+    engineFeatureLabel("threats")
+  ).engine;
 
   const cache = useRef(new Map<string, PositionEval>());
   const [result, setResult] = useState<{ key: string; passed: PositionEval }>();

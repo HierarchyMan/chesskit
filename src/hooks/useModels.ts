@@ -5,22 +5,32 @@ import {
   buildModelView,
 } from "@/lib/engine/modelStatus";
 import {
+  getAllDownloadFiles,
   getAllEngineModels,
-  getAllModelFiles,
+  getDownloadFiles,
+  getEngineFile,
   getEngineModel,
-  getModelFiles,
   getRemovableFiles,
   setNativeEngines,
 } from "@/lib/engine/models";
 import {
+  StoredFile,
   downloadModelFiles,
+  isFileCurrent,
   isModelStorageSupported,
   readStoredFiles,
+  registerModelCacheWorker,
   removeModelFiles,
 } from "@/lib/engine/modelStorage";
 import { isModelSupported } from "@/lib/engine/shared";
 import { EngineId } from "@/types/enums";
-import { atom, createStore, useAtomValue, useStore } from "jotai";
+import {
+  atom,
+  createStore,
+  getDefaultStore,
+  useAtomValue,
+  useStore,
+} from "jotai";
 import { useCallback, useMemo } from "react";
 
 type Store = ReturnType<typeof createStore>;
@@ -28,17 +38,17 @@ type PerEngine<T> = Partial<Record<EngineId, T>>;
 
 const bridgeAtom = atom<BridgeStatus>("unknown");
 const bridgeListingAtom = atom<BridgeListing | undefined>(undefined);
-const storedFilesAtom = atom<ReadonlyMap<string, number>>(new Map());
-const loadedCountsAtom = atom<PerEngine<number>>({});
+export const storedFilesAtom = atom<ReadonlyMap<string, StoredFile>>(new Map());
+const runningCountsAtom = atom<PerEngine<number>>({});
 const progressAtom = atom<PerEngine<ModelProgress>>({});
 const errorsAtom = atom<PerEngine<string>>({});
 
 // Called by useEngineState when an engine starts (+1) or is shut down (-1).
-export const markEngineLoadedAtom = atom(
+export const markEngineRunningAtom = atom(
   null,
   (get, set, update: { name: EngineId; delta: 1 | -1 }) => {
-    const counts = get(loadedCountsAtom);
-    set(loadedCountsAtom, {
+    const counts = get(runningCountsAtom);
+    set(runningCountsAtom, {
       ...counts,
       [update.name]: (counts[update.name] ?? 0) + update.delta,
     });
@@ -60,7 +70,13 @@ const withEntry = <T>(
 };
 
 const readStorage = async (store: Store): Promise<void> => {
-  store.set(storedFilesAtom, await readStoredFiles(getAllModelFiles()));
+  store.set(storedFilesAtom, await readStoredFiles(getAllDownloadFiles()));
+};
+
+/** Starts the engine store once, at app start: the cache worker, old downloads, then the file list. */
+export const startModelStorage = async (): Promise<void> => {
+  await registerModelCacheWorker();
+  await readStorage(getDefaultStore()).catch((reason) => console.error(reason));
 };
 
 const probeBridge = async (store: Store): Promise<void> => {
@@ -88,7 +104,13 @@ const refreshModels = (store: Store): Promise<void> => {
 
 const downloadModel = async (store: Store, name: EngineId): Promise<void> => {
   const model = getEngineModel(name);
-  if (model.source !== "browser" || store.get(progressAtom)[name]) return;
+  if (
+    model.source !== "browser" ||
+    model.bundled ||
+    store.get(progressAtom)[name]
+  ) {
+    return;
+  }
 
   const setError = (message: string | undefined) =>
     store.set(errorsAtom, withEntry(store.get(errorsAtom), name, message));
@@ -97,20 +119,27 @@ const downloadModel = async (store: Store, name: EngineId): Promise<void> => {
 
   setError(undefined);
   if (!isModelStorageSupported()) {
-    setError("Offline storage is not available in this browser.");
+    setError(
+      "This browser cannot keep downloads here (HTTPS or localhost only)."
+    );
     return;
   }
 
   // Set before the first await so a second click cannot start a parallel download.
-  setProgress({ done: 0, total: 0 });
+  setProgress({ receivedBytes: 0, totalBytes: 0 });
   try {
-    const files = getModelFiles(model);
+    const files = getDownloadFiles(model);
     const stored = await readStoredFiles(files);
-    const missing = files.filter((file) => !stored.has(file));
+    // Out-of-date copies are fetched again, current ones are kept.
+    const needed = files.filter((file) => !isFileCurrent(file, stored));
+    const totalBytes = needed.reduce(
+      (total, file) => total + getEngineFile(file).bytes,
+      0
+    );
 
-    setProgress({ done: 0, total: missing.length });
-    await downloadModelFiles(missing, (done) =>
-      setProgress({ done, total: missing.length })
+    setProgress({ receivedBytes: 0, totalBytes });
+    await downloadModelFiles(needed, (receivedBytes) =>
+      setProgress({ receivedBytes, totalBytes })
     );
   } catch (error) {
     setError(error instanceof Error ? error.message : "Unknown error");
@@ -124,7 +153,7 @@ const removeModel = async (store: Store, name: EngineId): Promise<void> => {
   const model = getEngineModel(name);
   if (model.source !== "browser" || store.get(progressAtom)[name]) return;
 
-  const stored = await readStoredFiles(getAllModelFiles());
+  const stored = await readStoredFiles(getAllDownloadFiles());
   await removeModelFiles(getRemovableFiles(name, stored));
 
   store.set(errorsAtom, withEntry(store.get(errorsAtom), name, undefined));
@@ -136,9 +165,10 @@ export const useModels = () => {
   const bridge = useAtomValue(bridgeAtom);
   const listing = useAtomValue(bridgeListingAtom);
   const stored = useAtomValue(storedFilesAtom);
-  const loadedCounts = useAtomValue(loadedCountsAtom);
+  const runningCounts = useAtomValue(runningCountsAtom);
   const progress = useAtomValue(progressAtom);
   const errors = useAtomValue(errorsAtom);
+  const storageSupported = isModelStorageSupported();
 
   const models = useMemo(
     () =>
@@ -152,14 +182,15 @@ export const useModels = () => {
                 })
               : undefined,
           stored,
-          loaded: loadedCounts[model.name] ?? 0,
+          storageSupported,
+          running: runningCounts[model.name] ?? 0,
           progress: progress[model.name],
           error: errors[model.name],
           bridge,
           supported: isModelSupported(model),
         })
       ),
-    [stored, loadedCounts, progress, errors, bridge, listing]
+    [stored, storageSupported, runningCounts, progress, errors, bridge, listing]
   );
 
   const refresh = useCallback(() => refreshModels(store), [store]);
@@ -173,7 +204,7 @@ export const useModels = () => {
   );
 
   const storedBytes = useMemo(
-    () => [...stored.values()].reduce((total, bytes) => total + bytes, 0),
+    () => [...stored.values()].reduce((total, file) => total + file.bytes, 0),
     [stored]
   );
 
@@ -181,7 +212,7 @@ export const useModels = () => {
     models,
     bridge,
     storedBytes,
-    storageSupported: isModelStorageSupported(),
+    storageSupported,
     refresh,
     download,
     remove,

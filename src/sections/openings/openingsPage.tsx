@@ -288,39 +288,27 @@ function LearnPanel({ study }: { study: OpeningStudy }) {
 
   return (
     <>
+      <Stack direction="row" gap={1} flexWrap="wrap">
+        <Button
+          variant="contained"
+          startIcon={<Icon icon="mdi:target" height={18} />}
+          onClick={study.startDrill}
+        >
+          Drill this line
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<Icon icon="mdi:chart-line" height={18} />}
+          onClick={analyse}
+        >
+          Analyze
+        </Button>
+      </Stack>
+
       <Panel title="The line">
         <Stack spacing={1.5}>
-          <Stack direction="row" flexWrap="wrap" gap={0.5}>
-            {steps.map((step) => (
-              <Chip
-                key={step.ply}
-                size="small"
-                label={step.color === "w" ? moveLabel(step) : step.san}
-                color={step.ply + 1 === ply ? "primary" : "default"}
-                variant={step.ply < ply ? "filled" : "outlined"}
-                onClick={() => study.goTo(step.ply + 1)}
-              />
-            ))}
-          </Stack>
-
-          <Box
-            sx={{
-              p: 1.5,
-              minHeight: 64,
-              borderRadius: 2,
-              border: 1,
-              borderColor: "divider",
-              backgroundColor: "action.hover",
-            }}
-          >
-            <Typography variant="body2">
-              {study.currentNote ??
-                (ply === 0
-                  ? "Press next, or click a move, to see the idea behind each move."
-                  : "A developing move that follows the line.")}
-            </Typography>
-          </Box>
-
+          {/* The stepper comes before the line and the note, whose length
+              changes with every move, so it never moves under the thumb. */}
           <Stack direction="row" justifyContent="center" gap={0.5}>
             <IconButton aria-label="Start" onClick={() => study.goTo(0)}>
               <Icon icon="mdi:skip-previous" height={24} />
@@ -353,6 +341,37 @@ function LearnPanel({ study }: { study: OpeningStudy }) {
               <Icon icon="mdi:skip-next" height={24} />
             </IconButton>
           </Stack>
+
+          <Stack direction="row" flexWrap="wrap" gap={0.5}>
+            {steps.map((step) => (
+              <Chip
+                key={step.ply}
+                size="small"
+                label={step.color === "w" ? moveLabel(step) : step.san}
+                color={step.ply + 1 === ply ? "primary" : "default"}
+                variant={step.ply < ply ? "filled" : "outlined"}
+                onClick={() => study.goTo(step.ply + 1)}
+              />
+            ))}
+          </Stack>
+
+          <Box
+            sx={{
+              p: 1.5,
+              minHeight: 64,
+              borderRadius: 2,
+              border: 1,
+              borderColor: "divider",
+              backgroundColor: "action.hover",
+            }}
+          >
+            <Typography variant="body2">
+              {study.currentNote ??
+                (ply === 0
+                  ? "Press next, or click a move, to see the idea behind each move."
+                  : "A developing move that follows the line.")}
+            </Typography>
+          </Box>
         </Stack>
       </Panel>
 
@@ -365,23 +384,6 @@ function LearnPanel({ study }: { study: OpeningStudy }) {
           ))}
         </Stack>
       </Panel>
-
-      <Stack direction="row" gap={1} flexWrap="wrap">
-        <Button
-          variant="contained"
-          startIcon={<Icon icon="mdi:target" height={18} />}
-          onClick={study.startDrill}
-        >
-          Drill this line
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<Icon icon="mdi:chart-line" height={18} />}
-          onClick={analyse}
-        >
-          Analyze
-        </Button>
-      </Stack>
     </>
   );
 }
@@ -418,6 +420,42 @@ function DrillPanel({
             variant="outlined"
             label={`${study.hints} hint${study.hints === 1 ? "" : "s"}`}
           />
+        </Stack>
+
+        {/* Buttons before the feedback, which changes length every move. */}
+        <Stack direction="row" gap={1} flexWrap="wrap">
+          {phase !== "done" && (
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={phase !== "playing" || !!study.hintUci}
+              startIcon={<Icon icon="mdi:lightbulb-on-outline" height={18} />}
+              onClick={study.askHint}
+            >
+              Hint
+            </Button>
+          )}
+          <Button
+            size="small"
+            variant={phase === "done" ? "contained" : "outlined"}
+            startIcon={<Icon icon="mdi:refresh" height={18} />}
+            onClick={study.startDrill}
+          >
+            {phase === "done" ? "Drill again" : "Restart"}
+          </Button>
+          <Button size="small" variant="outlined" onClick={study.startLearn}>
+            Back to learning
+          </Button>
+          {phase === "done" && (
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<Icon icon="mdi:skip-next" height={18} />}
+              onClick={onNext}
+            >
+              Next: {nextName}
+            </Button>
+          )}
         </Stack>
 
         {phase === "playing" && (
@@ -464,41 +502,6 @@ function DrillPanel({
               : `Finished with ${study.mistakes} mistake${study.mistakes === 1 ? "" : "s"} and ${study.hints} hint${study.hints === 1 ? "" : "s"}. Drill again with none to mark it as learned.`}
           </Alert>
         )}
-
-        <Stack direction="row" gap={1} flexWrap="wrap">
-          {phase !== "done" && (
-            <Button
-              size="small"
-              variant="outlined"
-              disabled={phase !== "playing" || !!study.hintUci}
-              startIcon={<Icon icon="mdi:lightbulb-on-outline" height={18} />}
-              onClick={study.askHint}
-            >
-              Hint
-            </Button>
-          )}
-          <Button
-            size="small"
-            variant={phase === "done" ? "contained" : "outlined"}
-            startIcon={<Icon icon="mdi:refresh" height={18} />}
-            onClick={study.startDrill}
-          >
-            {phase === "done" ? "Drill again" : "Restart"}
-          </Button>
-          <Button size="small" variant="outlined" onClick={study.startLearn}>
-            Back to learning
-          </Button>
-          {phase === "done" && (
-            <Button
-              size="small"
-              variant="text"
-              startIcon={<Icon icon="mdi:skip-next" height={18} />}
-              onClick={onNext}
-            >
-              Next: {nextName}
-            </Button>
-          )}
-        </Stack>
       </Stack>
     </Panel>
   );

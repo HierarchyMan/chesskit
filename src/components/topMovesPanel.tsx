@@ -1,5 +1,6 @@
+import { EngineFailureAlert } from "@/components/engineDownloadAlert";
 import PrettyMoveSan from "@/components/prettyMoveSan";
-import { EngineStatus } from "@/hooks/useEngine";
+import { EngineState } from "@/hooks/useEngine";
 import { useTopMoves } from "@/hooks/useTopMoves";
 import { MoveSide, TopMove, formatLine } from "@/lib/engine/topMoves";
 import { UciEngine } from "@/lib/engine/uciEngine";
@@ -26,9 +27,8 @@ interface Props {
   fen: string;
   positionKey?: string;
   engine: UciEngine | null;
-  engineStatus?: EngineStatus;
-  engineError?: string;
-  onRetryEngine?: () => void;
+  // The engine's start state, for its failure or download prompt.
+  engineState?: EngineState;
   side: MoveSide;
   onSideChange?: (side: MoveSide) => void;
   count?: number;
@@ -48,9 +48,7 @@ export default function TopMovesPanel({
   fen,
   positionKey,
   engine,
-  engineStatus,
-  engineError,
-  onRetryEngine,
+  engineState,
   side,
   onSideChange,
   count = 3,
@@ -108,7 +106,7 @@ export default function TopMovesPanel({
     };
   };
   const isLoading = status === "loading";
-  const engineFailed = engineStatus === "error";
+  const engineFailed = engineState?.status === "error";
 
   const description = useMemo(() => {
     const name = sideName(fen, side);
@@ -156,19 +154,8 @@ export default function TopMovesPanel({
 
       {isLoading && <LinearProgress sx={{ borderRadius: 1 }} />}
 
-      {engineFailed && (
-        <Alert
-          severity="error"
-          action={
-            onRetryEngine && (
-              <Button color="inherit" size="small" onClick={onRetryEngine}>
-                Retry
-              </Button>
-            )
-          }
-        >
-          {engineError ?? "The engine did not start."}
-        </Alert>
+      {engineFailed && engineState && (
+        <EngineFailureAlert state={engineState} />
       )}
 
       {status === "error" && !engineFailed && (

@@ -5,10 +5,13 @@ import {
   BoardThemeName,
   boardHueAtom,
   boardThemeAtom,
+  pieceMotionAtom,
   pieceSetAtom,
   showCoordinatesAtom,
   soundEnabledAtom,
 } from "@/components/board/states";
+import { PIECE_MOTION_CHOICES, PieceMotion } from "@/lib/pieceMotion";
+import { puzzleShowSetupAtom } from "@/sections/puzzles/states";
 import { PIECE_SETS } from "@/constants";
 import { getRecommendedWorkersNb } from "@/lib/engine/worker";
 import { EngineField } from "@/components/enginePicker";
@@ -311,6 +314,8 @@ function BoardTab() {
   const [hue, setHue] = useAtom(boardHueAtom);
   const [coordinates, setCoordinates] = useAtom(showCoordinatesAtom);
   const [sound, setSound] = useAtom(soundEnabledAtom);
+  const [motion, setMotion] = useAtom(pieceMotionAtom);
+  const [puzzleSetup, setPuzzleSetup] = useAtom(puzzleShowSetupAtom);
   const isDark = useTheme().palette.mode === "dark";
 
   return (
@@ -374,6 +379,22 @@ function BoardTab() {
           </Select>
         </FormControl>
 
+        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+          <InputLabel id="settings-motion-label">Piece animation</InputLabel>
+          <Select
+            labelId="settings-motion-label"
+            input={<OutlinedInput label="Piece animation" />}
+            value={motion}
+            onChange={(event) => setMotion(event.target.value as PieceMotion)}
+          >
+            {PIECE_MOTION_CHOICES.map(({ id, label }) => (
+              <MenuItem key={id} value={id}>
+                {label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
         <Slider
           label="Board hue"
           value={hue}
@@ -401,6 +422,15 @@ function BoardTab() {
               />
             }
             label="Move sounds"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={puzzleSetup}
+                onChange={(_, value) => setPuzzleSetup(value)}
+              />
+            }
+            label="Puzzles: play the opponent's last move first"
           />
         </Stack>
       </Grid>

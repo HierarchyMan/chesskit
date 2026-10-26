@@ -14,6 +14,7 @@ import LoadGameButton from "@/sections/loadGame/loadGameButton";
 import { useGameSummaries } from "@/hooks/useGameDatabase";
 import { useRouter } from "next/router";
 import { PageTitle } from "@/components/pageTitle";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const gridLocaleText: GridLocaleText = {
   ...GRID_DEFAULT_LOCALE_TEXT,
@@ -41,7 +42,8 @@ export default function GameDatabase() {
       }
       const game = await getGame(id);
       if (!game) throw new Error("Game not found");
-      await navigator.clipboard?.writeText?.(game.pgn);
+      if (!(await copyToClipboard(game.pgn)))
+        throw new Error("Clipboard unavailable");
     },
     [getGame]
   );

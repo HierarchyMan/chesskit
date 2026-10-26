@@ -1,9 +1,10 @@
 import { EngineId } from "@/types/enums";
-import { bridgeEngineUrl, probeBridgeEngine } from "./bridge";
+import { BRIDGE_ORIGIN, bridgeEngineUrl, probeBridgeEngine } from "./bridge";
 import { EngineRuntimeSettings } from "./engineSettings";
 import { createJokeWorker } from "./jokes/jokeWorker";
 import { isJokeEngineName } from "./jokes/strategies";
 import { EngineModel, getEngineModel } from "./models";
+import { requireDownloadedEngine } from "./modelStorage";
 import { isModelSupported } from "./shared";
 import { EngineSetup, EngineSource, UciEngine } from "./uciEngine";
 import { setSpinOption } from "./uciOptions";
@@ -32,12 +33,14 @@ const sourceFor = async (
 ): Promise<EngineSource> => {
   switch (model.source) {
     case "browser":
+      // The app serves only the bundled engine; any other runs from the user's download.
+      await requireDownloadedEngine(model);
       return model.script;
     case "bridge": {
       const status = await probeBridgeEngine(model.script, signal);
       if (!status.running) {
         throw new Error(
-          "The engine bridge is not running. Start it with start-reckless-bridge.bat (or start-chess.bat) and try again."
+          `The engine bridge is not running on this computer (${BRIDGE_ORIGIN}). Start it with start-reckless-bridge.bat (or start-chess.bat) and try again.`
         );
       }
       if (!status.available) {

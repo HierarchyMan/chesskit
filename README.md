@@ -136,7 +136,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 
-Chesskit was created by [Guillaume Sanchez-Dumont](https://github.com/GuillaumeSD) and is maintained with its contributors. The Stockfish builds in `public/engines` are the work of the Stockfish team and are distributed under their own licences. Puzzles come from the [Lichess](https://lichess.org) API. The Kaneo piece set in `public/piece/kaneo` is by [Kadagaden](https://github.com/Kadagaden/chess-pieces), inspired by chess.com's Neo pieces, and is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Chesskit was created by [Guillaume Sanchez-Dumont](https://github.com/GuillaumeSD) and is maintained with its contributors. The Stockfish builds are the work of the Stockfish team and are distributed under their own licences: the app ships Stockfish 19 Lite in `public/engines`, and every other engine is downloaded by the user from its original source (see `docs/engines.md`). Puzzles come from the [Lichess](https://lichess.org) API. The Kaneo piece set in `public/piece/kaneo` is by [Kadagaden](https://github.com/Kadagaden/chess-pieces), inspired by chess.com's Neo pieces, and is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ## License
 

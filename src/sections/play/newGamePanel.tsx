@@ -1,10 +1,9 @@
 import Panel from "@/components/panel";
 import StrengthControl from "@/components/strengthControl";
+import { EngineFailureAlert } from "@/components/engineDownloadAlert";
 import { EngineField } from "@/components/enginePicker";
-import { engineLabel } from "@/constants";
+import { DEFAULT_ENGINE, engineLabel } from "@/constants";
 import { EngineState } from "@/hooks/useEngine";
-import { useModels } from "@/hooks/useModels";
-import { getEngineModel } from "@/lib/engine/models";
 import { ODDS_OPTIONS } from "@/lib/odds";
 import { Color, EngineId } from "@/types/enums";
 import { Icon } from "@iconify/react";
@@ -74,9 +73,7 @@ export default function NewGamePanel({ botEngine }: Props) {
   const [showPosition, setShowPosition] = useState(false);
   const [error, setError] = useState("");
   const { startGame } = useStartGame();
-  const { models } = useModels();
   const router = useRouter();
-  const selectedModel = models.find((view) => view.model.name === engineName);
 
   useEffect(() => {
     setPlayerColor(
@@ -107,6 +104,30 @@ export default function NewGamePanel({ botEngine }: Props) {
   return (
     <Panel title="New game" sx={{ maxHeight: "none" }}>
       <Stack spacing={2.5}>
+        {/* Settings are remembered, so Start leads: on a tall screen it sits
+            right under the board instead of after a form that can expand. */}
+        <Stack spacing={1}>
+          <Button
+            variant="contained"
+            size="large"
+            disabled={!ready || !!setup.error}
+            onClick={handleStart}
+            startIcon={<Icon icon="mdi:play" height={22} />}
+          >
+            {ready
+              ? "Start game"
+              : botEngine.status === "error"
+                ? "Engine unavailable"
+                : "Loading engine…"}
+          </Button>
+          {error && <Alert severity="error">{error}</Alert>}
+          {setup.error && (
+            <Typography variant="caption" color="error.main">
+              The starting position below is not valid.
+            </Typography>
+          )}
+        </Stack>
+
         <Section title="Opponent">
           <Stack spacing={1.5}>
             <EngineField
@@ -121,7 +142,7 @@ export default function NewGamePanel({ botEngine }: Props) {
             <EngineStatusLine
               engine={botEngine}
               engineName={engineName}
-              downloaded={selectedModel?.downloaded ?? false}
+              onUseDefault={() => setEngineName(DEFAULT_ENGINE)}
             />
 
             <StrengthControl
@@ -279,22 +300,6 @@ export default function NewGamePanel({ botEngine }: Props) {
             </Stack>
           </Collapse>
         </Box>
-
-        {error && <Alert severity="error">{error}</Alert>}
-
-        <Button
-          variant="contained"
-          size="large"
-          disabled={!ready || !!setup.error}
-          onClick={handleStart}
-          startIcon={<Icon icon="mdi:play" height={22} />}
-        >
-          {ready
-            ? "Start game"
-            : botEngine.status === "error"
-              ? "Engine unavailable"
-              : "Loading engine…"}
-        </Button>
       </Stack>
     </Panel>
   );
@@ -323,11 +328,11 @@ function Section({
 function EngineStatusLine({
   engine,
   engineName,
-  downloaded,
+  onUseDefault,
 }: {
   engine: EngineState;
   engineName: EngineId;
-  downloaded: boolean;
+  onUseDefault: () => void;
 }) {
   if (engine.status === "ready") {
     return (
@@ -338,29 +343,12 @@ function EngineStatusLine({
   }
 
   if (engine.status === "error") {
-    return (
-      <Alert
-        severity="error"
-        action={
-          <Button color="inherit" size="small" onClick={engine.retry}>
-            Retry
-          </Button>
-        }
-      >
-        {engine.error ?? "The engine did not start."}
-      </Alert>
-    );
+    return <EngineFailureAlert state={engine} onUseDefault={onUseDefault} />;
   }
-
-  const { sizeMb } = getEngineModel(engineName);
 
   return (
     <Typography variant="body2" sx={{ opacity: 0.75 }}>
-      Loading {engineLabel(engineName).small}
-      {!downloaded && sizeMb > 20
-        ? ` (about ${sizeMb}MB, first time only)`
-        : ""}
-      …
+      Loading {engineLabel(engineName).small}…
     </Typography>
   );
 }

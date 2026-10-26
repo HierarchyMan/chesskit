@@ -1,3 +1,4 @@
+import { EngineFailureAlert } from "@/components/engineDownloadAlert";
 import { moveStoryAtom } from "@/lib/moveStoryState";
 import Panel from "@/components/panel";
 import { CLASSIFICATION_COLORS } from "@/constants";
@@ -10,7 +11,6 @@ import {
 import { MoveClassification } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -65,18 +65,7 @@ export default function CoachCard({
       }
     >
       <Stack spacing={1.25}>
-        {error && (
-          <Alert
-            severity="error"
-            action={
-              <Button color="inherit" size="small" onClick={engineState.retry}>
-                Retry
-              </Button>
-            }
-          >
-            {error}
-          </Alert>
-        )}
+        {error && <EngineFailureAlert state={engineState} message={error} />}
 
         {!feedback && !error && (
           <Typography variant="body2" sx={{ opacity: 0.75 }}>

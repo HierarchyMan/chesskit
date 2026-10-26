@@ -1,4 +1,5 @@
 import { useEngineState } from "@/hooks/useEngine";
+import { engineFeatureLabel } from "@/lib/engine/featureEngines";
 import { useFeatureEngineName } from "@/hooks/useFeatureEngineName";
 import {
   ArenaAnalysisSession,
@@ -21,7 +22,10 @@ export const useMoveCoach = (enabled: boolean) => {
   const gameId = useAtomValue(gameIdAtom);
   const player = useAtomValue(playerColorAtom);
   const engineName = useFeatureEngineName("coach");
-  const engineState = useEngineState(enabled ? engineName : undefined);
+  const engineState = useEngineState(
+    enabled ? engineName : undefined,
+    engineFeatureLabel("coach")
+  );
   const engine = engineState.engine;
   const [update, setUpdate] = useState<
     ArenaAnalysisUpdate & { source?: UciEngine; gameId?: number }

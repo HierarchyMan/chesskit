@@ -6,6 +6,7 @@ import { getEngineModel } from "@/lib/engine/models";
 import { effectiveStrength } from "@/lib/engine/botMove";
 import { EngineName } from "@/types/enums";
 import { EngineState, useEngineState } from "@/hooks/useEngine";
+import { engineFeatureLabel } from "@/lib/engine/featureEngines";
 import { useChessActions } from "@/hooks/useChessActions";
 import { getEndgame } from "@/lib/endgames";
 import { CHALLENGE_STRENGTH, scoreFromLine } from "@/lib/engine/strength";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/engine/topMoves";
 import { getGameResult, getOutcomeFor } from "@/lib/gameResult";
 import { useFeatureEngineName } from "@/hooks/useFeatureEngineName";
+import { copyToClipboard } from "@/lib/clipboard";
 import { Icon } from "@iconify/react";
 import {
   Alert,
@@ -108,7 +110,8 @@ export default function GamePanel({ botEngine, coach }: Props) {
   const [notice, setNotice] = useState("");
 
   const hintEngine = useEngineState(
-    hintsOpen && activeMode === "casual" ? analysisEngineName : undefined
+    hintsOpen && activeMode === "casual" ? analysisEngineName : undefined,
+    engineFeatureLabel("advice")
   );
 
   const isCasual = activeMode === "casual";
@@ -193,9 +196,19 @@ export default function GamePanel({ botEngine, coach }: Props) {
 
   const outcome = info.over ? getOutcomeFor(info, playerColor) : "drawn";
 
+  // Order matters on a tall screen, where this panel sits under the board:
+  // what the player taps comes before anything that grows during the game
+  // (the move list, coach and hints), so the controls never drift down.
   return (
     <Stack spacing={2}>
-      {challenge && <ChallengeCard endgame={challenge} />}
+      {!isInProgress && info.over && (
+        <ResultCard
+          reason={info.reason}
+          outcome={outcome}
+          result={info.result}
+          opponent={engineLabel(botEngineName).small}
+        />
+      )}
 
       <Panel
         title={
@@ -229,22 +242,6 @@ export default function GamePanel({ botEngine, coach }: Props) {
             botThinking={botThinking}
             inCheck={game.inCheck()}
             inProgress={isInProgress}
-          />
-
-          <MovesList
-            moves={history}
-            startsWithBlack={startsWithBlack}
-            firstMoveNumber={firstMoveNumber}
-            currentPly={history.length}
-            maxHeight={230}
-            annotations={coach.moves.map((entry) => ({
-              classification: entry.after?.moveClassification,
-              evaluation: entry.after?.lines[0],
-              status:
-                coach.error && !entry.after?.moveClassification
-                  ? "error"
-                  : undefined,
-            }))}
           />
 
           {isInProgress && (
@@ -294,8 +291,26 @@ export default function GamePanel({ botEngine, coach }: Props) {
               Formal game: no hints and no takebacks.
             </Alert>
           )}
+
+          <MovesList
+            moves={history}
+            startsWithBlack={startsWithBlack}
+            firstMoveNumber={firstMoveNumber}
+            currentPly={history.length}
+            maxHeight={230}
+            annotations={coach.moves.map((entry) => ({
+              classification: entry.after?.moveClassification,
+              evaluation: entry.after?.lines[0],
+              status:
+                coach.error && !entry.after?.moveClassification
+                  ? "error"
+                  : undefined,
+            }))}
+          />
         </Stack>
       </Panel>
+
+      {challenge && <ChallengeCard endgame={challenge} />}
 
       {coachActive && <CoachCard coach={coach} />}
 
@@ -305,9 +320,7 @@ export default function GamePanel({ botEngine, coach }: Props) {
             fen={fen}
             positionKey={positionKey}
             engine={hintEngine.engine}
-            engineStatus={hintEngine.status}
-            engineError={hintEngine.error}
-            onRetryEngine={hintEngine.retry}
+            engineState={hintEngine}
             side={hintSide}
             onSideChange={(side) => {
               setHintArrows([]);
@@ -316,15 +329,6 @@ export default function GamePanel({ botEngine, coach }: Props) {
             onArrows={publishHintArrows}
           />
         </Panel>
-      )}
-
-      {!isInProgress && info.over && (
-        <ResultCard
-          reason={info.reason}
-          outcome={outcome}
-          result={info.result}
-          opponent={engineLabel(botEngineName).small}
-        />
       )}
 
       <Snackbar
@@ -452,8 +456,8 @@ function ResultCard({
         ? "mdi:emoticon-sad-outline"
         : "mdi:handshake-outline";
 
-  const copy = (label: string, text: string) => {
-    navigator.clipboard?.writeText?.(text);
+  const copy = async (label: string, text: string) => {
+    if (!(await copyToClipboard(text))) return;
     setCopied(label);
     setTimeout(() => setCopied(""), 1500);
   };

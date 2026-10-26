@@ -5,6 +5,7 @@ import {
 } from "./winPercentage";
 import { MoveClassification } from "@/types/enums";
 import { openingForPlacement } from "@/lib/openingIndex";
+import { Chess } from "chess.js";
 import { getIsPieceSacrifice, isSimplePieceRecapture } from "@/lib/chess";
 
 export const getMovesClassification = (
@@ -31,7 +32,10 @@ export const getMovesClassification = (
 
     const prevPosition = rawPositions[index - 1];
 
-    if (prevPosition.lines.length === 1) {
+    // Forced means the position had one legal move. The number of engine lines
+    // says nothing about that: an engine with no MultiPV, or a search that
+    // reported one line, would make every move forced.
+    if (new Chess(fens[index - 1]).moves().length === 1) {
       return {
         ...rawPosition,
         opening: currentOpening,

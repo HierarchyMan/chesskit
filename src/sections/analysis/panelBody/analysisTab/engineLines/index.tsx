@@ -4,15 +4,34 @@ import {
   boardAtom,
   currentPositionAtom,
   engineMultiPvAtom,
+  engineNameAtom,
 } from "../../../states";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { LineEval } from "@/types/eval";
 import { positionFor } from "@/lib/currentPosition";
+import { EngineFailureAlert } from "@/components/engineDownloadAlert";
+import { DEFAULT_ENGINE } from "@/constants";
+import { useAnalysisEngine } from "../../../engineContext";
 
 export default function EngineLines(props: GridProps) {
   const board = useAtomValue(boardAtom);
   const linesNumber = useAtomValue(engineMultiPvAtom);
   const position = positionFor(useAtomValue(currentPositionAtom), board.fen());
+  const engine = useAnalysisEngine();
+  const setEngineName = useSetAtom(engineNameAtom);
+
+  // An engine that did not start (or is not downloaded) takes the place of its lines.
+  if (engine.status === "error") {
+    return (
+      <Grid container {...props}>
+        <EngineFailureAlert
+          state={engine}
+          retryLabel="Retry analysis"
+          onUseDefault={() => setEngineName(DEFAULT_ENGINE)}
+        />
+      </Grid>
+    );
+  }
 
   const linesSkeleton: LineEval[] = Array.from({ length: linesNumber }).map(
     (_, i) => ({ pv: [`${i}`], depth: 0, multiPv: i + 1 })

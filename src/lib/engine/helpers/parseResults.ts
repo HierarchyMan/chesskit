@@ -25,11 +25,15 @@ export class EvaluationParser {
         depth = property("depth");
       if (pvIndex < 0 || pvIndex + 1 >= tokens.length || !depth) continue;
       const previous = this.lines[multiPv];
-      if (previous && Number(depth) < previous.depth) continue;
-      // A bound is only a guess from an unfinished search; keep the exact score of that depth.
+      if (previous && !previous.bound && Number(depth) < previous.depth)
+        continue;
+      // A bound is only a guess from an unfinished search. Engines print them
+      // for the re-search of one move, so its line holds a refuted move whose
+      // score is merely the edge of the search window. A bound may fill a slot
+      // that has no line yet, and never replaces one.
       const bound =
         fields.includes("lowerbound") || fields.includes("upperbound");
-      if (bound && previous && Number(depth) === previous.depth) continue;
+      if (bound && previous) continue;
       const cp = property("cp"),
         mate = property("mate");
       this.lines[multiPv] = {
@@ -38,6 +42,7 @@ export class EvaluationParser {
         mate: mate ? parseInt(mate) : undefined,
         depth: parseInt(depth),
         multiPv: parseInt(multiPv),
+        ...(bound ? { bound: true } : {}),
       };
     }
     const whiteToPlay = this.fen.split(" ")[1] === "w";

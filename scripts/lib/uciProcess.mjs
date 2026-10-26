@@ -6,14 +6,16 @@
 //   ENGINE=stockfish_17_lite,reckless   a comma list of engine names, or "all"
 //   ENGINE_PATH=...                     the binary, when a single engine is named
 //
-// Browser engines are the builds served with the app, run under Node (Lozza
-// through a Web Worker shim). Native engines are the programs listed in
+// Browser engines are the app's browser builds, run under Node (Lozza through a
+// Web Worker shim): the bundled one from public/, the rest from engine-files/
+// (`npm run engines -- --all`). Native engines are the programs listed in
 // ../engines/engines.json. Joke engines are not real engines and are skipped.
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENGINE_MODELS } from "../../src/lib/engine/models.ts";
+import { localEngineFile } from "../fetch-engines.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../..");
@@ -41,8 +43,7 @@ const locate = (name) => {
     };
   }
 
-  const script =
-    process.env.ENGINE_PATH ?? path.resolve(root, "public", model.script);
+  const script = process.env.ENGINE_PATH ?? localEngineFile(root, model.script);
   if (model.nodeRunner === "worker") {
     return {
       command: process.execPath,
@@ -78,7 +79,9 @@ export const startEngine = async (name) => {
   const { command, args, file: located } = locate(name);
   const file = located ?? args[0] ?? command;
   if (!existsSync(file)) {
-    console.log(`${name}: skipped, nothing at ${file}`);
+    console.log(
+      `${name}: skipped, nothing at ${file} (npm run engines -- --all restores every engine)`
+    );
     return undefined;
   }
 

@@ -71,7 +71,10 @@ function DisplaySwitch({
   );
 }
 
-/** A failed engine start, with its retry, stays in view wherever the overlays are. */
+/**
+ * A failed search, with its retry, stays in view wherever the overlays are. An
+ * engine that did not start shows in place of the engine lines instead.
+ */
 function AnalysisFailure() {
   const error = useAtomValue(analysisPositionErrorAtom);
   const engine = useAnalysisEngine();

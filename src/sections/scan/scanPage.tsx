@@ -42,6 +42,7 @@ import {
 } from "react";
 import GridFrame from "./gridFrame";
 import { useShapeTemplates } from "./useShapeTemplates";
+import { copyToClipboard } from "@/lib/clipboard";
 
 type OrientationChoice = "auto" | "white" | "black";
 
@@ -211,8 +212,8 @@ export default function ScanPage() {
     router.push(path);
   };
 
-  const copyFen = () => {
-    navigator.clipboard?.writeText?.(fen);
+  const copyFen = async () => {
+    if (!(await copyToClipboard(fen))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
