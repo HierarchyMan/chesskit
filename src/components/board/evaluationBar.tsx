@@ -9,43 +9,49 @@ import { useMotionScale } from "@/hooks/useMotionScale";
 
 const noPositionAtom = atom<CurrentPosition>({});
 
+const EMPTY_BAR = { whiteBarPercentage: 50, label: "—" };
+
 interface Props {
   height: number;
   boardOrientation?: Color;
   currentPositionAtom?: PrimitiveAtom<CurrentPosition>;
-  resetWhenPending?: boolean;
   fen: string;
 }
 
+/**
+ * The bar holds the last settled reading while the engine works on the new
+ * position, and only dims to say so. Snapping to 50% and "?" on every move made
+ * the bar flicker through a false "equal" before each real number, which reads
+ * as the position changing when only the number is late. A fresh game starts
+ * from the neutral bar again.
+ */
 export default function EvaluationBar({
   height,
   boardOrientation,
   currentPositionAtom = noPositionAtom,
-  resetWhenPending = false,
   fen,
 }: Props) {
-  const [evalBar, setEvalBar] = useState({
-    whiteBarPercentage: 50,
-    label: "0.0",
-  });
+  const [lastEval, setLastEval] = useState<typeof EMPTY_BAR | null>(null);
   const position = positionFor(useAtomValue(currentPositionAtom), fen);
   const motion = useMotionScale();
-  const slide = motion ? `height ${motion}s` : "none";
+  const slide = motion ? `height ${motion}s, opacity ${motion}s` : "none";
+  const evaluation = position.eval;
+  const currentLine = evaluation?.lines[0];
+  const exactEval =
+    currentLine &&
+    !currentLine.bound &&
+    (currentLine.cp !== undefined || currentLine.mate !== undefined)
+      ? evaluation
+      : undefined;
 
   useEffect(() => {
-    const bestLine = position?.eval?.lines[0];
-    if (!position.eval || !bestLine || bestLine.depth < 6) return;
+    if (exactEval) setLastEval(getEvaluationBarValue(exactEval));
+  }, [exactEval]);
 
-    const evalBar = getEvaluationBarValue(position.eval);
-    setEvalBar(evalBar);
-  }, [position]);
-
-  const currentLine = position.eval?.lines[0];
-  const displayedEval = resetWhenPending
-    ? position.eval && currentLine && currentLine.depth >= 6
-      ? getEvaluationBarValue(position.eval)
-      : { whiteBarPercentage: 50, label: "?" }
-    : evalBar;
+  const displayedEval = exactEval
+    ? getEvaluationBarValue(exactEval)
+    : (lastEval ?? EMPTY_BAR);
+  const pending = !exactEval;
 
   return (
     <Grid
@@ -56,9 +62,21 @@ export default function EvaluationBar({
       height={height}
       border="1px solid black"
       borderRadius={{ xs: "3px", sm: "5px" }}
-      sx={{ contain: "layout" }}
+      sx={{
+        contain: "layout",
+        opacity: pending ? 0.6 : 1,
+        transition: slide,
+      }}
       role="img"
-      aria-label={`Position evaluation: ${displayedEval.label}`}
+      aria-busy={pending}
+      aria-label={
+        pending
+          ? lastEval
+            ? `Updating evaluation. Previous reading: ${lastEval.label}`
+            : "Evaluation pending"
+          : `Position evaluation: ${displayedEval.label}`
+      }
+      title={pending ? "Updating evaluation…" : undefined}
     >
       <Box
         sx={{

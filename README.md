@@ -18,7 +18,7 @@ Chesskit lets you play, study, analyse and review chess with Stockfish on any de
 
 **Play**
 - Play against Stockfish at any Elo from 400 to 3200, at a fixed depth, or at full strength.
-- Casual games offer hints, takebacks and an optional coach. Formal games give no advice before a move; the coach can still grade a move after you make it.
+- Casual games offer hints, takebacks and an optional coach. A coached game shows an evaluation bar beside the board, which can be switched off in the new-game panel. Formal games give no advice before a move; the coach can still grade a move after you make it.
 - **Arrows** under the board show what the engine suggests while you play (off by default), a dashed arrow for the better move after one of yours, and the opponent's threats. See *Engine arrows* below.
 - Odds, clocks, resign and draw offers.
 

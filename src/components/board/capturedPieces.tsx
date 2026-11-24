@@ -29,9 +29,11 @@ export default function CapturedPieces({ fen, color, game }: Props) {
     <Grid
       container
       alignItems="end"
+      wrap="nowrap"
       spacing={0.7}
       size="auto"
       marginLeft={`-${0.3 * PIECE_SCALE}rem`}
+      sx={{ height: 18, overflow: "hidden", flexShrink: 0 }}
       aria-label={`Captured by ${color === Color.White ? "White" : "Black"}`}
     >
       <Stack direction="row" spacing={0.1}>

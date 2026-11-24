@@ -34,6 +34,7 @@ import {
   coachAtom,
   colorChoiceAtom,
   enginePlayNameAtom,
+  playEvalBarAtom,
   gameModeAtom,
   oddsAtom,
   playerColorAtom,
@@ -65,6 +66,7 @@ export default function NewGamePanel({ botEngine }: Props) {
   const [strength, setStrength] = useAtom(botStrengthAtom);
   const [mode, setMode] = useAtom(gameModeAtom);
   const [coach, setCoach] = useAtom(coachAtom);
+  const [evalBar, setEvalBar] = useAtom(playEvalBarAtom);
   const [colorChoice, setColorChoice] = useAtom(colorChoiceAtom);
   const [timeControl, setTimeControl] = useAtom(timeControlAtom);
   const [odds, setOdds] = useAtom(oddsAtom);
@@ -198,6 +200,23 @@ export default function NewGamePanel({ botEngine }: Props) {
               label={
                 <Typography variant="body2">
                   Coach: rate each of my moves and show what weak ones lead to
+                </Typography>
+              }
+            />
+          )}
+          {mode === "casual" && coach && (
+            <FormControlLabel
+              sx={{ ml: 2 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={evalBar}
+                  onChange={(_, checked) => setEvalBar(checked)}
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  Evaluation bar beside the board
                 </Typography>
               }
             />

@@ -1,4 +1,7 @@
 import Board from "@/components/board";
+import StoryControls from "@/components/board/storyControls";
+import { useInBoardCascade } from "@/lib/coachCascade";
+import { chessPathKey } from "@/lib/chessHistory";
 import ArrowOverlay from "@/components/board/arrowOverlay";
 import { useEngineArrows } from "@/components/board/useEngineArrows";
 import { colorNamer } from "@/lib/arrows/legend";
@@ -31,6 +34,7 @@ export default function Arena() {
   const arrows = useAtomValue(arenaProposalArrowsAtom);
   const setArrows = useSetAtom(arenaProposalArrowsAtom);
   const game = useAtomValue(arenaGameAtom);
+  const story = useInBoardCascade(chessPathKey(game));
   const position = useAtomValue(arenaDataAtom);
   const preview = useMemo(
     () => setupPosition(arena.startFen),
@@ -59,17 +63,28 @@ export default function Arena() {
         board={
           <Board
             id="ArenaBoard"
-            canPlay={arena.started && !arena.isOver}
+            canPlay={arena.started && !arena.isOver && !story.projection.active}
             gameAtom={arenaGameAtom}
-            previewFen={!arena.started ? preview.fen : undefined}
+            previewFen={
+              story.projection.previewFen ??
+              (!arena.started ? preview.fen : undefined)
+            }
+            lastMove={story.projection.lastMove}
+            highlights={story.projection.highlights}
+            demonstrationFrame={story.projection.active}
             whitePlayer={{ name: sideLabel(arena.white) }}
             blackPlayer={{ name: sideLabel(arena.black) }}
             boardOrientation={orientation}
             currentPositionAtom={arenaDataAtom}
             showEvaluationBar={arena.started && arena.analysis.showEvaluation}
-            resetEvaluationWhenPending
             showPlayerMoveIconAtom={arenaAnalysisOptionAtoms.annotations}
-            arrows={arena.started ? engine.arrows : NO_ARROWS}
+            arrows={
+              story.projection.active
+                ? story.projection.arrows
+                : arena.started
+                  ? engine.arrows
+                  : NO_ARROWS
+            }
           />
         }
         inspector={
@@ -84,6 +99,8 @@ export default function Arena() {
           >
             <ArenaSidePanel
               arena={arena}
+              story={story}
+              storyControls={<StoryControls story={story} />}
               onArrows={setArrows}
               overlays={
                 arena.started ? (

@@ -13,6 +13,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  Skeleton,
   Slider,
   Stack,
   TextField,
@@ -24,6 +25,7 @@ import {
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
 import { ReactNode, useEffect, useMemo, useState } from "react";
+import { useInBoardCascade } from "@/lib/coachCascade";
 import { BoardArrow } from "@/lib/arrows/types";
 import { arrowFromUci } from "@/lib/arrows/uci";
 import {
@@ -43,8 +45,12 @@ export default function ArenaSidePanel({
   arena,
   onArrows,
   overlays,
+  story,
+  storyControls,
 }: {
   arena: Arena;
+  story: ReturnType<typeof useInBoardCascade>;
+  storyControls: ReactNode;
   onArrows: (arrows: PositionArrows) => void;
   overlays?: ReactNode;
 }) {
@@ -67,7 +73,9 @@ export default function ArenaSidePanel({
       )}
       {arena.started && arena.isOver && <ResultCard arena={arena} />}
       {arena.isOver && playersEditor}
-      {arena.started && <MovesCard arena={arena} />}
+      {arena.started && (
+        <MovesCard arena={arena} story={story} storyControls={storyControls} />
+      )}
       {arena.started && <PlayersSummary arena={arena} />}
     </Stack>
   );
@@ -247,15 +255,25 @@ function ControlsCard({ arena }: { arena: Arena }) {
   return (
     <Panel
       title={
-        <Stack direction="row" alignItems="center" gap={1}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          gap={1}
+          sx={{ minHeight: 24 }}
+        >
           <Typography fontWeight={600}>
             {arena.isOver
               ? "Game over"
               : `${arena.turn === "w" ? "White" : "Black"} to move`}
           </Typography>
-          {arena.proposal.status === "thinking" && (
-            <CircularProgress size={16} thickness={5} />
-          )}
+          <CircularProgress
+            size={16}
+            thickness={5}
+            sx={{
+              visibility:
+                arena.proposal.status === "thinking" ? "visible" : "hidden",
+            }}
+          />
         </Stack>
       }
     >
@@ -271,6 +289,7 @@ function ControlsCard({ arena }: { arena: Arena }) {
             }
             disabled={arena.isOver}
             onClick={() => arena.setRunning(!arena.running)}
+            sx={{ minWidth: 124 }}
           >
             {arena.running ? "Pause" : "Auto-play"}
           </Button>
@@ -325,6 +344,7 @@ function ControlsCard({ arena }: { arena: Arena }) {
               aria-expanded={editingPlayers}
               startIcon={<Icon icon="mdi:cog-outline" height={18} />}
               onClick={() => setEditingPlayers(!editingPlayers)}
+              sx={{ minWidth: 146 }}
             >
               {editingPlayers ? "Hide players" : "Change players"}
             </Button>
@@ -452,14 +472,18 @@ function ProposalCard({
     <Panel
       title={<Typography fontWeight={600}>{moverName} proposes</Typography>}
     >
-      <Stack spacing={1}>
-        {proposal.status === "loading" && (
-          <Typography variant="body2">{proposal.message}</Typography>
-        )}
-        {proposal.status === "thinking" && (
-          <Typography variant="body2" sx={{ opacity: 0.75 }}>
-            Thinking…
-          </Typography>
+      <Stack spacing={1} sx={{ minHeight: 224 }}>
+        {(proposal.status === "loading" || proposal.status === "thinking") && (
+          <>
+            <Typography variant="body2" sx={{ opacity: 0.75 }}>
+              {proposal.status === "loading" ? proposal.message : "Thinking…"}
+            </Typography>
+            <Stack spacing={1}>
+              {[0, 1, 2, 3].map((idx) => (
+                <Skeleton key={idx} variant="rounded" height={42} />
+              ))}
+            </Stack>
+          </>
         )}
         {proposal.status === "error" && (
           <Alert
@@ -569,7 +593,15 @@ function ProposalCard({
   );
 }
 
-function MovesCard({ arena }: { arena: Arena }) {
+function MovesCard({
+  arena,
+  story,
+  storyControls,
+}: {
+  arena: Arena;
+  story: ReturnType<typeof useInBoardCascade>;
+  storyControls: ReactNode;
+}) {
   const history = arena.game.history();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const { analysis } = arena;
@@ -609,6 +641,7 @@ function MovesCard({ arena }: { arena: Arena }) {
             : undefined
         }
         maxHeight={200}
+        fixedHeight
         emptyText={
           arena.isOver
             ? "This starting position is already game over."
@@ -622,7 +655,14 @@ function MovesCard({ arena }: { arena: Arena }) {
               Follow latest move
             </Button>
           )}
-          <MoveFeedback entry={entry} arena={arena} />
+          <MoveFeedback
+            entry={entry}
+            onShowStory={(value) => {
+              arena.setRunning(false);
+              story.start(value, { exitLabel: "Back to game" });
+            }}
+          />
+          {storyControls}
         </>
       )}
     </Panel>

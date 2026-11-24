@@ -1,9 +1,9 @@
 import { createEngine } from "@/lib/engine/createEngine";
 import {
   engineHashMbAtom,
-  jokeAdvisorDepthAtom,
   nativeThreadsAtom,
 } from "@/lib/engine/engineSettings";
+import { useEffectiveJokeAdvisorDepth } from "./useEffectiveEngineSettings";
 import { getEngineModel } from "@/lib/engine/models";
 import {
   EngineNotDownloadedError,
@@ -63,7 +63,7 @@ export const useEngineState = (
   const hashMb = useAtomValue(engineHashMbAtom);
   const threads = useAtomValue(nativeThreadsAtom);
   const advisorName = useFeatureEngineName("jokes");
-  const advisorDepth = useAtomValue(jokeAdvisorDepthAtom);
+  const { depth: advisorDepth } = useEffectiveJokeAdvisorDepth();
   const stored = useAtomValue(storedFilesAtom);
   // Only joke engines that judge moves restart when the advisor changes.
   const advisorKey =

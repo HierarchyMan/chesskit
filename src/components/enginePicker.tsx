@@ -483,6 +483,8 @@ export function EngineField({
   role,
   inherit,
   helper,
+  disabled = false,
+  inheritedText,
 }: {
   label: string;
   value: EnginePick;
@@ -490,6 +492,8 @@ export function EngineField({
   role: EngineRole;
   inherit?: EngineId;
   helper?: ReactNode;
+  disabled?: boolean;
+  inheritedText?: string;
 }) {
   const [open, setOpen] = useState(false);
   const { models } = useModels();
@@ -500,19 +504,23 @@ export function EngineField({
   return (
     <Box>
       <ButtonBase
-        onClick={() => setOpen(true)}
-        aria-label={`${label}: ${engine ? engineLabel(engine).full : "none"}. Change`}
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(true)}
+        aria-label={`${label}: ${engine ? engineLabel(engine).full : "none"}. ${disabled ? "Inherited" : "Change"}`}
         sx={{
           width: "100%",
           textAlign: "left",
           justifyContent: "flex-start",
           border: 1,
+          borderStyle: disabled ? "dashed" : "solid",
           borderColor: "divider",
           borderRadius: 1,
           px: 1.75,
           py: 1,
           gap: 1.5,
-          "&:hover": { borderColor: "text.primary" },
+          opacity: disabled ? 0.55 : 1,
+          bgcolor: disabled ? "action.disabledBackground" : "transparent",
+          "&:hover": disabled ? undefined : { borderColor: "text.primary" },
           "&.Mui-focusVisible": { borderColor: "primary.main" },
         }}
       >
@@ -521,11 +529,13 @@ export function EngineField({
             {label}
           </Typography>
           <Typography variant="body1" noWrap>
-            {value === "analysis" && inherit
-              ? `Same as analysis (${engineLabel(inherit).small})`
-              : engine
-                ? engineLabel(engine).full
-                : "Choose an engine"}
+            {inheritedText
+              ? inheritedText
+              : value === "analysis" && inherit
+                ? `Same as analysis (${engineLabel(inherit).small})`
+                : engine
+                  ? engineLabel(engine).full
+                  : "Choose an engine"}
           </Typography>
           {status && (
             <Typography
@@ -541,7 +551,10 @@ export function EngineField({
           )}
         </Box>
         {view && <RatingBadge model={view.model} />}
-        <Icon icon="mdi:chevron-right" height={22} />
+        <Icon
+          icon={disabled ? "mdi:link-variant" : "mdi:chevron-right"}
+          height={disabled ? 18 : 22}
+        />
       </ButtonBase>
       {helper && (
         <Typography
@@ -551,15 +564,17 @@ export function EngineField({
           {helper}
         </Typography>
       )}
-      <EnginePickerDialog
-        open={open}
-        onClose={() => setOpen(false)}
-        value={value}
-        onSelect={onChange}
-        role={role}
-        title={label}
-        inherit={inherit}
-      />
+      {!disabled && (
+        <EnginePickerDialog
+          open={open}
+          onClose={() => setOpen(false)}
+          value={value}
+          onSelect={onChange}
+          role={role}
+          title={label}
+          inherit={inherit}
+        />
+      )}
     </Box>
   );
 }

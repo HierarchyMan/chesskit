@@ -5,6 +5,10 @@ import { engineLabel } from "@/constants";
 import { getEngineModel } from "@/lib/engine/models";
 import { effectiveStrength } from "@/lib/engine/botMove";
 import { EngineName } from "@/types/enums";
+import {
+  useEffectiveAdvice,
+  useEffectiveBotDrawEvalDepth,
+} from "@/hooks/useEffectiveEngineSettings";
 import { EngineState, useEngineState } from "@/hooks/useEngine";
 import { engineFeatureLabel } from "@/lib/engine/featureEngines";
 import { useChessActions } from "@/hooks/useChessActions";
@@ -35,15 +39,21 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
+import { ToolbarButton } from "@/components/ToolbarButton";
+import StrengthControl from "@/components/strengthControl";
 import { useRouter } from "next/router";
 import { useCallback, useMemo, useState } from "react";
 import { BoardArrow } from "@/lib/arrows/types";
 import ChallengeCard from "./challengeCard";
-import CoachCard from "./coachCard";
 import {
   activeCoachAtom,
   activeGameModeAtom,
+  gameIdAtom,
+  reviewPlyAtom,
+  playEvalBarAtom,
+  playCascadeActiveAtom,
   boardFlippedAtom,
   botStrengthAtom,
   botThinkingAtom,
@@ -59,22 +69,46 @@ import {
 } from "./states";
 import { opposite, useStartGame } from "./useStartGame";
 import { useMoveCoach } from "./useMoveCoach";
+import { useInteractiveCoach } from "./useInteractiveCoach";
 
 interface Props {
   botEngine: EngineState;
   coach: ReturnType<typeof useMoveCoach>;
+  interactive: ReturnType<typeof useInteractiveCoach>;
+  coachSlotRef: (el: HTMLDivElement | null) => void;
 }
 
-export default function GamePanel({ botEngine, coach }: Props) {
+export default function GamePanel({
+  botEngine,
+  coach,
+  interactive,
+  coachSlotRef,
+}: Props) {
+  const store = useStore();
+  const gameId = useAtomValue(gameIdAtom);
+  const inCascade = useAtomValue(playCascadeActiveAtom);
+  const [reviewPly, setReviewPly] = useAtom(reviewPlyAtom);
+  const [evalBar, setEvalBar] = useAtom(playEvalBarAtom);
+  const { backToSetup, restartGame } = useStartGame();
+  const [casualExit, setCasualExit] = useState<"restart" | "discard">(
+    "restart"
+  );
+  const [casualExitOpen, setCasualExitOpen] = useState(false);
+  const confirmCasualExit = (action: "restart" | "discard") => {
+    setCasualExit(action);
+    setCasualExitOpen(true);
+  };
+  const [offeringDraw, setOfferingDraw] = useState(false);
+  const [strengthOpen, setStrengthOpen] = useState(false);
   const game = useAtomValue(gameAtom);
   const playerColor = useAtomValue(playerColorAtom);
   const [isInProgress, setIsInProgress] = useAtom(isGameInProgressAtom);
   const activeMode = useAtomValue(activeGameModeAtom);
-  const coachActive = useAtomValue(activeCoachAtom);
+  const [coachActive, setCoachActive] = useAtom(activeCoachAtom);
   const [end, setEnd] = useAtom(gameEndAtom);
   const botThinking = useAtomValue(botThinkingAtom);
   const botEngineName = useAtomValue(enginePlayNameAtom);
-  const savedStrength = useAtomValue(botStrengthAtom);
+  const [savedStrength, setSavedStrength] = useAtom(botStrengthAtom);
   const challengeId = useAtomValue(challengeIdAtom);
   const challenge = challengeId ? getEndgame(challengeId) : undefined;
   const strength = challenge ? CHALLENGE_STRENGTH : savedStrength;
@@ -87,6 +121,8 @@ export default function GamePanel({ botEngine, coach }: Props) {
     [setHintArrows, positionKey]
   );
   const analysisEngineName = useFeatureEngineName("advice");
+  const { depth: adviceDepth, multiPv: adviceMultiPv } = useEffectiveAdvice();
+  const { depth: botDrawEvalDepth } = useEffectiveBotDrawEvalDepth();
   const { goToMove, undoMove } = useChessActions(gameAtom);
 
   const [hintsOpen, setHintsOpen] = useState(false);
@@ -116,6 +152,14 @@ export default function GamePanel({ botEngine, coach }: Props) {
 
   const isCasual = activeMode === "casual";
   const history = game.history();
+  const livePly = history.length;
+  const reviewing = reviewPly !== null && reviewPly < livePly;
+  const shownPly = reviewing ? reviewPly : livePly;
+  const selectPly = (ply: number) => {
+    const next = Math.max(0, Math.min(livePly, ply));
+    setReviewPly(next < livePly ? next : null);
+  };
+  const flip = () => setFlipped((value) => !value);
   const info = useMemo(() => getGameResult(game, end), [game, end]);
   const isPlayerTurn = game.turn() === playerColor;
   const firstMove = game.history({ verbose: true })[0];
@@ -131,7 +175,8 @@ export default function GamePanel({ botEngine, coach }: Props) {
         : "";
 
   const handleUndo = () => {
-    if (undoDisabledReason) return;
+    if (undoDisabledReason || inCascade || reviewing) return;
+    setReviewPly(null);
     if (isPlayerTurn) goToMove(history.length - 2, game);
     else undoMove();
   };
@@ -144,7 +189,8 @@ export default function GamePanel({ botEngine, coach }: Props) {
 
   const handleOfferDraw = async () => {
     const engine = botEngine.engine;
-    if (!engine || !isPlayerTurn) return;
+    if (!engine || !isPlayerTurn || offeringDraw || reviewing || inCascade)
+      return;
 
     // Joke engines score moves by their own taste, so their scores cannot judge a draw.
     if (getEngineModel(botEngineName).playsOwnMoves) {
@@ -160,13 +206,20 @@ export default function GamePanel({ botEngine, coach }: Props) {
       return;
     }
 
+    setOfferingDraw(true);
+    const stillCurrent = () =>
+      store.get(gameIdAtom) === gameId &&
+      store.get(gameAtom) === game &&
+      store.get(isGameInProgressAtom) &&
+      store.get(enginePlayNameAtom) === botEngineName;
     try {
       const result = await engine.evaluatePositionWithUpdate({
         fen: game.fen(),
-        depth: 12,
+        depth: botDrawEvalDepth,
         multiPv: 2,
         useCloudEval: false,
       });
+      if (!stillCurrent()) return;
       const playerScore = scoreFromLine(result.lines[0], game.turn());
       const botScore = -playerScore;
 
@@ -184,14 +237,61 @@ export default function GamePanel({ botEngine, coach }: Props) {
         );
       }
     } catch (error) {
+      if (stillCurrent()) setNotice("The draw offer could not be evaluated.");
       console.error(error);
-      setNotice("The draw offer could not be evaluated.");
+    } finally {
+      setOfferingDraw(false);
     }
   };
 
   const toggleHints = () => {
     if (hintsOpen) setHintArrows([]);
     setHintsOpen(!hintsOpen);
+  };
+
+  useKeyboardShortcut("f", (event) => {
+    event.preventDefault();
+    flip();
+  });
+  useKeyboardShortcut("h", (event) => {
+    if (!isCasual || !isInProgress || !isPlayerTurn || reviewing || inCascade)
+      return;
+    event.preventDefault();
+    if (coachActive) void interactive.requestHint();
+    else toggleHints();
+  });
+  useKeyboardShortcut("z", (event) => {
+    if (undoDisabledReason || inCascade || reviewing || event.repeat) return;
+    event.preventDefault();
+    handleUndo();
+  });
+  useKeyboardShortcut(["ArrowLeft", "ArrowRight", "Home", "End"], (event) => {
+    if (!livePly || inCascade) return;
+    event.preventDefault();
+    switch (event.key) {
+      case "ArrowLeft":
+        selectPly(shownPly - 1);
+        break;
+      case "ArrowRight":
+        selectPly(shownPly + 1);
+        break;
+      case "Home":
+        selectPly(0);
+        break;
+      case "End":
+        selectPly(livePly);
+        break;
+    }
+  });
+
+  const handleCasualExit = () => {
+    if (casualExit === "restart") {
+      const error = restartGame();
+      if (error) setNotice(error);
+    } else {
+      backToSetup();
+    }
+    setCasualExitOpen(false);
   };
 
   const outcome = info.over ? getOutcomeFor(info, playerColor) : "drawn";
@@ -246,27 +346,28 @@ export default function GamePanel({ botEngine, coach }: Props) {
 
           {isInProgress && (
             <Stack direction="row" flexWrap="wrap" gap={1}>
-              {isCasual && (
+              {isCasual && !coachActive && (
                 <ActionButton
                   icon="mdi:lightbulb-on-outline"
                   label={hintsOpen ? "Hide hints" : "Hint"}
                   tooltip="Show the engine's top moves for either side"
                   onClick={toggleHints}
                   active={hintsOpen}
+                  minWidth={112}
                 />
               )}
               <ActionButton
                 icon="mdi:undo-variant"
                 label="Take back"
                 tooltip={undoDisabledReason || "Take back your last move"}
-                disabled={!!undoDisabledReason}
+                disabled={!!undoDisabledReason || reviewing || inCascade}
                 onClick={handleUndo}
               />
               <ActionButton
                 icon="mdi:swap-vertical"
                 label="Flip"
                 tooltip="Flip the board"
-                onClick={() => setFlipped((value) => !value)}
+                onClick={flip}
               />
               <ActionButton
                 icon="mdi:handshake-outline"
@@ -274,7 +375,13 @@ export default function GamePanel({ botEngine, coach }: Props) {
                 tooltip={
                   isPlayerTurn ? "Ask the bot for a draw" : "Wait for your turn"
                 }
-                disabled={!isPlayerTurn || !botEngine.engine}
+                disabled={
+                  !isPlayerTurn ||
+                  !botEngine.engine ||
+                  offeringDraw ||
+                  reviewing ||
+                  inCascade
+                }
                 onClick={handleOfferDraw}
               />
               <ActionButton
@@ -292,12 +399,87 @@ export default function GamePanel({ botEngine, coach }: Props) {
             </Alert>
           )}
 
+          {isInProgress && isCasual && (
+            <Stack direction="row" gap={0.5} flexWrap="wrap">
+              <Button
+                size="small"
+                variant={coachActive ? "outlined" : "text"}
+                aria-pressed={coachActive}
+                onClick={() => {
+                  if (!coachActive && hintsOpen) toggleHints();
+                  setCoachActive(!coachActive);
+                }}
+              >
+                Coach
+              </Button>
+              <Button
+                size="small"
+                variant={coachActive && evalBar ? "outlined" : "text"}
+                disabled={!coachActive}
+                aria-pressed={coachActive && evalBar}
+                onClick={() => setEvalBar(!evalBar)}
+              >
+                Eval bar
+              </Button>
+              {!challenge && shownStrength && (
+                <Button size="small" onClick={() => setStrengthOpen(true)}>
+                  Bot strength
+                </Button>
+              )}
+              <Button size="small" onClick={() => confirmCasualExit("restart")}>
+                Restart
+              </Button>
+              <Button size="small" onClick={() => confirmCasualExit("discard")}>
+                End practice
+              </Button>
+            </Stack>
+          )}
+
+          <Box ref={coachSlotRef} sx={{ "&:empty": { display: "none" } }} />
+
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            gap={0.5}
+          >
+            <Stack direction="row" data-board-shortcuts>
+              <ToolbarButton
+                tooltip="First position (Home)"
+                icon="ri:skip-back-line"
+                disabled={!shownPly || inCascade}
+                onClick={() => selectPly(0)}
+              />
+              <ToolbarButton
+                tooltip="Previous move (←)"
+                icon="ri:arrow-left-s-line"
+                disabled={!shownPly || inCascade}
+                onClick={() => selectPly(shownPly - 1)}
+              />
+              <ToolbarButton
+                tooltip="Next move (→)"
+                icon="ri:arrow-right-s-line"
+                disabled={!reviewing || inCascade}
+                onClick={() => selectPly(shownPly + 1)}
+              />
+            </Stack>
+            <Button
+              size="small"
+              disabled={!reviewing || inCascade}
+              onClick={() => selectPly(livePly)}
+            >
+              {isInProgress ? "Live position" : "Final position"}
+            </Button>
+          </Stack>
+
           <MovesList
             moves={history}
             startsWithBlack={startsWithBlack}
             firstMoveNumber={firstMoveNumber}
-            currentPly={history.length}
+            currentPly={shownPly}
+            onSelect={inCascade ? undefined : selectPly}
             maxHeight={230}
+            fixedHeight
             annotations={coach.moves.map((entry) => ({
               classification: entry.after?.moveClassification,
               evaluation: entry.after?.lines[0],
@@ -312,8 +494,6 @@ export default function GamePanel({ botEngine, coach }: Props) {
 
       {challenge && <ChallengeCard endgame={challenge} />}
 
-      {coachActive && <CoachCard coach={coach} />}
-
       {isInProgress && isCasual && hintsOpen && (
         <Panel title="Hints">
           <TopMovesPanel
@@ -322,6 +502,8 @@ export default function GamePanel({ botEngine, coach }: Props) {
             engine={hintEngine.engine}
             engineState={hintEngine}
             side={hintSide}
+            depth={adviceDepth}
+            count={adviceMultiPv}
             onSideChange={(side) => {
               setHintArrows([]);
               setHintSideChoice({ side, fen, positionKey });
@@ -337,6 +519,51 @@ export default function GamePanel({ botEngine, coach }: Props) {
         onClose={() => setNotice("")}
         message={notice}
       />
+
+      <Dialog
+        open={strengthOpen}
+        onClose={() => setStrengthOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Bot strength</DialogTitle>
+        <DialogContent dividers>
+          <StrengthControl
+            value={savedStrength}
+            onChange={setSavedStrength}
+            engineName={botEngineName}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setStrengthOpen(false)}>Done</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={casualExitOpen}
+        onClose={() => setCasualExitOpen(false)}
+        aria-labelledby="play-exit-title"
+      >
+        <DialogTitle id="play-exit-title">
+          {casualExit === "restart"
+            ? "Restart this game?"
+            : "End this practice game?"}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Your current moves will be discarded. This practice game won’t count
+            as a loss.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button autoFocus onClick={() => setCasualExitOpen(false)}>
+            Keep playing
+          </Button>
+          <Button variant="contained" onClick={handleCasualExit}>
+            {casualExit === "restart" ? "Restart game" : "End practice"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={confirmResign} onClose={() => setConfirmResign(false)}>
         <DialogTitle>Resign this game?</DialogTitle>
@@ -372,13 +599,29 @@ function StatusLine({
   if (!inProgress || over) return null;
 
   return (
-    <Stack direction="row" alignItems="center" gap={1}>
-      {isPlayerTurn ? (
-        <Icon icon="mdi:cursor-default-click-outline" height={20} />
-      ) : (
-        <CircularProgress size={16} thickness={5} />
-      )}
-      <Typography variant="body2">
+    <Stack
+      direction="row"
+      alignItems="center"
+      gap={1}
+      sx={{ height: 24, minHeight: 24 }}
+    >
+      <Box
+        sx={{
+          width: 20,
+          height: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        {isPlayerTurn ? (
+          <Icon icon="mdi:cursor-default-click-outline" height={20} />
+        ) : (
+          <CircularProgress size={16} thickness={5} />
+        )}
+      </Box>
+      <Typography variant="body2" noWrap>
         {isPlayerTurn
           ? inCheck
             ? "You are in check. Your move."
@@ -398,6 +641,7 @@ function ActionButton({
   onClick,
   disabled,
   active,
+  minWidth,
 }: {
   icon: string;
   label: string;
@@ -405,6 +649,7 @@ function ActionButton({
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
+  minWidth?: number;
 }) {
   return (
     <Tooltip title={tooltip}>
@@ -416,6 +661,7 @@ function ActionButton({
           disabled={disabled}
           onClick={onClick}
           startIcon={<Icon icon={icon} height={18} />}
+          sx={minWidth ? { minWidth } : undefined}
         >
           {label}
         </Button>

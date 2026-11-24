@@ -48,3 +48,10 @@ export const soundEnabledAtom = storedAtom<boolean>(
   true,
   (value): value is boolean => typeof value === "boolean"
 );
+
+/** Promote a pawn to a queen at once, without asking which piece. */
+export const autoQueenAtom = storedAtom<boolean>(
+  "autoQueen",
+  false,
+  (value): value is boolean => typeof value === "boolean"
+);

@@ -1,3 +1,4 @@
+import { useEffectiveAdvice } from "@/hooks/useEffectiveEngineSettings";
 import { engineDepthAtom } from "@/sections/analysis/states";
 import { EngineFeature, engineFeatureLabel } from "@/lib/engine/featureEngines";
 import { CurrentPosition } from "@/types/eval";
@@ -17,11 +18,11 @@ const isOver = (fen: string): boolean => {
 
 /**
  * The engine's evaluation of one position, on the engine chosen for `feature`,
- * to the depth set for analysis. The snapshot names the position it describes,
- * so a board that has moved on can tell it is out of date (see `positionFor`).
- * The engine is loaded while `enabled`, which should follow the user's
- * choice and not the turn, and it searches only while `active`. No engine is
- * loaded, and nothing runs, while `enabled` is false.
+ * to that feature's configured search depth. The snapshot names the position it
+ * describes, so a board that has moved on can tell it is out of date (see
+ * `positionFor`). The engine is loaded while `enabled`, which should follow the
+ * user's choice and not the turn, and it searches only while `active`. No
+ * engine is loaded, and nothing runs, while `enabled` is false.
  */
 export const usePositionEval = ({
   feature,
@@ -37,7 +38,9 @@ export const usePositionEval = ({
   lines: number;
 }): CurrentPosition => {
   const engineName = useFeatureEngineName(feature);
-  const depth = useAtomValue(engineDepthAtom);
+  const analysisDepth = useAtomValue(engineDepthAtom);
+  const { depth: adviceDepth } = useEffectiveAdvice();
+  const depth = feature === "advice" ? adviceDepth : analysisDepth;
   const engine = useEngineState(
     enabled ? engineName : undefined,
     engineFeatureLabel(feature)

@@ -59,8 +59,10 @@ export default function PlayerHeader({
       sx={{
         minHeight: 40,
         height: 40,
+        maxHeight: 40,
         flexShrink: 0,
         minWidth: 0,
+        overflow: "hidden",
         userSelect: "none",
         flexWrap: "nowrap",
       }}
@@ -112,9 +114,15 @@ export default function PlayerHeader({
               : color === Color.White
                 ? "black"
                 : "white",
+            height: 34,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            px: 1,
+            flexShrink: 0,
+            fontVariantNumeric: "tabular-nums",
           }}
           borderRadius="5px"
-          padding={0.8}
           border="1px solid #424242"
           width="5rem"
           textAlign="right"

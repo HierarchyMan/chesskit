@@ -362,6 +362,46 @@ export const getThreatenedPieces = (game: Chess, color: Color): Square[] => {
   return threatened;
 };
 
+const HANGING_VALUES: Record<PieceSymbol, number> = {
+  p: 1,
+  n: 3,
+  b: 3,
+  r: 5,
+  q: 9,
+  k: 100,
+};
+
+/**
+ * The squares of `color`'s pieces that really are in danger: attacked, and
+ * either not defended or attacked by something worth less than the piece. A
+ * defended piece attacked only by a more valuable one is not marked, since
+ * taking it would lose material. Marking every attacked piece (a defended
+ * pawn, a knight guarded by a pawn) is noise a player learns to ignore.
+ */
+export const getHangingPieces = (game: Chess, color: Color): Square[] => {
+  const attacker = color === Color.White ? Color.Black : Color.White;
+  const hanging: Square[] = [];
+  for (const row of game.board()) {
+    for (const piece of row) {
+      if (!piece || piece.color !== color || piece.type === "k") continue;
+      const attackers = game.attackers(piece.square, attacker);
+      if (!attackers.length) continue;
+
+      const defended = game.isAttacked(piece.square, color);
+      const cheapestAttacker = Math.min(
+        ...attackers.map((square) => {
+          const type = game.get(square)?.type;
+          return type ? HANGING_VALUES[type] : HANGING_VALUES.k;
+        })
+      );
+      if (!defended || cheapestAttacker < HANGING_VALUES[piece.type]) {
+        hanging.push(piece.square);
+      }
+    }
+  }
+  return hanging;
+};
+
 /** Captures come from this game's moves, not missing starting material.
  * Custom roots, promotions and en passant make a FEN-only inventory ambiguous. */
 export const getCapturedPieces = (

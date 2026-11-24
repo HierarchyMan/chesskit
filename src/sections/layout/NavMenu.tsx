@@ -14,7 +14,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { useAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import Image from "next/image";
 import NextLink from "next/link";
 import { useRouter } from "next/router";
@@ -25,7 +25,7 @@ import {
   NavItem,
   isNavItemActive,
 } from "./navItems";
-import { navPreferenceAtom } from "./states";
+import { navPreferenceAtom, shortcutsOpenAtom } from "./states";
 
 export const NAV_COLLAPSED_WIDTH = 68;
 export const NAV_EXPANDED_WIDTH = 228;
@@ -40,6 +40,7 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const isNarrow = useMediaQuery("(max-width:1279.95px)");
   const [navPreference, setNavPreference] = useAtom(navPreferenceAtom);
+  const setShortcutsOpen = useSetAtom(shortcutsOpenAtom);
   const router = useRouter();
 
   const expanded = isDesktop ? (navPreference ?? !isNarrow) : true;
@@ -161,6 +162,32 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
         ))}
       </Box>
 
+      <Tooltip title="Keyboard shortcuts (?)" placement="right">
+        <ListItemButton
+          aria-label="Keyboard shortcuts"
+          onClick={() => {
+            if (!isDesktop) onMobileClose();
+            setShortcutsOpen(true);
+          }}
+          sx={{
+            mx: 1,
+            borderRadius: 2,
+            flexGrow: 0,
+            justifyContent: expanded ? "flex-start" : "center",
+          }}
+        >
+          <Typography
+            aria-hidden="true"
+            fontWeight={700}
+            sx={{ width: 22, textAlign: "center" }}
+          >
+            ?
+          </Typography>
+          {expanded && (
+            <ListItemText primary="Keyboard shortcuts" sx={{ ml: 1 }} />
+          )}
+        </ListItemButton>
+      </Tooltip>
       {isDesktop && (
         <Stack
           alignItems={expanded ? "flex-end" : "center"}

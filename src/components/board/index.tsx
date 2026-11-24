@@ -8,6 +8,7 @@ import {
   Square,
 } from "react-chessboard/dist/chessboard/types";
 import { useChessActions } from "@/hooks/useChessActions";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import {
   ReactNode,
   RefObject,
@@ -26,17 +27,24 @@ import EvaluationBar from "./evaluationBar";
 import { Player } from "@/types/game";
 import PlayerHeader from "./playerHeader";
 import { useBoardAppearance } from "./appearance";
+import { autoQueenAtom } from "./states";
 import ArrowLayer from "./arrowLayer";
 import { useInkArrows } from "./useInkArrows";
 import { BoardArrow } from "@/lib/arrows/types";
-import { chessPathKey } from "@/lib/chessHistory";
-import { getCheckedKing, getThreatenedPieces } from "@/lib/chess";
+import { chessPathKey, isChessPrefix } from "@/lib/chessHistory";
+import { getCheckedKing, getHangingPieces } from "@/lib/chess";
 import QualityIcon, { useQualityMark } from "./moveQuality";
 import DrawBadges from "./drawBadges";
 import { getBoardDraw } from "@/lib/boardDraw";
 import { GameEnd } from "@/lib/gameResult";
 import { PIECE_SLIDE_MS } from "@/lib/pieceMotion";
-import { BoardCues, LastMoveCue, VerdictCue } from "./cues";
+import {
+  BoardCues,
+  BoardEffect,
+  LastMoveCue,
+  SquareHighlight,
+  VerdictCue,
+} from "./cues";
 import VerdictMark from "./verdictMark";
 
 const noPositionAtom = atom<CurrentPosition>({});
@@ -53,7 +61,8 @@ export interface Props {
   currentPositionAtom?: PrimitiveAtom<CurrentPosition>;
   showPlayerMoveIconAtom?: PrimitiveAtom<boolean>;
   showEvaluationBar?: boolean;
-  resetEvaluationWhenPending?: boolean;
+  /** Changes when the board is attached to a different game or session. */
+  gameIdentity?: number | string;
   arrows?: readonly BoardArrow[];
   /** Controls that sit above the board, such as a compact overlay entry. */
   header?: ReactNode;
@@ -71,10 +80,29 @@ export interface Props {
   lastMove?: LastMoveCue;
   /** A square to ring, such as the piece a hint points at. */
   hintSquare?: Square;
+  /** Multi-square semantic highlights (danger, bright, success, mentioned, selected). */
+  highlights?: readonly SquareHighlight[];
+  /** Transient square animation (king shake/spin, progress badge). */
+  effect?: BoardEffect;
+  /** Visual demonstration frame shown while the coach plays out a preview cascade. */
+  demonstrationFrame?: boolean;
   /** A tick or cross on the square the user's move went to. */
   verdict?: VerdictCue;
   /** Names the position shown; a change means a different position, not a move. */
   motionKey?: string;
+  /**
+   * Let the player queue one move while the opponent is thinking (a premove).
+   * It plays the moment the opponent replies, if it is still legal, and is
+   * dropped if anything else changes the game first.
+   */
+  premoves?: boolean;
+  /**
+   * Frame the viewer's own pieces the other side can win, on the other side's
+   * turn. Off by default: it is an aid, so a mode without aids leaves it off.
+   */
+  threatMarks?: boolean;
+  /** Called with +1 or -1 as the wheel turns over the board, to step through moves. */
+  onWheelStep?: (direction: 1 | -1) => void;
 }
 
 /** The board's width in pixels, measured as it changes. */
@@ -103,7 +131,7 @@ export default function Board({
   currentPositionAtom = noPositionAtom,
   showPlayerMoveIconAtom,
   showEvaluationBar = false,
-  resetEvaluationWhenPending = false,
+  gameIdentity,
   arrows,
   header,
   footer,
@@ -113,8 +141,14 @@ export default function Board({
   recordedDraw,
   lastMove,
   hintSquare,
+  highlights,
+  effect,
+  demonstrationFrame = false,
   verdict,
   motionKey,
+  premoves = false,
+  threatMarks = false,
+  onWheelStep,
 }: Props) {
   const stage = useBoardStage();
   const boardSize = stage?.width ?? suppliedBoardSize;
@@ -147,11 +181,22 @@ export default function Board({
     showPlayerMoveIconAtom
   );
   const { playMove } = useChessActions(gameAtom);
+  const autoQueen = useAtomValue(autoQueenAtom);
+  const [queuedMove, setQueuedMove] = useState<{
+    from: Square;
+    to: Square;
+    game: Chess;
+    identity: typeof gameIdentity;
+    color: Color;
+  } | null>(null);
   const clickedSquaresAtom = useMemo(() => atom<Square[]>([]), []);
   const setClickedSquares = useSetAtom(clickedSquaresAtom);
   const playableSquaresAtom = useMemo(() => atom<MoveTarget[]>([]), []);
   const setPlayableSquares = useSetAtom(playableSquaresAtom);
   const [showPromotionDialog, setShowPromotionDialog] = useState(false);
+  const pendingPromotion = useRef(false);
+  const isDragging = useRef(false);
+  const dragCancelled = useRef(false);
   const [moveClickFrom, setMoveClickFrom] = useState<Square | null>(null);
   const [moveClickTo, setMoveClickTo] = useState<Square | null>(null);
   const appearance = useBoardAppearance();
@@ -183,8 +228,10 @@ export default function Board({
           ? { from: lastFrom, to: lastTo, tone: lastTone }
           : undefined,
       hint: hintSquare,
+      highlights,
+      effect,
     });
-  }, [lastFrom, lastTo, lastTone, hintSquare, setCues]);
+  }, [lastFrom, lastTo, lastTone, hintSquare, highlights, effect, setCues]);
   const drawResult = useMemo(
     () =>
       getBoardDraw(
@@ -209,6 +256,7 @@ export default function Board({
   // around it while a drag is under way.
 
   useEffect(() => {
+    pendingPromotion.current = false;
     setClickedSquares([]);
     setMoveClickFrom(null);
     setMoveClickTo(null);
@@ -216,35 +264,110 @@ export default function Board({
     setPlayableSquares([]);
   }, [gameFen, setClickedSquares, setPlayableSquares]);
 
+  const allowPremove =
+    premoves &&
+    !previewFen &&
+    (canPlay === Color.White || canPlay === Color.Black);
   const isPiecePlayable = useCallback(
-    ({ piece }: { piece: string }): boolean => {
-      if (game.isGameOver() || !canPlay) return false;
-      if (canPlay === true || canPlay === piece[0]) return true;
-      return false;
-    },
-    [canPlay, game]
+    ({ piece }: { piece: string }): boolean =>
+      !previewFen &&
+      !game.isGameOver() &&
+      (canPlay === true || canPlay === piece[0]) &&
+      (turn === piece[0] || allowPremove),
+    [allowPremove, canPlay, game, previewFen, turn]
   );
+
+  useEffect(() => {
+    if (!queuedMove) return;
+    if (
+      !allowPremove ||
+      queuedMove.identity !== gameIdentity ||
+      queuedMove.color !== canPlay ||
+      game.isGameOver()
+    ) {
+      setQueuedMove(null);
+      return;
+    }
+    if (game === queuedMove.game) return;
+    setQueuedMove(null);
+
+    const history = game.history({ verbose: true });
+    if (
+      turn !== canPlay ||
+      history.length !== queuedMove.game.history().length + 1 ||
+      !isChessPrefix(queuedMove.game, game)
+    )
+      return;
+
+    const legal = game
+      .moves({ square: queuedMove.from, verbose: true })
+      .find(
+        (move) =>
+          move.to === queuedMove.to &&
+          (!move.promotion || (autoQueen && move.promotion === "q"))
+      );
+    if (legal)
+      playMove(
+        { from: legal.from, to: legal.to, promotion: legal.promotion },
+        game
+      );
+  }, [
+    allowPremove,
+    autoQueen,
+    canPlay,
+    game,
+    gameIdentity,
+    playMove,
+    queuedMove,
+    turn,
+  ]);
 
   const onPieceDrop = useCallback(
     (source: Square, target: Square, piece: string): boolean => {
-      if (!isPiecePlayable({ piece })) return false;
+      if (dragCancelled.current || !isPiecePlayable({ piece })) return false;
+      if (turn !== piece[0]) {
+        if (
+          source !== target &&
+          (canPlay === Color.White || canPlay === Color.Black)
+        ) {
+          setQueuedMove({
+            from: source,
+            to: target,
+            game,
+            identity: gameIdentity,
+            color: canPlay,
+          });
+        }
+        return false;
+      }
 
+      const promotion = game
+        .moves({ square: source, verbose: true })
+        .find((move) => move.to === target && move.promotion === "q");
+      if (promotion && !autoQueen) {
+        pendingPromotion.current = true;
+        setMoveClickFrom(source);
+        setMoveClickTo(target);
+        setShowPromotionDialog(true);
+        return false;
+      }
       const result = playMove(
         {
           from: source,
           to: target,
-          promotion: piece[1]?.toLowerCase() ?? "q",
+          promotion: promotion ? "q" : undefined,
         },
         game
       );
 
       return !!result;
     },
-    [isPiecePlayable, playMove, game]
+    [autoQueen, canPlay, game, gameIdentity, isPiecePlayable, playMove, turn]
   );
 
   const resetMoveClick = useCallback(
     (square?: Square | null) => {
+      pendingPromotion.current = false;
       setMoveClickFrom(square ?? null);
       setMoveClickTo(null);
       setShowPromotionDialog(false);
@@ -264,14 +387,84 @@ export default function Board({
     [setMoveClickFrom, setMoveClickTo, setPlayableSquares, game]
   );
 
+  const cancelBoardInput = () => {
+    if (isDragging.current) dragCancelled.current = true;
+    resetMoveClick();
+    setQueuedMove(null);
+  };
+  useKeyboardShortcut(
+    "Escape",
+    cancelBoardInput,
+    !!moveClickFrom || !!queuedMove || showPromotionDialog
+  );
+
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board || !onWheelStep) return;
+    let lastStep = 0;
+    let distance = 0;
+    let lastWheel = 0;
+    const handleWheel = (event: WheelEvent) => {
+      if (
+        event.ctrlKey ||
+        event.metaKey ||
+        !event.deltaY ||
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      )
+        return;
+      event.preventDefault();
+      const now = performance.now();
+      if (
+        now - lastWheel > 150 ||
+        Math.sign(distance) !== Math.sign(event.deltaY)
+      )
+        distance = 0;
+      lastWheel = now;
+      distance += event.deltaY * (event.deltaMode ? 24 : 1);
+      if (Math.abs(distance) < 24 || now - lastStep < 110) return;
+      lastStep = now;
+      onWheelStep(distance > 0 ? 1 : -1);
+      distance = 0;
+    };
+    board.addEventListener("wheel", handleWheel, { passive: false });
+    return () => board.removeEventListener("wheel", handleWheel);
+  }, [onWheelStep]);
+
   const handleSquareLeftClick = useCallback(
     (square: Square, piece?: string) => {
       setClickedSquares([]);
       clearInk();
 
+      if (showPromotionDialog) return;
+      if (moveClickFrom === square) {
+        resetMoveClick();
+        return;
+      }
+
+      const canSelect = !!piece && isPiecePlayable({ piece });
       if (!moveClickFrom) {
-        if (piece && !isPiecePlayable({ piece })) return;
-        resetMoveClick(square);
+        if (canSelect) resetMoveClick(square);
+        return;
+      }
+
+      const selected = game.get(moveClickFrom);
+      if (
+        selected &&
+        selected.color !== turn &&
+        allowPremove &&
+        (canPlay === Color.White || canPlay === Color.Black)
+      ) {
+        if (canSelect) resetMoveClick(square);
+        else {
+          setQueuedMove({
+            from: moveClickFrom,
+            to: square,
+            game,
+            identity: gameIdentity,
+            color: canPlay,
+          });
+          resetMoveClick();
+        }
         return;
       }
 
@@ -279,17 +472,13 @@ export default function Board({
       const move = validMoves.find((m) => m.to === square);
 
       if (!move) {
-        resetMoveClick(square);
+        resetMoveClick(canSelect ? square : null);
         return;
       }
 
       setMoveClickTo(square);
 
-      if (
-        move.piece === "p" &&
-        ((move.color === "w" && square[1] === "8") ||
-          (move.color === "b" && square[1] === "1"))
-      ) {
+      if (move.promotion && !autoQueen) {
         setShowPromotionDialog(true);
         return;
       }
@@ -298,20 +487,27 @@ export default function Board({
         {
           from: moveClickFrom,
           to: square,
+          promotion: move.promotion ? "q" : undefined,
         },
         game
       );
 
-      resetMoveClick(result ? undefined : square);
+      resetMoveClick(result || !canSelect ? undefined : square);
     },
     [
+      allowPremove,
+      autoQueen,
+      canPlay,
+      clearInk,
       game,
+      gameIdentity,
       isPiecePlayable,
       moveClickFrom,
       playMove,
       resetMoveClick,
       setClickedSquares,
-      clearInk,
+      showPromotionDialog,
+      turn,
     ]
   );
 
@@ -328,18 +524,24 @@ export default function Board({
 
   const handlePieceDragBegin = useCallback(
     (_: string, square: Square) => {
+      isDragging.current = true;
+      dragCancelled.current = false;
       resetMoveClick(square);
     },
     [resetMoveClick]
   );
 
   const handlePieceDragEnd = useCallback(() => {
-    resetMoveClick();
+    isDragging.current = false;
+    if (!pendingPromotion.current) resetMoveClick();
   }, [resetMoveClick]);
 
   const onPromotionPieceSelect = useCallback(
     (piece?: PromotionPieceOption, from?: Square, to?: Square) => {
-      if (!piece) return false;
+      if (!piece) {
+        resetMoveClick();
+        return false;
+      }
       const promotionPiece = piece[1]?.toLowerCase() ?? "q";
 
       if (moveClickFrom && moveClickTo) {
@@ -384,12 +586,17 @@ export default function Board({
       atom((get) => {
         // Only a side the viewer plays can be threatened, and only while the
         // other side is to move: on the viewer's own turn they can act first.
-        if (canPlay !== Color.White && canPlay !== Color.Black) return [];
+        if (
+          !threatMarks ||
+          previewFen ||
+          (canPlay !== Color.White && canPlay !== Color.Black)
+        )
+          return [];
         const game = get(gameAtom);
         if (game.turn() === canPlay) return [];
-        return getThreatenedPieces(game, canPlay);
+        return getHangingPieces(game, canPlay);
       }),
-    [gameAtom, canPlay]
+    [gameAtom, canPlay, previewFen, threatMarks]
   );
 
   const SquareRenderer: CustomSquareRenderer = useMemo(() => {
@@ -435,7 +642,7 @@ export default function Board({
                 height={pixels ?? boardSize ?? 400}
                 boardOrientation={boardOrientation}
                 currentPositionAtom={currentPositionAtom}
-                resetWhenPending={resetEvaluationWhenPending}
+                key={gameIdentity}
                 fen={gameFen}
               />
             )}
@@ -473,35 +680,71 @@ export default function Board({
           justifyContent="center"
           alignItems="center"
           ref={boardRef}
-          sx={{ aspectRatio: "1 / 1", width: "100%", position: "relative" }}
+          sx={{
+            aspectRatio: "1 / 1",
+            width: "100%",
+            minWidth: 0,
+            position: "relative",
+            borderRadius: demonstrationFrame ? "10px" : 0,
+            boxShadow: demonstrationFrame
+              ? "0 0 0 3px rgba(245, 184, 46, 0.72), 0 10px 28px rgba(0, 0, 0, 0.28)"
+              : "none",
+            transition: "box-shadow 220ms ease",
+          }}
           size={12}
+          onMouseDownCapture={(event) => {
+            if (event.button === 2 && isDragging.current) cancelBoardInput();
+          }}
           {...handlers}
         >
-          <Chessboard
-            id={`${boardId}-${canPlay}`}
-            position={gameFen}
-            onPieceDrop={onPieceDrop}
-            boardOrientation={
-              boardOrientation === Color.White ? "white" : "black"
-            }
-            customBoardStyle={appearance.customBoardStyle}
-            customDarkSquareStyle={appearance.customDarkSquareStyle}
-            customLightSquareStyle={appearance.customLightSquareStyle}
-            showBoardNotation={appearance.showBoardNotation}
-            areArrowsAllowed={false}
-            isDraggablePiece={isPiecePlayable}
-            customSquare={SquareRenderer}
-            onSquareClick={handleSquareLeftClick}
-            onSquareRightClick={handleSquareRightClick}
-            onPieceDragBegin={handlePieceDragBegin}
-            onPieceDragEnd={handlePieceDragEnd}
-            onPromotionPieceSelect={onPromotionPieceSelect}
-            showPromotionDialog={showPromotionDialog}
-            promotionToSquare={moveClickTo}
-            animationDuration={PIECE_SLIDE_MS}
-            motionKey={motionKey}
-            customPieces={appearance.customPieces}
-          />
+          <Box sx={{ position: "absolute", inset: 0 }}>
+            <Chessboard
+              id={boardId}
+              boardWidth={pixels}
+              position={gameFen}
+              onPieceDrop={onPieceDrop}
+              boardOrientation={
+                boardOrientation === Color.White ? "white" : "black"
+              }
+              customBoardStyle={appearance.customBoardStyle}
+              customDarkSquareStyle={appearance.customDarkSquareStyle}
+              customLightSquareStyle={appearance.customLightSquareStyle}
+              showBoardNotation={appearance.showBoardNotation}
+              areArrowsAllowed={false}
+              isDraggablePiece={isPiecePlayable}
+              customSquare={SquareRenderer}
+              onSquareClick={handleSquareLeftClick}
+              onSquareRightClick={handleSquareRightClick}
+              onPieceDragBegin={handlePieceDragBegin}
+              onPieceDragEnd={handlePieceDragEnd}
+              onPromotionPieceSelect={onPromotionPieceSelect}
+              onPromotionCheck={() => false}
+              customSquareStyles={{
+                ...(moveClickFrom && !previewFen
+                  ? {
+                      [moveClickFrom]: {
+                        boxShadow: "inset 0 0 0 3px rgba(72, 119, 194, .9)",
+                      },
+                    }
+                  : {}),
+                ...(queuedMove && allowPremove
+                  ? {
+                      [queuedMove.from]: {
+                        backgroundColor: "rgba(140, 104, 199, .45)",
+                      },
+                      [queuedMove.to]: {
+                        backgroundColor: "rgba(140, 104, 199, .65)",
+                      },
+                    }
+                  : {}),
+              }}
+              showPromotionDialog={showPromotionDialog}
+              promotionToSquare={moveClickTo}
+              animationDuration={PIECE_SLIDE_MS}
+              motionKey={motionKey}
+              customPieces={appearance.customPieces}
+            />
+          </Box>
           <ArrowLayer
             arrows={arrows ?? NO_ARROWS}
             ink={ink}
@@ -511,12 +754,15 @@ export default function Board({
             fen={gameFen}
             size={pixels}
             masking
-            qualityMarkedSquare={qualityMark?.square ?? verdict?.square}
+            qualityMarkedSquare={
+              previewFen ? undefined : (qualityMark?.square ?? verdict?.square)
+            }
           />
-          {verdict && !qualityMark && (
+          {!previewFen && verdict && !qualityMark && (
             <VerdictMark verdict={verdict} orientation={orientation} />
           )}
-          {qualityMark &&
+          {!previewFen &&
+            qualityMark &&
             !drawResult?.kings.some(
               (king) => king.square === qualityMark.square
             ) && <QualityIcon mark={qualityMark} orientation={orientation} />}

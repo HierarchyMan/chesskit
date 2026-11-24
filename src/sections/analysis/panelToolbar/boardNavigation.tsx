@@ -28,7 +28,7 @@ export default function BoardNavigation() {
       undoBoardMove();
     }
   });
-  useKeyboardShortcut("ArrowDown", (event) => {
+  useKeyboardShortcut(["ArrowUp", "Home"], (event) => {
     if (boardHistory.length) {
       event.preventDefault();
       resetBoard();
@@ -43,9 +43,10 @@ export default function BoardNavigation() {
       alignItems="center"
       gap={0.5}
       width="100%"
+      sx={{ height: 44, minHeight: 44, maxHeight: 44, flexShrink: 0 }}
     >
       <ToolbarButton
-        tooltip="Back to start (↓)"
+        tooltip="Back to start (↑ / Home)"
         onClick={() => resetBoard()}
         icon="ri:skip-back-line"
         disabled={boardHistory.length === 0}

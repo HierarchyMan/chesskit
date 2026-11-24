@@ -13,7 +13,7 @@ export default function GoToLastPositionButton() {
     navigate("end");
   };
 
-  useKeyboardShortcut("ArrowUp", (event) => {
+  useKeyboardShortcut(["ArrowDown", "End"], (event) => {
     if (!isButtonDisabled) {
       event.preventDefault();
       goToLastPosition();
@@ -22,7 +22,7 @@ export default function GoToLastPositionButton() {
 
   return (
     <ToolbarButton
-      tooltip="Final position (↑)"
+      tooltip="Final position (↓ / End)"
       onClick={goToLastPosition}
       icon="ri:skip-forward-line"
       disabled={isButtonDisabled}

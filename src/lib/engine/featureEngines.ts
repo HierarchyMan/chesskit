@@ -11,11 +11,36 @@ import { isReliableEngineId } from "./models";
 export type EngineFeature =
   | "threats"
   | "coach"
+  | "coachDialogue"
   | "advice"
   | "evaluator"
   | "jokes";
 
-export type EngineChoice = "analysis" | EngineId;
+export type EngineInheritSource = "analysis" | "coach" | "bot";
+export type EngineChoice = EngineInheritSource | EngineId;
+
+export const ENGINE_INHERIT_SOURCES: Record<
+  EngineFeature,
+  readonly EngineInheritSource[]
+> = {
+  coach: ["analysis", "bot"],
+  coachDialogue: ["analysis", "coach", "bot"],
+  advice: ["analysis", "bot"],
+  threats: ["analysis", "bot"],
+  evaluator: ["analysis"],
+  jokes: ["analysis"],
+};
+
+export const ENGINE_INHERIT_LABELS: Record<EngineInheritSource, string> = {
+  analysis: "Analysis",
+  coach: "Coach",
+  bot: "Bot",
+};
+
+export const isEngineInheritSource = (
+  value: unknown
+): value is EngineInheritSource =>
+  value === "analysis" || value === "coach" || value === "bot";
 
 export const ENGINE_FEATURES: {
   id: EngineFeature;
@@ -23,9 +48,14 @@ export const ENGINE_FEATURES: {
   help: string;
 }[] = [
   {
-    id: "threats",
-    label: "Threats",
-    help: "Finds what the opponent would do if it were their move, in Analysis and Play.",
+    id: "coach",
+    label: "Play coach (grading)",
+    help: "Grades each move you make against a bot and drives the live evaluation bar.",
+  },
+  {
+    id: "coachDialogue",
+    label: "Play coach (dialogue)",
+    help: "Evaluates positions for Coach David's real-time commentary, warnings, and hints.",
   },
   {
     id: "advice",
@@ -33,9 +63,9 @@ export const ENGINE_FEATURES: {
     help: "Hints and the engine's moves on the board while you play a bot.",
   },
   {
-    id: "coach",
-    label: "Play coach",
-    help: "Grades each move you make against a bot.",
+    id: "threats",
+    label: "Threats",
+    help: "Finds what the opponent would do if it were their move, in Analysis and Play.",
   },
   {
     id: "evaluator",
@@ -53,19 +83,40 @@ export const engineFeatureLabel = (feature: EngineFeature): string =>
   ENGINE_FEATURES.find((entry) => entry.id === feature)?.label ?? feature;
 
 export const isEngineChoice = (value: unknown): value is EngineChoice =>
-  value === "analysis" || isReliableEngineId(value);
+  isEngineInheritSource(value) || isReliableEngineId(value);
+
+export interface EngineResolveContext {
+  coachChoice?: EngineChoice;
+  botEngine?: EngineId;
+}
 
 /**
  * The engine a feature runs on. Features that grade moves need real
- * evaluations, so when the analysis engine is a joke engine (or any engine
- * whose scores are not real) they use the default engine instead.
+ * evaluations, so when an inherited source is a joke engine (or any engine
+ * whose scores are not real) they fall back to a reliable engine instead.
  */
 export const resolveEngineChoice = (
   choice: EngineChoice,
-  analysisEngine: EngineId
+  analysisEngine: EngineId,
+  context?: EngineResolveContext
 ): EngineId => {
-  if (choice !== "analysis") return choice;
-  return isReliableEngineId(analysisEngine) ? analysisEngine : DEFAULT_ENGINE;
+  const safeAnalysis = isReliableEngineId(analysisEngine)
+    ? analysisEngine
+    : DEFAULT_ENGINE;
+
+  if (choice === "analysis") return safeAnalysis;
+  if (choice === "bot") {
+    const bot = context?.botEngine;
+    return bot && isReliableEngineId(bot) ? bot : safeAnalysis;
+  }
+  if (choice === "coach") {
+    const coachChoice = context?.coachChoice;
+    if (!coachChoice || coachChoice === "coach") return safeAnalysis;
+    return resolveEngineChoice(coachChoice, analysisEngine, {
+      botEngine: context?.botEngine,
+    });
+  }
+  return choice;
 };
 
 export const featureEngineAtoms = {
@@ -81,6 +132,11 @@ export const featureEngineAtoms = {
   ),
   coach: storedAtom<EngineChoice>(
     "engine-for-coach",
+    "analysis",
+    isEngineChoice
+  ),
+  coachDialogue: storedAtom<EngineChoice>(
+    "engine-for-coach-dialogue",
     "analysis",
     isEngineChoice
   ),

@@ -376,6 +376,7 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
         <Box
           ref={listRef}
           sx={{
+            height: 260,
             maxHeight: 260,
             overflowY: "auto",
             border: 1,

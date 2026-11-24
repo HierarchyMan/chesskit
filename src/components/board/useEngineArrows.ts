@@ -8,6 +8,7 @@ import {
 import { ArrowFocus, BoardArrow } from "@/lib/arrows/types";
 import { positionFor } from "@/lib/currentPosition";
 import { useThreats } from "@/hooks/useThreats";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { CurrentPosition } from "@/types/eval";
 import { arrowTuningAtom } from "@/lib/arrows/tuningAtom";
 import { PrimitiveAtom, useAtom, useAtomValue } from "jotai";
@@ -29,6 +30,8 @@ interface Options {
   extra?: readonly BoardArrow[];
   /** The graded last move, when the board's own snapshot does not have it. */
   feedback?: LastMoveFeedback;
+  /** Keep the coach's instruction legible while it points to a square. */
+  prioritizeTeaching?: boolean;
 }
 
 /**
@@ -44,7 +47,9 @@ export const useEngineArrows = ({
   capabilities,
   extra = NONE,
   feedback,
+  prioritizeTeaching = false,
 }: Options) => {
+  const visible = usePageVisibility();
   const [stored, setStored] = useAtom(prefsAtom);
   const tuning = useAtomValue(arrowTuningAtom);
   const [focus, setFocus] = useState<ArrowFocus | null>(null);
@@ -61,7 +66,7 @@ export const useEngineArrows = ({
   const threats = useThreats({
     fen,
     main: positionFor(position, fen).eval,
-    enabled: prefs.enabled && prefs.threats,
+    enabled: visible && prefs.enabled && prefs.threats && !prioritizeTeaching,
   });
   const built = useMemo(
     () =>
@@ -70,10 +75,12 @@ export const useEngineArrows = ({
   );
   // The master switch covers every automatic arrow, wherever it came from.
   // These come first, so the hover state they carry wins a tie.
-  const arrows = useMemo(
-    () => applyFocus([...(prefs.enabled ? extra : NONE), ...built], focus),
-    [extra, built, focus, prefs.enabled]
-  );
+  const arrows = useMemo(() => {
+    if (prioritizeTeaching) {
+      return [...extra.filter((arrow) => arrow.kind === "content")];
+    }
+    return applyFocus([...(prefs.enabled ? extra : NONE), ...built], focus);
+  }, [extra, built, focus, prefs.enabled, prioritizeTeaching]);
 
   const update = useCallback(
     (change: Partial<ArrowPrefs>) =>

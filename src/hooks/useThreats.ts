@@ -10,6 +10,7 @@ import {
 import { PositionEval } from "@/types/eval";
 import { useAtomValue } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffectiveThreatDepth } from "./useEffectiveEngineSettings";
 import { useEngineState } from "./useEngine";
 import { useFeatureEngineName } from "./useFeatureEngineName";
 
@@ -33,6 +34,7 @@ interface Options {
 export const useThreats = ({ fen, main, enabled }: Options): BoardArrow[] => {
   const engineName = useFeatureEngineName("threats");
   const tuning = useAtomValue(arrowTuningAtom);
+  const { depth: threatDepth } = useEffectiveThreatDepth();
   const handedOver = useMemo(() => positionForThreats(fen), [fen]);
   // Without an evaluation of the position there is nothing to measure against,
   // such as on a bot's turn, so no search is started for it.
@@ -44,7 +46,7 @@ export const useThreats = ({ fen, main, enabled }: Options): BoardArrow[] => {
 
   const cache = useRef(new Map<string, PositionEval>());
   const [result, setResult] = useState<{ key: string; passed: PositionEval }>();
-  const { threatDepth, threatsShown } = tuning;
+  const { threatsShown } = tuning;
   const key = `${engineName}|${threatDepth}|${threatsShown}|${handedOver}`;
 
   useEffect(() => {

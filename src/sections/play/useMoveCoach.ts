@@ -1,3 +1,4 @@
+import { useEffectiveCoachGrading } from "@/hooks/useEffectiveEngineSettings";
 import { useEngineState } from "@/hooks/useEngine";
 import { engineFeatureLabel } from "@/lib/engine/featureEngines";
 import { useFeatureEngineName } from "@/hooks/useFeatureEngineName";
@@ -11,17 +12,15 @@ import { useAtomValue } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gameAtom, gameIdAtom, playerColorAtom } from "./states";
 
-const COACH_DEPTH = 12;
-const COACH_LINES = 3;
-
 /** One evaluator owns board grades and coach feedback. It is separate from
  * bot/advice engines and survives bot replies without cancelling a grade.
  * A new game or engine retires the whole evaluation owner. */
-export const useMoveCoach = (enabled: boolean) => {
+export const useMoveCoach = (enabled: boolean, visible = true) => {
   const game = useAtomValue(gameAtom);
   const gameId = useAtomValue(gameIdAtom);
   const player = useAtomValue(playerColorAtom);
   const engineName = useFeatureEngineName("coach");
+  const { depth, multiPv } = useEffectiveCoachGrading();
   const engineState = useEngineState(
     enabled ? engineName : undefined,
     engineFeatureLabel("coach")
@@ -38,8 +37,8 @@ export const useMoveCoach = (enabled: boolean) => {
       (fen) =>
         engine.evaluatePositionWithUpdate({
           fen,
-          depth: COACH_DEPTH,
-          multiPv: COACH_LINES,
+          depth,
+          multiPv,
           useCloudEval: false,
         }),
       (value) => setUpdate({ ...value, source: engine, gameId })
@@ -50,11 +49,13 @@ export const useMoveCoach = (enabled: boolean) => {
       session.current = null;
       void engine.stopAllCurrentJobs().catch(() => undefined);
     };
-  }, [enabled, engine, engineName, gameId]);
+  }, [enabled, engine, engineName, gameId, depth, multiPv]);
 
   useEffect(() => {
-    if (enabled) session.current?.update(game, true, true);
-  }, [game, gameId, enabled, engine, engineName]);
+    if (!enabled) return;
+    if (visible) session.current?.update(game, true, true);
+    else session.current?.pause();
+  }, [game, gameId, enabled, visible, engine, engineName, depth, multiPv]);
 
   const ownsSnapshot =
     update.source === engine &&

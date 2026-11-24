@@ -132,6 +132,11 @@ export class ArenaAnalysisSession {
     if (!this.busy && !this.disposed && !this.error) void this.drain();
   }
 
+  /** Let the current search finish, then wait for the next visible target. */
+  pause() {
+    this.target = undefined;
+  }
+
   dispose() {
     this.disposed = true;
     this.target = undefined;

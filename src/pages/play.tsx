@@ -15,9 +15,11 @@ import {
   startingPositionAtom,
 } from "@/sections/play/states";
 import { useGameLifecycle } from "@/sections/play/useGameLifecycle";
+import { usePlayRecovery } from "@/sections/play/usePlayRecovery";
 import { useStartGame } from "@/sections/play/useStartGame";
 import { Box } from "@mui/material";
 import { useAtomValue, useSetAtom } from "jotai";
+import { useState } from "react";
 
 export default function Play() {
   const engineName = useAtomValue(enginePlayNameAtom);
@@ -27,9 +29,11 @@ export default function Play() {
   const end = useAtomValue(gameEndAtom);
   const setStartingPosition = useSetAtom(startingPositionAtom);
   const { startChallenge } = useStartGame();
-  const overlay = usePlayOverlay();
+  const overlay = usePlayOverlay(botEngine.engine);
+  const [coachSlot, setCoachSlot] = useState<HTMLDivElement | null>(null);
 
-  useGameLifecycle();
+  const recoveryReady = usePlayRecovery();
+  useGameLifecycle(overlay.interactiveCoach.choices.length > 0, recoveryReady);
 
   useHandoff(["fen", "challenge"], (handoff) => {
     if (handoff.kind === "challenge") startChallenge(handoff.id);
@@ -45,7 +49,12 @@ export default function Play() {
         inspectorMinWidth={400}
         inspectorLabel="Play controls"
         board={
-          <Board engine={botEngine.engine} setup={!hasGame} overlay={overlay} />
+          <Board
+            engine={botEngine.engine}
+            setup={!hasGame}
+            overlay={overlay}
+            coachSlot={coachSlot}
+          />
         }
         inspector={
           <Box
@@ -57,10 +66,15 @@ export default function Play() {
               scrollbarGutter: "stable",
             }}
           >
-            {hasGame ? (
+            {!recoveryReady ? null : hasGame ? (
               <>
                 {/* Opening the overlays panel must not push the game controls down. */}
-                <GamePanel botEngine={botEngine} coach={overlay.coach} />
+                <GamePanel
+                  botEngine={botEngine}
+                  coach={overlay.coach}
+                  interactive={overlay.interactiveCoach}
+                  coachSlotRef={setCoachSlot}
+                />
                 <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
                   <ArrowOverlay
                     view="inspector"

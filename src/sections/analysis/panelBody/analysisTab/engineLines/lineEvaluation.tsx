@@ -30,7 +30,10 @@ export default function LineEvaluation({ line }: Props) {
   };
 
   return (
-    <ListItem disablePadding sx={{ alignItems: "flex-start", py: 0.5, gap: 1 }}>
+    <ListItem
+      disablePadding
+      sx={{ alignItems: "flex-start", py: 0.5, gap: 1, minHeight: 54 }}
+    >
       <Typography
         marginY={0.3}
         paddingY={0.2}

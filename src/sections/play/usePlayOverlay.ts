@@ -1,11 +1,14 @@
 import { useEngineArrows } from "@/components/board/useEngineArrows";
 import { usePositionEval } from "@/hooks/usePositionEval";
+import { useEffectiveAdvice } from "@/hooks/useEffectiveEngineSettings";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { playerNamer } from "@/lib/arrows/legend";
 import {
   ARROW_CAPABILITIES,
   FORMAL_CAPABILITIES,
   effectivePrefs,
 } from "@/lib/arrows/prefs";
+import { UciEngine } from "@/lib/engine/uciEngine";
 import { atom, useAtomValue } from "jotai";
 import { useMemo } from "react";
 import {
@@ -20,9 +23,10 @@ import {
   playerColorAtom,
 } from "./states";
 import { useMoveCoach } from "./useMoveCoach";
+import { useInteractiveCoach } from "./useInteractiveCoach";
 
 /** One suggestion owner supplies both the board and its inspector controls. */
-export function usePlayOverlay() {
+export function usePlayOverlay(botEngine: UciEngine | null = null) {
   const game = useAtomValue(gameAtom);
   const playerColor = useAtomValue(playerColorAtom);
   const isInProgress = useAtomValue(isGameInProgressAtom);
@@ -31,9 +35,12 @@ export function usePlayOverlay() {
   const gameId = useAtomValue(gameIdAtom);
   const gameEnd = useAtomValue(gameEndAtom);
   const hasGame = isInProgress || game.history().length > 0 || !!gameEnd;
-  const coach = useMoveCoach(
-    activeMode === "casual" && activeCoach && gameId > 0 && hasGame
-  );
+  const coachEnabled =
+    activeMode === "casual" && activeCoach && gameId > 0 && hasGame;
+  const visible = usePageVisibility();
+  const { multiPv: adviceLines } = useEffectiveAdvice();
+  const coach = useMoveCoach(coachEnabled, visible);
+  const interactiveCoach = useInteractiveCoach(coachEnabled, coach, botEngine);
   const positionAtom = useMemo(() => atom(coach.position), [coach.position]);
   const hints = useAtomValue(hintArrowsAtom);
   const capabilities =
@@ -43,9 +50,12 @@ export function usePlayOverlay() {
     feature: "advice",
     fen: game.fen(),
     enabled:
-      isInProgress && wanted.enabled && (wanted.moves > 0 || wanted.threats),
+      visible &&
+      isInProgress &&
+      wanted.enabled &&
+      (wanted.moves > 0 || wanted.threats),
     active: game.turn() === playerColor && !game.isGameOver(),
-    lines: Math.max(2, wanted.moves),
+    lines: adviceLines,
   });
   const verdict = coach.feedback;
   const feedback = useMemo(() => {
@@ -63,13 +73,20 @@ export function usePlayOverlay() {
       classification: verdict.classification,
     };
   }, [verdict, game]);
+
+  const combinedExtraArrows = useMemo(
+    () => [...hints, ...interactiveCoach.arrows],
+    [hints, interactiveCoach.arrows]
+  );
+
   const engine = useEngineArrows({
     position: advice,
     fen: game.fen(),
     prefsAtom: playArrowPrefsAtom,
     capabilities,
-    extra: hints,
+    extra: combinedExtraArrows,
     feedback,
+    prioritizeTeaching: interactiveCoach.arrows.length > 0,
   });
   const nameOf = useMemo(() => playerNamer(playerColor), [playerColor]);
   return {
@@ -78,6 +95,8 @@ export function usePlayOverlay() {
     nameOf,
     turn: game.turn(),
     coach,
+    coachEnabled,
+    interactiveCoach,
     positionAtom,
   };
 }

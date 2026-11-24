@@ -327,7 +327,7 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
 
   if (phase === "idle") {
     return (
-      <Stack spacing={1.5} alignItems="flex-start">
+      <Stack spacing={1.5} alignItems="flex-start" sx={{ minHeight: 248 }}>
         <Typography fontWeight={600}>30 seconds on the clock</Typography>
         <Typography variant="body2" sx={{ opacity: 0.8 }}>
           Answer as many as you can. Misses cost time, not points, so keep
@@ -346,7 +346,7 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
 
   if (phase === "done") {
     return (
-      <Stack spacing={1.25} alignItems="flex-start">
+      <Stack spacing={1.25} alignItems="flex-start" sx={{ minHeight: 248 }}>
         <Stack direction="row" alignItems="center" gap={1}>
           <Typography variant="h4" fontWeight={700}>
             {score}
@@ -370,7 +370,7 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
   }
 
   return (
-    <Stack spacing={1.5}>
+    <Stack spacing={1.5} sx={{ minHeight: 248 }}>
       <LinearProgress
         variant="determinate"
         value={(msLeft / ROUND_MS) * 100}
@@ -378,10 +378,10 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
       />
 
       <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="body2">
+        <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
           {(msLeft / 1000).toFixed(1)}s left
         </Typography>
-        <Typography variant="body2">
+        <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
           Score <b>{score}</b>
         </Typography>
       </Stack>
@@ -401,7 +401,11 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
 
       {mode === "name" && (
         <Stack spacing={1} alignItems="center">
-          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+          <Typography
+            variant="body2"
+            noWrap
+            sx={{ opacity: 0.8, minHeight: 22 }}
+          >
             {trainer.typed
               ? `${trainer.typed}… now the rank`
               : "Pick the file, then the rank (or type it)"}
@@ -513,26 +517,15 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
       <Typography fontWeight={600}>
         {route.from} → {route.to}
       </Typography>
-      <Typography variant="body2" sx={{ opacity: 0.85 }}>
+      <Typography
+        variant="body2"
+        sx={{ opacity: 0.85, fontVariantNumeric: "tabular-nums" }}
+      >
         The shortest route takes <b>{route.moves}</b> hops. You have used{" "}
         <b>{used}</b>.
       </Typography>
 
-      {knightResult && (
-        <Typography
-          variant="body2"
-          color={
-            knightResult.used === knightResult.best
-              ? "success.main"
-              : "warning.main"
-          }
-        >
-          {knightResult.used === knightResult.best
-            ? "Perfect, that is as short as it gets."
-            : `Arrived in ${knightResult.used}. The shortest was ${knightResult.best}. Show the route to see it.`}
-        </Typography>
-      )}
-
+      {/* Keep action buttons above the result line so finishing a route never shifts them. */}
       <Stack direction="row" gap={1} flexWrap="wrap">
         <Button
           size="small"
@@ -548,6 +541,7 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
           variant="outlined"
           startIcon={<Icon icon="mdi:eye-outline" height={18} />}
           onClick={() => trainer.setShowSolution(!trainer.showSolution)}
+          sx={{ minWidth: 118 }}
         >
           {trainer.showSolution ? "Hide route" : "Show route"}
         </Button>
@@ -556,10 +550,28 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
           variant={knightResult ? "contained" : "text"}
           startIcon={<Icon icon="mdi:skip-next" height={18} />}
           onClick={trainer.start}
+          sx={{ minWidth: 114 }}
         >
           {knightResult ? "Next route" : "Skip"}
         </Button>
       </Stack>
+
+      <Box sx={{ minHeight: 40 }}>
+        {knightResult && (
+          <Typography
+            variant="body2"
+            color={
+              knightResult.used === knightResult.best
+                ? "success.main"
+                : "warning.main"
+            }
+          >
+            {knightResult.used === knightResult.best
+              ? "Perfect, that is as short as it gets."
+              : `Arrived in ${knightResult.used}. The shortest was ${knightResult.best}. Show the route to see it.`}
+          </Typography>
+        )}
+      </Box>
     </Stack>
   );
 }

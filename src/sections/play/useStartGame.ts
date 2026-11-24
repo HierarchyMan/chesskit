@@ -11,6 +11,10 @@ import { useCallback } from "react";
 import {
   activeCoachAtom,
   activeGameModeAtom,
+  activeTimeControlAtom,
+  timeControlAtom,
+  reviewPlyAtom,
+  clocksAtom,
   coachAtom,
   boardFlippedAtom,
   botStrengthAtom,
@@ -47,6 +51,7 @@ export const useStartGame = () => {
     (overrides?: {
       playerColor?: Color;
       challengeId?: string;
+      restart?: boolean;
     }): string | undefined => {
       const challenge = overrides?.challengeId
         ? getEndgame(overrides.challengeId)
@@ -65,6 +70,16 @@ export const useStartGame = () => {
       const playerColor =
         choice === "random" ? store.get(playerColorAtom) : choice;
       const botColor = playerColor === Color.White ? Color.Black : Color.White;
+      const restarting = overrides?.restart === true;
+      const mode = challenge
+        ? "casual"
+        : store.get(restarting ? activeGameModeAtom : gameModeAtom);
+      const coaching =
+        mode === "casual" &&
+        store.get(restarting ? activeCoachAtom : coachAtom);
+      const timeControl = challenge
+        ? { minutes: 0, increment: 0 }
+        : store.get(restarting ? activeTimeControlAtom : timeControlAtom);
 
       const engineName = store.get(enginePlayNameAtom);
       const strength = challenge
@@ -73,13 +88,21 @@ export const useStartGame = () => {
 
       let startFen: string | undefined;
       try {
-        const setup = playSetupPosition(
-          store.get(startingPositionAtom),
-          store.get(oddsAtom),
-          botColor
-        );
-        if (!challenge && setup.error) return setup.error;
-        startFen = challenge ? challenge.fen : setup.fen;
+        if (challenge) {
+          startFen = challenge.fen;
+        } else if (restarting) {
+          const current = store.get(gameAtom);
+          startFen =
+            current.history({ verbose: true })[0]?.before ?? current.fen();
+        } else {
+          const setup = playSetupPosition(
+            store.get(startingPositionAtom),
+            store.get(oddsAtom),
+            botColor
+          );
+          if (setup.error) return setup.error;
+          startFen = setup.fen;
+        }
         if (startFen && new Chess(startFen).isGameOver()) {
           return "That position is already finished.";
         }
@@ -105,16 +128,15 @@ export const useStartGame = () => {
       });
 
       store.set(playerColorAtom, playerColor);
+      store.set(activeGameModeAtom, mode);
+      store.set(activeCoachAtom, coaching);
+      const initialMs = timeControl.minutes * 60_000;
+      store.set(activeTimeControlAtom, timeControl);
       store.set(
-        activeGameModeAtom,
-        challenge ? "casual" : store.get(gameModeAtom)
+        clocksAtom,
+        initialMs > 0 ? { w: initialMs, b: initialMs } : null
       );
-      store.set(
-        activeCoachAtom,
-        !challenge &&
-          store.get(gameModeAtom) === "casual" &&
-          store.get(coachAtom)
-      );
+      store.set(reviewPlyAtom, null);
       store.set(challengeIdAtom, challenge?.id ?? null);
       store.set(challengeStatusAtom, "active");
       store.set(gameEndAtom, null);
@@ -130,8 +152,12 @@ export const useStartGame = () => {
   );
 
   const backToSetup = useCallback(() => {
-    resetGame({ noHeaders: true });
     store.set(isGameInProgressAtom, false);
+    resetGame({ noHeaders: true });
+    store.set(activeCoachAtom, false);
+    store.set(reviewPlyAtom, null);
+    store.set(activeTimeControlAtom, { minutes: 0, increment: 0 });
+    store.set(clocksAtom, null);
     store.set(gameEndAtom, null);
     store.set(savedGameIdAtom, null);
     store.set(hintArrowsAtom, []);
@@ -145,7 +171,17 @@ export const useStartGame = () => {
     [startGame]
   );
 
-  return { startGame, startChallenge, backToSetup };
+  const restartGame = useCallback(
+    () =>
+      startGame({
+        playerColor: store.get(playerColorAtom),
+        challengeId: store.get(challengeIdAtom) ?? undefined,
+        restart: true,
+      }),
+    [startGame, store]
+  );
+
+  return { startGame, startChallenge, backToSetup, restartGame };
 };
 
 export type StartGame = ReturnType<typeof useStartGame>;

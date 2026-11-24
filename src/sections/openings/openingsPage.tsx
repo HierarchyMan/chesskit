@@ -358,7 +358,9 @@ function LearnPanel({ study }: { study: OpeningStudy }) {
           <Box
             sx={{
               p: 1.5,
-              minHeight: 64,
+              height: 92,
+              minHeight: 92,
+              overflowY: "auto",
               borderRadius: 2,
               border: 1,
               borderColor: "divider",
@@ -424,22 +426,21 @@ function DrillPanel({
 
         {/* Buttons before the feedback, which changes length every move. */}
         <Stack direction="row" gap={1} flexWrap="wrap">
-          {phase !== "done" && (
-            <Button
-              size="small"
-              variant="outlined"
-              disabled={phase !== "playing" || !!study.hintUci}
-              startIcon={<Icon icon="mdi:lightbulb-on-outline" height={18} />}
-              onClick={study.askHint}
-            >
-              Hint
-            </Button>
-          )}
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={phase !== "playing" || !!study.hintUci}
+            startIcon={<Icon icon="mdi:lightbulb-on-outline" height={18} />}
+            onClick={study.askHint}
+          >
+            Hint
+          </Button>
           <Button
             size="small"
             variant={phase === "done" ? "contained" : "outlined"}
             startIcon={<Icon icon="mdi:refresh" height={18} />}
             onClick={study.startDrill}
+            sx={{ minWidth: 112 }}
           >
             {phase === "done" ? "Drill again" : "Restart"}
           </Button>
@@ -458,21 +459,23 @@ function DrillPanel({
           )}
         </Stack>
 
-        {phase === "playing" && (
-          <Typography variant="body2">
-            Your move. Play the book move for {line.name}.
-          </Typography>
-        )}
-        {phase === "replying" && (
-          <Typography variant="body2" sx={{ opacity: 0.8 }}>
-            Your opponent answers…
-          </Typography>
-        )}
-        {phase === "wrong" && (
-          <Typography variant="body2" color="error.main">
-            That is not the book move. Take it back and think again.
-          </Typography>
-        )}
+        <Box sx={{ minHeight: 40 }}>
+          {phase === "playing" && (
+            <Typography variant="body2">
+              Your move. Play the book move for {line.name}.
+            </Typography>
+          )}
+          {phase === "replying" && (
+            <Typography variant="body2" sx={{ opacity: 0.8 }}>
+              Your opponent answers…
+            </Typography>
+          )}
+          {phase === "wrong" && (
+            <Typography variant="body2" color="error.main">
+              That is not the book move. Take it back and think again.
+            </Typography>
+          )}
+        </Box>
 
         {(study.feedback.mine || study.feedback.reply) && phase !== "wrong" && (
           <Stack spacing={0.75}>

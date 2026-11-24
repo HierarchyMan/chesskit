@@ -21,6 +21,7 @@ interface Props {
   currentPly?: number;
   onSelect?: (ply: number) => void;
   maxHeight?: number | string;
+  fixedHeight?: boolean;
   emptyText?: string;
   annotations?: MoveAnnotation[];
 }
@@ -32,12 +33,14 @@ export default function MovesList({
   currentPly,
   onSelect,
   maxHeight = 240,
+  fixedHeight = false,
   emptyText = "No moves yet",
   annotations,
 }: Props) {
   const pageFlow = useWorkspacePageFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const offset = startsWithBlack ? 1 : 0;
+  const boundedHeight = fixedHeight && !pageFlow && maxHeight !== "none";
 
   useEffect(() => {
     const list = containerRef.current;
@@ -69,9 +72,16 @@ export default function MovesList({
 
   if (!moves.length) {
     return (
-      <Typography variant="body2" sx={{ opacity: 0.6, py: 1 }}>
-        {emptyText}
-      </Typography>
+      <Box
+        sx={{
+          height: boundedHeight ? maxHeight : undefined,
+          minHeight: boundedHeight ? maxHeight : undefined,
+        }}
+      >
+        <Typography variant="body2" sx={{ opacity: 0.6, py: 1 }}>
+          {emptyText}
+        </Typography>
+      </Box>
     );
   }
 
@@ -84,12 +94,22 @@ export default function MovesList({
     const color = (ply + offset) % 2 === 0 ? "w" : "b";
     const active = currentPly !== undefined && currentPly - 1 === ply;
     const annotation = annotations?.[ply];
+    const annotationLabel = annotation
+      ? `${
+          annotation.classification
+            ? classificationName(annotation.classification)
+            : annotation.status === "error"
+              ? "Unavailable"
+              : "Pending"
+        }${annotation.evaluation ? ` · ${getLineEvalLabel(annotation.evaluation)}` : ""}`
+      : undefined;
 
     return (
       <ButtonBase
         data-active={active}
         disabled={!onSelect}
         onClick={() => onSelect?.(ply + 1)}
+        title={annotationLabel ? `${san} — ${annotationLabel}` : undefined}
         aria-label={
           annotation
             ? `${san}: ${annotation.classification ? classificationName(annotation.classification) : annotation.status === "error" ? "evaluation unavailable" : "analysis pending"}`
@@ -99,22 +119,26 @@ export default function MovesList({
           justifyContent: "flex-start",
           px: 0.75,
           py: 0.25,
+          minHeight: 28,
           borderRadius: 1,
           fontSize: "0.95rem",
           backgroundColor: active ? "primary.main" : undefined,
           color: active ? "primary.contrastText" : undefined,
           gap: 0.5,
-          flexWrap: annotations ? "wrap" : undefined,
+          flexWrap: "nowrap",
           minWidth: 0,
+          overflow: "hidden",
           "&:hover": {
             backgroundColor: active ? "primary.main" : "action.hover",
           },
         }}
       >
-        <PrettyMoveSan
-          san={san}
-          color={active ? (color === "w" ? "b" : "w") : color}
-        />
+        <Box component="span" sx={{ flexShrink: 0 }}>
+          <PrettyMoveSan
+            san={san}
+            color={active ? (color === "w" ? "b" : "w") : color}
+          />
+        </Box>
         {annotation && (
           <>
             {annotation.classification && (
@@ -123,17 +147,21 @@ export default function MovesList({
                 alt=""
                 width={16}
                 height={16}
+                style={{ flexShrink: 0 }}
               />
             )}
-            <Typography component="span" variant="caption">
-              {annotation.classification
-                ? classificationName(annotation.classification)
-                : annotation.status === "error"
-                  ? "Unavailable"
-                  : "Pending"}
-              {annotation.evaluation
-                ? ` · ${getLineEvalLabel(annotation.evaluation)}`
-                : ""}
+            <Typography
+              component="span"
+              variant="caption"
+              noWrap
+              sx={{
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {annotationLabel}
             </Typography>
           </>
         )}
@@ -145,8 +173,11 @@ export default function MovesList({
     <Box
       ref={containerRef}
       sx={{
+        height: boundedHeight ? maxHeight : undefined,
+        minHeight: boundedHeight ? maxHeight : undefined,
         maxHeight: pageFlow ? "none" : maxHeight,
         overflowY: pageFlow || maxHeight === "none" ? "visible" : "auto",
+        scrollbarGutter: boundedHeight ? "stable" : undefined,
         position: "relative",
       }}
     >

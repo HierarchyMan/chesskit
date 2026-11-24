@@ -10,7 +10,7 @@ import { CLASSIFICATION_COLORS } from "@/constants";
 import { boardHueAtom } from "./states";
 import { areObjectsEqual, isObject } from "@/lib/object";
 import { CheckedKing } from "@/lib/chess";
-import { BoardCues } from "./cues";
+import { BoardCues, HighlightTone } from "./cues";
 
 /** A square the selected piece can move to. */
 export interface MoveTarget {
@@ -139,6 +139,27 @@ export function getSquareRenderer({
         useMemo(() => atom((get) => get(cuesAtom).hint === square), [square])
       );
 
+      const coachHighlight = useAtomValue(
+        useMemo(
+          () =>
+            atom((get) =>
+              get(cuesAtom).highlights?.find((h) => h.square === square)
+            ),
+          [square]
+        )
+      );
+
+      const squareEffect = useAtomValue(
+        useMemo(
+          () =>
+            atom((get) => {
+              const eff = get(cuesAtom).effect;
+              return eff?.square === square ? eff : undefined;
+            }),
+          [square]
+        )
+      );
+
       const highlightSquareStyle: CSSProperties | undefined = useMemo(
         () =>
           isClicked
@@ -153,9 +174,17 @@ export function getSquareRenderer({
         [isClicked, isFromSquare, isToSquare, moveClassification, cuedMove]
       );
 
+      const effectClassName =
+        squareEffect?.kind === "shake_king"
+          ? "ck-effect-shake"
+          : squareEffect?.kind === "spin_king"
+            ? "ck-effect-spin"
+            : undefined;
+
       return (
         <div
           ref={ref}
+          className={effectClassName}
           style={{
             ...style,
             position: "relative",
@@ -168,13 +197,32 @@ export function getSquareRenderer({
           {children}
           {isMatedKing && <div style={checkmateMarkStyle}>#</div>}
           {highlightSquareStyle && <div style={highlightSquareStyle} />}
+          {coachHighlight && (
+            <div
+              className={
+                coachHighlight.pulse ? "ck-highlight-pulse" : undefined
+              }
+              style={coachHighlightStyle(coachHighlight.tone)}
+            />
+          )}
           {isHinted && <div style={hintSquareStyle} />}
           {isPlayable && (
             <div
               style={isCapture ? captureSquareStyles : playableSquareStyles}
             />
           )}
-          {isThreatened && <div style={captureSquareStyles} />}
+          {isThreatened && <div style={hangingSquareStyle} />}
+          {squareEffect &&
+            (squareEffect.kind === "point_earned" ||
+              squareEffect.kind === "progress_made") && (
+              <div
+                key={squareEffect.key ?? 0}
+                className="ck-effect-float"
+                style={floatingBadgeStyle(squareEffect.kind)}
+              >
+                {squareEffect.kind === "point_earned" ? "+1" : "★"}
+              </div>
+            )}
         </div>
       );
     }),
@@ -223,6 +271,59 @@ const hintSquareStyle: CSSProperties = {
   backgroundColor: "rgba(60, 140, 255, 0.22)",
   pointerEvents: "none",
 };
+
+const COACH_HIGHLIGHT_PALETTE: Record<
+  HighlightTone,
+  { bg: string; ring: string }
+> = {
+  danger: {
+    bg: "rgba(239, 68, 68, 0.30)",
+    ring: "inset 0 0 0 3px rgba(239, 68, 68, 0.92)",
+  },
+  bright: {
+    bg: "rgba(245, 184, 46, 0.30)",
+    ring: "inset 0 0 0 3px rgba(245, 184, 46, 0.92)",
+  },
+  success: {
+    bg: "rgba(34, 197, 94, 0.28)",
+    ring: "inset 0 0 0 3px rgba(34, 197, 94, 0.92)",
+  },
+  mentioned: {
+    bg: "rgba(99, 130, 246, 0.26)",
+    ring: "inset 0 0 0 3px rgba(99, 130, 246, 0.9)",
+  },
+  selected: {
+    bg: "rgba(56, 189, 248, 0.28)",
+    ring: "inset 0 0 0 3px rgba(56, 189, 248, 0.92)",
+  },
+};
+
+const coachHighlightStyle = (tone: HighlightTone): CSSProperties => ({
+  position: "absolute",
+  inset: 0,
+  backgroundColor: COACH_HIGHLIGHT_PALETTE[tone].bg,
+  boxShadow: COACH_HIGHLIGHT_PALETTE[tone].ring,
+  pointerEvents: "none",
+  zIndex: 2,
+});
+
+const floatingBadgeStyle = (
+  kind: "point_earned" | "progress_made"
+): CSSProperties => ({
+  position: "absolute",
+  top: "14%",
+  right: "10%",
+  padding: "2px 6px",
+  borderRadius: "999px",
+  backgroundColor: kind === "point_earned" ? "#22c55e" : "#f59e0b",
+  color: "#ffffff",
+  fontSize: "calc(var(--board-size, 400px) * 0.032)",
+  fontWeight: 800,
+  lineHeight: 1.1,
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.35)",
+  pointerEvents: "none",
+  zIndex: 8,
+});
 
 const checkedKingStyle: CSSProperties = {
   position: "absolute",
@@ -280,6 +381,21 @@ const captureSquareStyles: CSSProperties = {
   // Radial stops are percentages of the half side, so 100% is the edge midpoint.
   background:
     "radial-gradient(circle closest-side, transparent 86%, rgba(0,0,0,.14) 86%)",
+};
+
+/**
+ * A piece of the viewer's that the other side can win. A dashed red frame, so
+ * it can never be read as a capture target (which is a ring) or a legal move
+ * (which is a dot).
+ */
+const hangingSquareStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  boxSizing: "border-box",
+  border: "3px dashed rgba(220, 38, 38, 0.9)",
+  borderRadius: 4,
+  backgroundColor: "rgba(220, 38, 38, 0.1)",
+  pointerEvents: "none",
 };
 
 const previousMoveSquareStyle = (

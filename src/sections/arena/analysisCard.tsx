@@ -1,4 +1,3 @@
-import { moveStoryAtom } from "@/lib/moveStoryState";
 import AnalysisOptionsPanel, {
   AnalysisOptionCopy,
 } from "@/components/analysisOptions/analysisOptionsPanel";
@@ -9,21 +8,19 @@ import {
 } from "@/lib/classificationLabels";
 import { getLineEvalLabel } from "@/lib/chess";
 import { AnalysisOption } from "@/lib/analysisOptions";
-import {
-  ARENA_ANALYSIS_DEPTH,
-  ArenaMoveAnalysis,
-} from "@/lib/engine/arenaAnalysis";
-import { buildMoveStory } from "@/lib/visualize/moveStory";
+import { useEffectiveArenaEval } from "@/hooks/useEffectiveEngineSettings";
+import { ArenaMoveAnalysis } from "@/lib/engine/arenaAnalysis";
+import { buildMoveStory, MoveStory } from "@/lib/visualize/moveStory";
 import { describeMove } from "@/lib/visualize/explain";
 import { getPreviousBestMoveFeedback } from "@/lib/bestMoveHint";
 import {
   Alert,
+  Box,
   Button,
   CircularProgress,
   Stack,
   Typography,
 } from "@mui/material";
-import { useSetAtom } from "jotai";
 import { useMemo } from "react";
 import { arenaAnalysisOptionAtoms } from "./states";
 import { Arena } from "./useArena";
@@ -41,6 +38,7 @@ const formatAccuracy = (value: number | null | undefined) =>
 
 export default function AnalysisCard({ arena }: { arena: Arena }) {
   const { analysis } = arena;
+  const { depth: arenaDepth } = useEffectiveArenaEval();
   const completed = analysis.moves.filter(
     (entry) => entry.after?.moveClassification
   ).length;
@@ -51,33 +49,41 @@ export default function AnalysisCard({ arena }: { arena: Arena }) {
       atoms={arenaAnalysisOptionAtoms}
       copy={ARENA_OPTION_COPY}
       details={{
-        annotations:
-          analysis.enabled && hasMoves ? (
-            <Stack spacing={0.25}>
-              {analysis.opening && (
-                <Typography variant="caption">
-                  Opening: {analysis.opening}
-                </Typography>
-              )}
-              <Typography variant="caption">
-                Accuracy · White {formatAccuracy(analysis.accuracy?.white)} ·
-                Black {formatAccuracy(analysis.accuracy?.black)}
-              </Typography>
-            </Stack>
-          ) : undefined,
+        annotations: analysis.enabled ? (
+          <Stack spacing={0.25} sx={{ minHeight: 38 }}>
+            <Typography
+              variant="caption"
+              noWrap
+              title={analysis.opening || undefined}
+            >
+              {analysis.opening ? `Opening: ${analysis.opening}` : "\u00A0"}
+            </Typography>
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {hasMoves
+                ? `Accuracy · White ${formatAccuracy(analysis.accuracy?.white)} · Black ${formatAccuracy(analysis.accuracy?.black)}`
+                : "Accuracy · White — · Black —"}
+            </Typography>
+          </Stack>
+        ) : undefined,
       }}
       footer={
         <>
-          {analysis.showArrows && analysis.bestMove && (
-            <Typography variant="caption">
-              {analysis.bestMove.color === "w" ? "White" : "Black"} to move:{" "}
-              {analysis.bestMove.san}
-            </Typography>
-          )}
-          <Typography variant="caption" sx={{ opacity: 0.7, pt: 1 }}>
-            {engineLabel(analysis.engineName).small} · depth{" "}
-            {ARENA_ANALYSIS_DEPTH}. Uses the engine chosen for Arena evaluation
-            in Settings, which is the analysis engine unless you change it.
+          <Typography
+            variant="caption"
+            noWrap
+            sx={{ minHeight: 20, display: "block" }}
+          >
+            {analysis.showArrows && analysis.bestMove
+              ? `${analysis.bestMove.color === "w" ? "White" : "Black"} to move: ${analysis.bestMove.san}`
+              : "\u00A0"}
+          </Typography>
+          <Typography variant="caption" sx={{ opacity: 0.7, pt: 0.5 }}>
+            {engineLabel(analysis.engineName).small} · depth {arenaDepth}. Uses
+            the engine and search depth chosen for Arena evaluation in Settings.
             Positive scores favor White. Options are remembered.
           </Typography>
           {analysis.error ? (
@@ -92,11 +98,34 @@ export default function AnalysisCard({ arena }: { arena: Arena }) {
               {analysis.error} The match can continue.
             </Alert>
           ) : analysis.enabled ? (
-            <Stack direction="row" gap={1} alignItems="center" role="status">
-              {(analysis.busy || analysis.engineState.status !== "ready") && (
+            <Stack
+              direction="row"
+              gap={1}
+              alignItems="center"
+              role="status"
+              sx={{ minHeight: 20 }}
+            >
+              <Box
+                sx={{
+                  width: 14,
+                  height: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  visibility:
+                    analysis.busy || analysis.engineState.status !== "ready"
+                      ? "visible"
+                      : "hidden",
+                }}
+              >
                 <CircularProgress size={14} />
-              )}
-              <Typography variant="caption">
+              </Box>
+              <Typography
+                variant="caption"
+                noWrap
+                sx={{ fontVariantNumeric: "tabular-nums" }}
+              >
                 {analysis.engineState.status !== "ready"
                   ? "Loading analysis engine…"
                   : analysis.showAnnotations
@@ -115,12 +144,11 @@ export default function AnalysisCard({ arena }: { arena: Arena }) {
 
 export function MoveFeedback({
   entry,
-  arena,
+  onShowStory,
 }: {
   entry: ArenaMoveAnalysis;
-  arena: Arena;
+  onShowStory: (story: MoveStory) => void;
 }) {
-  const setStory = useSetAtom(moveStoryAtom);
   const { move, before, after } = entry;
   const classification = after?.moveClassification;
   const previousBestMove = getPreviousBestMoveFeedback({
@@ -174,12 +202,9 @@ export function MoveFeedback({
             size="small"
             variant="outlined"
             sx={{ alignSelf: "flex-start" }}
-            onClick={() => {
-              arena.setRunning(false);
-              setStory({ open: true, story, classification });
-            }}
+            onClick={() => onShowStory(story)}
           >
-            Visualize move
+            Show why
           </Button>
         </>
       )}

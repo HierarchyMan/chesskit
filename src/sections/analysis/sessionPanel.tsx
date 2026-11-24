@@ -140,7 +140,7 @@ export default function SessionPanel() {
           <Typography fontWeight={600} noWrap>
             {session.title}
           </Typography>
-          <Typography variant="caption" role="status">
+          <Typography variant="caption" role="status" noWrap display="block">
             {state.status === "saved"
               ? "Saved on this device"
               : state.status === "saving"

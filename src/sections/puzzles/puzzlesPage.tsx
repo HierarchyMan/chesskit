@@ -1,4 +1,8 @@
 import Board from "@/components/board";
+import StoryControls from "@/components/board/storyControls";
+import { useInBoardCascade } from "@/lib/coachCascade";
+import { chessPathKey } from "@/lib/chessHistory";
+import { useAtomValue } from "jotai";
 import BoardWorkspace from "@/components/boardWorkspace";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Color } from "@/types/enums";
@@ -14,6 +18,8 @@ const SIDE_PANEL_WIDTH = 420;
 
 export default function PuzzlesPage() {
   const trainer = usePuzzleTrainer();
+  const game = useAtomValue(puzzleGameAtom);
+  const story = useInBoardCascade(`${trainer.motionKey}|${chessPathKey(game)}`);
 
   const { puzzle, phase, arrowMove, arrowSide, solver } = trainer;
   const solved = phase === "solved";
@@ -48,15 +54,28 @@ export default function PuzzlesPage() {
       board={
         <Board
           id="PuzzleBoard"
-          canPlay={trainer.movableSide as Color | false}
+          canPlay={
+            story.projection.active
+              ? false
+              : (trainer.movableSide as Color | false)
+          }
+          previewFen={story.projection.previewFen}
+          highlights={story.projection.highlights}
+          demonstrationFrame={story.projection.active}
           gameAtom={puzzleGameAtom}
           whitePlayer={{ name: solver === "w" ? "You" : "Opponent" }}
           blackPlayer={{ name: solver === "b" ? "You" : "Opponent" }}
           boardOrientation={solver === "w" ? Color.White : Color.Black}
-          arrows={arrows}
-          lastMove={trainer.lastMove}
-          hintSquare={puzzle ? trainer.hintSquare : undefined}
-          verdict={trainer.verdict}
+          arrows={story.projection.active ? story.projection.arrows : arrows}
+          lastMove={
+            story.projection.active
+              ? story.projection.lastMove
+              : trainer.lastMove
+          }
+          hintSquare={
+            puzzle && !story.projection.active ? trainer.hintSquare : undefined
+          }
+          verdict={story.projection.active ? undefined : trainer.verdict}
           motionKey={trainer.motionKey}
         />
       }
@@ -70,7 +89,13 @@ export default function PuzzlesPage() {
             scrollbarGutter: "stable",
           }}
         >
-          <PuzzlePanel trainer={trainer} />
+          <PuzzlePanel
+            trainer={trainer}
+            onShowStory={(value) =>
+              story.start(value, { exitLabel: "Back to puzzle" })
+            }
+            storyControls={<StoryControls story={story} />}
+          />
         </Box>
       }
     />

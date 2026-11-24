@@ -173,7 +173,13 @@ export default function AnalyzeButton() {
         } else void handleAnalyze();
       }}
       disabled={!activeRequest && !readyToAnalyse}
-      sx={{ minHeight: 36, borderRadius: "6px", whiteSpace: "nowrap" }}
+      sx={{
+        minHeight: 36,
+        minWidth: 136,
+        borderRadius: "6px",
+        whiteSpace: "nowrap",
+        fontVariantNumeric: "tabular-nums",
+      }}
     >
       {activeRequest
         ? `Stop${evaluationProgress ? ` (${Math.round(evaluationProgress)}%)` : " analysis"}`

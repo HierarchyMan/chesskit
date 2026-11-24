@@ -1,9 +1,9 @@
-import { moveStoryAtom } from "@/lib/moveStoryState";
+import { ReactNode } from "react";
 import Panel from "@/components/panel";
 import { setHandoff } from "@/lib/handoff";
 import { PUZZLE_THEMES } from "@/lib/puzzles";
 import { displayThemes } from "@/lib/puzzleThemes";
-import { buildMoveStory } from "@/lib/visualize/moveStory";
+import { buildMoveStory, MoveStory } from "@/lib/visualize/moveStory";
 import { Icon } from "@iconify/react";
 import {
   Alert,
@@ -20,7 +20,6 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import { useSetAtom } from "jotai";
 import { useRouter } from "next/router";
 import PuzzleControls from "./puzzleControls";
 import { PuzzleSource } from "./states";
@@ -35,11 +34,16 @@ const SOURCES: { id: PuzzleSource; label: string; icon: string }[] = [
 
 interface Props {
   trainer: PuzzleTrainer;
+  onShowStory: (story: MoveStory) => void;
+  storyControls: ReactNode;
 }
 
-export default function PuzzlePanel({ trainer }: Props) {
+export default function PuzzlePanel({
+  trainer,
+  onShowStory,
+  storyControls,
+}: Props) {
   const router = useRouter();
-  const setStory = useSetAtom(moveStoryAtom);
   const { puzzle, phase, source, stats } = trainer;
 
   const solved = phase === "solved";
@@ -62,16 +66,14 @@ export default function PuzzlePanel({ trainer }: Props) {
     const entry = trainer.mistakeEntry;
     if (!entry) return;
 
-    setStory({
-      open: true,
-      classification: entry.classification,
-      story: buildMoveStory({
+    onShowStory(
+      buildMoveStory({
         fenBefore: entry.fenBefore,
         playedUci: entry.playedUci,
         beforeLines: entry.beforeLines,
         afterLines: entry.afterLines,
-      }),
-    });
+      })
+    );
   };
 
   // Order matters on a tall screen, where this panel sits under the board:
@@ -192,17 +194,6 @@ export default function PuzzlePanel({ trainer }: Props) {
                 flexWrap="wrap"
                 alignItems="center"
               >
-                {trainer.waiting && (
-                  <Button
-                    size="small"
-                    variant="contained"
-                    startIcon={<Icon icon="mdi:skip-next" height={18} />}
-                    onClick={trainer.advance}
-                  >
-                    Next move
-                  </Button>
-                )}
-
                 {!solved && (
                   <>
                     <Tooltip
@@ -225,6 +216,10 @@ export default function PuzzlePanel({ trainer }: Props) {
                             <Icon icon="mdi:lightbulb-on-outline" height={18} />
                           }
                           onClick={trainer.askHint}
+                          sx={{
+                            minWidth: 112,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
                         >
                           {trainer.nextHintReveals
                             ? "Show move"
@@ -274,6 +269,17 @@ export default function PuzzlePanel({ trainer }: Props) {
                   )
                 )}
 
+                {trainer.waiting && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<Icon icon="mdi:skip-next" height={18} />}
+                    onClick={trainer.advance}
+                  >
+                    Next move
+                  </Button>
+                )}
+
                 {solved && (
                   <Button
                     size="small"
@@ -292,10 +298,12 @@ export default function PuzzlePanel({ trainer }: Props) {
                     startIcon={<Icon icon="mdi:eye-outline" height={18} />}
                     onClick={visualizeMistake}
                   >
-                    Why was mine bad?
+                    Show why
                   </Button>
                 )}
               </Stack>
+
+              {storyControls}
 
               {solved && trainer.line.length > 0 && (
                 <Stack
@@ -356,7 +364,12 @@ export default function PuzzlePanel({ trainer }: Props) {
               )}
 
               {/* One live region, so each change in the story is announced. */}
-              <Stack spacing={1} role="status" aria-live="polite">
+              <Stack
+                spacing={1}
+                role="status"
+                aria-live="polite"
+                sx={{ minHeight: 44 }}
+              >
                 {phase === "setup" && (
                   <Typography variant="body2" sx={{ opacity: 0.8 }}>
                     Watch what your opponent just played…
@@ -477,7 +490,7 @@ export default function PuzzlePanel({ trainer }: Props) {
                   <Typography variant="body2">
                     {helped
                       ? isMistake
-                        ? "Press Why was mine bad? to see what your move allowed."
+                        ? "Choose Show why to see what your move allowed."
                         : "You found it in the end. Step through the line once more and it will stick."
                       : "Clean solve."}
                     {trainer.ratingDelta !== null && (

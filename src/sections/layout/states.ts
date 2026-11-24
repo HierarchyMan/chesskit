@@ -18,3 +18,4 @@ export const importDialogAtom = atom<{
   initialImage?: string;
 }>({ open: false });
 export const commandPaletteOpenAtom = atom(false);
+export const shortcutsOpenAtom = atom(false);

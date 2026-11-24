@@ -1,9 +1,8 @@
+import { useEffectiveArenaEval } from "@/hooks/useEffectiveEngineSettings";
 import { useEngineState } from "@/hooks/useEngine";
 import { engineFeatureLabel } from "@/lib/engine/featureEngines";
 import { getBestMoveSuggestion } from "@/lib/bestMoveHint";
 import {
-  ARENA_ANALYSIS_DEPTH,
-  ARENA_ANALYSIS_LINES,
   ArenaAnalysisSession,
   ArenaAnalysisUpdate,
   getArenaAccuracy,
@@ -28,6 +27,7 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
   );
   const showArrows = arrowsOn && arrowMoves > 0;
   const engineName = useFeatureEngineName("evaluator");
+  const { depth, multiPv } = useEffectiveArenaEval();
   const enabled = started && (showEvaluation || showAnnotations || showArrows);
   const engineState = useEngineState(
     enabled ? engineName : undefined,
@@ -50,8 +50,8 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
       (fen) =>
         engine.evaluatePositionWithUpdate({
           fen,
-          depth: ARENA_ANALYSIS_DEPTH,
-          multiPv: ARENA_ANALYSIS_LINES,
+          depth,
+          multiPv,
           useCloudEval: false,
         }),
       (value) => setUpdate({ ...value, source: engine })
@@ -63,11 +63,20 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
       // This instance belongs only to the evaluator, never either player.
       void engine.stopAllCurrentJobs();
     };
-  }, [engine, engineName, enabled]);
+  }, [engine, engineName, enabled, depth, multiPv]);
 
   useEffect(() => {
     if (enabled) session.current?.update(game, showAnnotations, showArrows);
-  }, [game, enabled, engine, engineName, showAnnotations, showArrows]);
+  }, [
+    game,
+    enabled,
+    engine,
+    engineName,
+    depth,
+    multiPv,
+    showAnnotations,
+    showArrows,
+  ]);
 
   const hasCurrentSource =
     enabled && update.source === engine && engine?.name === engineName;

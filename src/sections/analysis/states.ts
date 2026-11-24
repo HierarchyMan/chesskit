@@ -6,6 +6,8 @@ import { EngineId } from "@/types/enums";
 import { isAnalysisEngineId } from "@/lib/engine/models";
 import { SavedEvals } from "@/types/eval";
 import { PieceCode } from "@/lib/editorPosition";
+import type { MoveStory } from "@/lib/visualize/moveStory";
+import type { SquareHighlight } from "@/components/board/cues";
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 
@@ -70,3 +72,18 @@ export const useCloudEvalAtom = storedAtom("use-cloud-eval", false, isBoolean);
 export const engineWorkersNbAtom = atomWithStorage("engineWorkersNb", 8);
 
 export const savedEvalsAtom = atom<SavedEvals>({});
+
+/** Active in-board "Show why" cascade requested from the Analysis editorial strip. */
+export const analysisCascadeStoryAtom = atom<MoveStory | null>(null);
+
+/** Live narration for an active Analysis cascade, shown in MoveInfo without resizing the board. */
+export const analysisCascadeNarrationAtom = atom<{
+  branch: "played" | "better";
+  stepIndex: number;
+  maxStep: number;
+  san?: string;
+  caption?: string;
+} | null>(null);
+
+/** Restrained board highlight(s) synced to the current Analysis editorial note. */
+export const analysisHighlightsAtom = atom<SquareHighlight[]>([]);

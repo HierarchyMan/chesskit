@@ -28,6 +28,12 @@ const readLegacyBestMove = (mode: ArrowMode): boolean | undefined => {
 export const createArrowPrefsAtom = (mode: ArrowMode) =>
   storedAtom<ArrowPrefs>(
     `arrow-prefs-${mode}`,
-    migrateBestMoveSwitch(mode, readLegacyBestMove(mode)),
-    isArrowPrefs
+    migrateBestMoveSwitch(mode, undefined),
+    isArrowPrefs,
+    () => {
+      const legacy = readLegacyBestMove(mode);
+      return legacy === undefined
+        ? undefined
+        : migrateBestMoveSwitch(mode, legacy);
+    }
   );

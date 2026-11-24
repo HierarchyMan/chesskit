@@ -17,14 +17,19 @@ import {
   isGameInProgressAtom,
   playerColorAtom,
   savedGameIdAtom,
-  timeControlAtom,
+  activeTimeControlAtom,
+  playCascadeActiveAtom,
 } from "./states";
 
-export const useGameLifecycle = () => {
+export const useGameLifecycle = (
+  coachAwaitingChoice: boolean,
+  ready: boolean
+) => {
   const game = useAtomValue(gameAtom);
   const gameId = useAtomValue(gameIdAtom);
   const playerColor = useAtomValue(playerColorAtom);
-  const timeControl = useAtomValue(timeControlAtom);
+  const timeControl = useAtomValue(activeTimeControlAtom);
+  const cascadeActive = useAtomValue(playCascadeActiveAtom);
   const [isInProgress, setIsInProgress] = useAtom(isGameInProgressAtom);
   const [end, setEnd] = useAtom(gameEndAtom);
   const challengeId = useAtomValue(challengeIdAtom);
@@ -39,7 +44,8 @@ export const useGameLifecycle = () => {
   useChessClock({
     clocksAtom,
     game,
-    running: isInProgress,
+    ready,
+    running: ready && isInProgress && !coachAwaitingChoice && !cascadeActive,
     gameId,
     initialMs: challengeId ? 0 : timeControl.minutes * 60_000,
     incrementMs: timeControl.increment * 1000,

@@ -10,6 +10,7 @@ import { PropsWithChildren, useState } from "react";
 import NavBar from "./NavBar";
 import NavMenu from "./NavMenu";
 import CommandPalette from "./commandPalette";
+import ShortcutsDialog from "./shortcutsDialog";
 import { theme, themeStorage } from "./theme";
 import GlobalDialogs from "./dialogs";
 import GlobalImportListeners from "../importDialog/globalListeners";
@@ -96,6 +97,7 @@ function LayoutBody({ children }: PropsWithChildren) {
 
       <GlobalDialogs />
       <CommandPalette switchDarkMode={switchDarkMode} />
+      <ShortcutsDialog />
       <GlobalImportListeners />
     </>
   );

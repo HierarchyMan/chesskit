@@ -152,7 +152,12 @@ export default function TopMovesPanel({
         </Typography>
       )}
 
-      {isLoading && <LinearProgress sx={{ borderRadius: 1 }} />}
+      <LinearProgress
+        sx={{
+          borderRadius: 1,
+          visibility: isLoading ? "visible" : "hidden",
+        }}
+      />
 
       {engineFailed && engineState && (
         <EngineFailureAlert state={engineState} />
@@ -165,7 +170,7 @@ export default function TopMovesPanel({
       {!engineFailed && status !== "error" && moves.length === 0 && (
         <Stack spacing={0.75}>
           {Array.from({ length: count }).map((_, index) => (
-            <Skeleton key={index} variant="rounded" height={34} />
+            <Skeleton key={index} variant="rounded" height={72} />
           ))}
         </Stack>
       )}

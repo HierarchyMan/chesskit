@@ -65,9 +65,10 @@ export default function BoardWorkspace({
   });
   const [chrome, setChrome] = useState({ height: 144, gutter: 48 });
   const reportChrome = useCallback((height: number, gutter: number) => {
-    const next = { height: Math.ceil(height), gutter: Math.ceil(gutter) };
+    const next = { height: Math.round(height), gutter: Math.round(gutter) };
     setChrome((previous) =>
-      previous.height === next.height && previous.gutter === next.gutter
+      Math.abs(previous.height - next.height) <= 1 &&
+      Math.abs(previous.gutter - next.gutter) <= 1
         ? previous
         : next
     );
@@ -80,7 +81,15 @@ export default function BoardWorkspace({
     const measure = () => {
       const rect = element.getBoundingClientRect();
       const next = {
-        width: Math.floor(element.clientWidth),
+        width: Math.max(
+          200,
+          Math.floor(
+            Math.min(
+              element.clientWidth,
+              window.innerWidth - Math.max(0, rect.left) * 2
+            )
+          )
+        ),
         portrait: window.innerHeight > window.innerWidth,
         height: Math.max(
           200,
@@ -142,7 +151,12 @@ export default function BoardWorkspace({
     >
       <Box
         data-board-stage
-        sx={{ display: "flex", justifyContent: "flex-start", minWidth: 0 }}
+        sx={{
+          display: "flex",
+          justifyContent: "flex-start",
+          minWidth: 0,
+          maxWidth: "100%",
+        }}
       >
         <StageContext.Provider value={stage}>{board}</StageContext.Provider>
       </Box>

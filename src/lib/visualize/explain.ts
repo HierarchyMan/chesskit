@@ -5,6 +5,12 @@ export type MoveTag =
   | "check"
   | "mate"
   | "fork"
+  | "pin"
+  | "skewer"
+  | "discovered"
+  | "back_rank"
+  | "passed_pawn"
+  | "open_file"
   | "hanging"
   | "threat"
   | "castle"
@@ -15,6 +21,10 @@ export interface MoveDescription {
   text: string;
   tags: MoveTag[];
   capturedValue: number;
+  /** Primary tactical target square (e.g. forked/pinned/attacked enemy piece). */
+  targetSquare?: Square;
+  /** Newly exposed friendly piece square, if the move hangs material. */
+  dangerSquare?: Square;
 }
 
 const PIECE_NAMES: Record<PieceSymbol, string> = {
@@ -214,6 +224,151 @@ const describePieceOn = (game: Chess, square: Square): string => {
   return piece ? `${PIECE_NAMES[piece.type]} on ${square}` : square;
 };
 
+const sliderDirections = (type: PieceSymbol): number[][] => {
+  if (type === "b") return DIAGONALS;
+  if (type === "r") return STRAIGHTS;
+  if (type === "q") return [...DIAGONALS, ...STRAIGHTS];
+  return [];
+};
+
+/** Detects if a slider placed on `from` pins or skewers an enemy piece along a ray. */
+const detectPinOrSkewer = (
+  game: Chess,
+  from: Square,
+  mover: Color
+): { kind: "pin" | "skewer"; front: Square; behind: Square } | undefined => {
+  const slider = game.get(from);
+  if (!slider || slider.color !== mover) return undefined;
+  const dirs = sliderDirections(slider.type);
+  if (!dirs.length) return undefined;
+
+  const opponent = opposite(mover);
+  const f0 = FILES.indexOf(from[0]);
+  const r0 = Number(from[1]) - 1;
+
+  for (const [df, dr] of dirs) {
+    let f = f0 + df;
+    let r = r0 + dr;
+    let first: { sq: Square; type: PieceSymbol } | undefined;
+    while (f >= 0 && f < 8 && r >= 0 && r < 8) {
+      const sq = toSquare(f, r)!;
+      const p = game.get(sq);
+      if (p) {
+        if (!first) {
+          if (p.color !== opponent) break;
+          first = { sq, type: p.type };
+        } else {
+          if (p.color !== opponent) break;
+          const v1 = first.type === "k" ? 100 : PIECE_VALUES[first.type];
+          const v2 = p.type === "k" ? 100 : PIECE_VALUES[p.type];
+          if (v2 > v1 && v2 >= 5) {
+            return { kind: "pin", front: first.sq, behind: sq };
+          }
+          if (v1 > v2 && v1 >= 5 && v2 >= 3) {
+            return { kind: "skewer", front: first.sq, behind: sq };
+          }
+          break;
+        }
+      }
+      f += df;
+      r += dr;
+    }
+  }
+  return undefined;
+};
+
+/** Detects whether moving a piece from `from` uncovered a friendly slider attack on an enemy piece. */
+const detectDiscoveredAttack = (
+  before: Chess,
+  after: Chess,
+  from: Square,
+  to: Square,
+  mover: Color
+): Square | undefined => {
+  const opponent = opposite(mover);
+  const f0 = FILES.indexOf(from[0]);
+  const r0 = Number(from[1]) - 1;
+
+  for (const [df, dr] of [...DIAGONALS, ...STRAIGHTS]) {
+    const isDiag = df !== 0 && dr !== 0;
+    // Walk backward from `from` to find a friendly slider
+    let bf = f0 - df;
+    let br = r0 - dr;
+    let sliderFound = false;
+    while (bf >= 0 && bf < 8 && br >= 0 && br < 8) {
+      const sq = toSquare(bf, br)!;
+      const p = after.get(sq);
+      if (p) {
+        if (
+          p.color === mover &&
+          (p.type === "q" || (isDiag ? p.type === "b" : p.type === "r"))
+        ) {
+          sliderFound = true;
+        }
+        break;
+      }
+      bf -= df;
+      br -= dr;
+    }
+    if (!sliderFound) continue;
+
+    // Walk forward from `from` to find an enemy king or valuable/undefended target
+    let ff = f0 + df;
+    let fr = r0 + dr;
+    while (ff >= 0 && ff < 8 && fr >= 0 && fr < 8) {
+      const sq = toSquare(ff, fr)!;
+      if (sq === to) break;
+      const p = after.get(sq);
+      if (p) {
+        if (
+          p.color === opponent &&
+          (p.type === "k" ||
+            PIECE_VALUES[p.type] >= 5 ||
+            after.attackers(sq, opponent).length === 0) &&
+          before.get(sq)?.type === p.type
+        ) {
+          return sq;
+        }
+        break;
+      }
+      ff += df;
+      fr += dr;
+    }
+  }
+  return undefined;
+};
+
+/** Checks if the pawn moved to `to` is now a passed pawn. */
+const isPassedPawn = (game: Chess, to: Square, mover: Color): boolean => {
+  const p = game.get(to);
+  if (!p || p.type !== "p" || p.color !== mover) return false;
+  const f0 = FILES.indexOf(to[0]);
+  const r0 = Number(to[1]) - 1;
+  const opponent = opposite(mover);
+  const dir = mover === "w" ? 1 : -1;
+  for (let r = r0 + dir; r >= 0 && r < 8; r += dir) {
+    for (let df = -1; df <= 1; df++) {
+      const sq = toSquare(f0 + df, r);
+      if (!sq) continue;
+      const cell = game.get(sq);
+      if (cell && cell.color === opponent && cell.type === "p") return false;
+    }
+  }
+  return mover === "w" ? r0 >= 4 : r0 <= 3;
+};
+
+/** Checks if a rook landed on a file with no friendly pawns. */
+const isOpenFileRook = (game: Chess, to: Square, mover: Color): boolean => {
+  const p = game.get(to);
+  if (!p || p.type !== "r" || p.color !== mover) return false;
+  const file = to[0];
+  for (let rank = 1; rank <= 8; rank++) {
+    const cell = game.get(`${file}${rank}` as Square);
+    if (cell && cell.type === "p" && cell.color === mover) return false;
+  }
+  return true;
+};
+
 export const describeMove = (
   fenBefore: string,
   uci: string
@@ -284,6 +439,16 @@ export const describeMove = (
 
   const movedPiece = after.get(move.to);
   const movedInfo = isVulnerable(after, move.to, mover);
+  let targetSquare: Square | undefined;
+  let dangerSquare: Square | undefined;
+
+  if (
+    (isMate || after.inCheck()) &&
+    (move.to[1] === "1" || move.to[1] === "8") &&
+    (move.piece === "r" || move.piece === "q")
+  ) {
+    tags.push("back_rank");
+  }
 
   if (movedPiece && movedPiece.type !== "k" && !isMate) {
     const targets = pieceAttacks(after, move.to)
@@ -299,6 +464,7 @@ export const describeMove = (
 
     if (targets.length >= 2 && !movedInfo.vulnerable) {
       tags.push("fork");
+      targetSquare = targets[0].square;
       const names = targets
         .slice(0, 3)
         .map(
@@ -308,12 +474,53 @@ export const describeMove = (
     }
   }
 
+  if (!isMate && !movedInfo.vulnerable && !tags.includes("fork")) {
+    const ray = detectPinOrSkewer(after, move.to, mover);
+    if (ray) {
+      tags.push(ray.kind);
+      targetSquare = ray.front;
+      if (ray.kind === "pin") {
+        participles.push(
+          `pinning the ${describePieceOn(after, ray.front)} to the ${describePieceOn(after, ray.behind)}`
+        );
+      } else {
+        participles.push(
+          `skewering the ${describePieceOn(after, ray.front)} and the ${describePieceOn(after, ray.behind)}`
+        );
+      }
+    }
+  }
+
+  if (!isMate) {
+    const discovered = detectDiscoveredAttack(
+      before,
+      after,
+      move.from,
+      move.to,
+      mover
+    );
+    if (discovered) {
+      tags.push("discovered");
+      if (!targetSquare) targetSquare = discovered;
+      if (
+        !tags.includes("fork") &&
+        !tags.includes("pin") &&
+        !tags.includes("skewer")
+      ) {
+        participles.push(
+          `unleashing a discovered attack on the ${describePieceOn(after, discovered)}`
+        );
+      }
+    }
+  }
+
   if (!isMate) {
     const hangingBefore = vulnerablePieces(before, mover);
     const exposed = [...vulnerablePieces(after, mover)].filter(
       (square) => square === move.to || !hangingBefore.has(square)
     );
     const alreadyWarnedAboutMovedPiece = warnings.length > 0;
+    if (alreadyWarnedAboutMovedPiece) dangerSquare = move.to;
 
     for (const square of exposed) {
       if (square === move.to && alreadyWarnedAboutMovedPiece) continue;
@@ -323,6 +530,7 @@ export const describeMove = (
 
       const name = describePieceOn(after, square);
       tags.push("hanging");
+      dangerSquare = square;
       warnings.push(
         info.defended && info.byPiece
           ? `the ${name} can be won by a ${PIECE_NAMES[info.byPiece]}`
@@ -332,7 +540,12 @@ export const describeMove = (
     }
   }
 
-  if (!isMate && !tags.includes("fork")) {
+  if (
+    !isMate &&
+    !tags.includes("fork") &&
+    !tags.includes("pin") &&
+    !tags.includes("skewer")
+  ) {
     const threatsBefore = vulnerablePieces(before, opponent);
     const newThreats = [...vulnerablePieces(after, opponent)].filter(
       (square) => !threatsBefore.has(square)
@@ -340,10 +553,25 @@ export const describeMove = (
 
     if (newThreats.length) {
       tags.push("threat");
+      if (!targetSquare) targetSquare = newThreats[0];
       participles.push(
         `attacking the ${describePieceOn(after, newThreats[0])}`
       );
     }
+  }
+
+  if (!isMate && isPassedPawn(after, move.to, mover)) {
+    tags.push("passed_pawn");
+    if (!participles.length) {
+      participles.push("pushing a dangerous passed pawn");
+    }
+  } else if (
+    !isMate &&
+    !participles.length &&
+    isOpenFileRook(after, move.to, mover)
+  ) {
+    tags.push("open_file");
+    participles.push(`claiming the open ${move.to[0]}-file`);
   }
 
   const fullMove = Number(fenBefore.split(" ")[5]) || 1;
@@ -362,5 +590,5 @@ export const describeMove = (
   text += ".";
   if (warnings.length) text += ` But ${joinClauses(warnings)}.`;
 
-  return { text, tags, capturedValue };
+  return { text, tags, capturedValue, targetSquare, dangerSquare };
 };

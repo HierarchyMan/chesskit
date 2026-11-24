@@ -29,6 +29,7 @@ export const gameAtom = atom(new Chess());
 export const playerColorAtom = atom<Color>(Color.White);
 export const isGameInProgressAtom = atom(false);
 export const gameIdAtom = atom(0);
+export const reviewPlyAtom = atom<number | null>(null);
 export const activeGameModeAtom = atom<GameMode>("casual");
 export const activeCoachAtom = atom(false);
 export const gameEndAtom = atom<GameEnd | null>(null);
@@ -71,14 +72,16 @@ const readLegacyElo = (): number | undefined => {
   }
 };
 
-const initialStrength = (): BotStrength => {
-  const legacyElo = readLegacyElo();
+const DEFAULT_BOT_STRENGTH: BotStrength = {
+  ...DEFAULT_STRENGTH,
+  depth: clampDepth(DEFAULT_STRENGTH.depth),
+};
 
-  return {
-    ...DEFAULT_STRENGTH,
-    elo: legacyElo === undefined ? DEFAULT_STRENGTH.elo : clampElo(legacyElo),
-    depth: clampDepth(DEFAULT_STRENGTH.depth),
-  };
+const legacyBotStrength = (): BotStrength | undefined => {
+  const legacyElo = readLegacyElo();
+  if (legacyElo === undefined) return undefined;
+
+  return { ...DEFAULT_BOT_STRENGTH, elo: clampElo(legacyElo) };
 };
 
 export const enginePlayNameAtom = storedAtom<EngineId>(
@@ -89,8 +92,9 @@ export const enginePlayNameAtom = storedAtom<EngineId>(
 
 export const botStrengthAtom = storedAtom<BotStrength>(
   "bot-strength",
-  initialStrength(),
-  isBotStrength
+  DEFAULT_BOT_STRENGTH,
+  isBotStrength,
+  legacyBotStrength
 );
 
 export const gameModeAtom = storedAtom<GameMode>(
@@ -101,6 +105,14 @@ export const gameModeAtom = storedAtom<GameMode>(
 
 export const coachAtom = storedAtom<boolean>(
   "play-coach",
+  true,
+  (value): value is boolean => typeof value === "boolean"
+);
+
+/** Shown beside the board during a coached game. The coach's own evaluation
+ * drives it, so it has no effect without the coach. */
+export const playEvalBarAtom = storedAtom<boolean>(
+  "play-eval-bar",
   true,
   (value): value is boolean => typeof value === "boolean"
 );
@@ -125,4 +137,30 @@ export const oddsAtom = storedAtom<Odds>(
     ["none", "pawn", "knight", "bishop", "rook", "queen"].includes(
       value as string
     )
+);
+
+export const coachPersonaIdAtom = storedAtom<string>(
+  "play-coach-persona",
+  "David",
+  (value): value is string => typeof value === "string" && value.length > 0
+);
+
+export const coachVoiceEnabledAtom = storedAtom<boolean>(
+  "play-coach-voice",
+  false,
+  (value): value is boolean => typeof value === "boolean"
+);
+
+/** True while an in-board coach refutation cascade is playing, pausing bot replies. */
+export const playCascadeActiveAtom = atom(false);
+
+export const activeTimeControlAtom = atom<TimeControl>({
+  minutes: 0,
+  increment: 0,
+});
+
+export const playPremovesAtom = storedAtom<boolean>(
+  "play-premoves",
+  true,
+  (value): value is boolean => typeof value === "boolean"
 );
