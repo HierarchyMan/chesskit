@@ -19,14 +19,38 @@ export type JokeStrategy = (context: JokeContext) => string[];
 export type JokeEngineName =
   | EngineName.Drawfish
   | EngineName.Worstfish
+  | EngineName.Secondfish
+  | EngineName.Medianfish
+  | EngineName.Chokefish
+  | EngineName.Roulette
+  | EngineName.Anarchy
+  | EngineName.Berserker
+  | EngineName.QueenLover
+  | EngineName.Knightmare
   | EngineName.RandomMover
   | EngineName.Alphabetical
+  | EngineName.ReverseAlphabetical
   | EngineName.Cccp
   | EngineName.Pacifist
   | EngineName.Bongcloud
   | EngineName.Swarm
   | EngineName.Huddle
-  | EngineName.Generous;
+  | EngineName.Generous
+  | EngineName.MinOpponentMoves
+  | EngineName.MaxOpponentMoves
+  | EngineName.Mirror
+  | EngineName.SameColor
+  | EngineName.OppositeColor
+  | EngineName.SuicideKing
+  | EngineName.ReverseStarting
+  | EngineName.StalemateSeeker
+  | EngineName.Sniper
+  | EngineName.Lazy
+  | EngineName.EdgeLord
+  | EngineName.Center
+  | EngineName.SocialDistancer
+  | EngineName.Greedy
+  | EngineName.Aristocrat;
 
 const PIECE_VALUES: Record<PieceSymbol, number> = {
   p: 1,
@@ -35,6 +59,15 @@ const PIECE_VALUES: Record<PieceSymbol, number> = {
   r: 5,
   q: 9,
   k: 0,
+};
+
+const ARISTOCRAT_ORDER: Record<PieceSymbol, number> = {
+  q: 0,
+  r: 1,
+  b: 2,
+  n: 3,
+  k: 4,
+  p: 5,
 };
 
 export const moveToUci = (move: Move): string =>
@@ -128,15 +161,174 @@ const cccpClass = (move: Move): number => {
   return 4;
 };
 
+const isLightSquare = (square: Square): boolean => {
+  const [x, y] = squareCoords(square);
+  return (x + y) % 2 === 1;
+};
+
+const squareColorRank = (move: Move, wantLight: boolean): number => {
+  const toMatches = isLightSquare(move.to) === wantLight;
+  const fromMatches = isLightSquare(move.from) === wantLight;
+  if (!fromMatches && toMatches) return 0;
+  if (fromMatches && toMatches) return 1;
+  if (!fromMatches && !toMatches) return 2;
+  return 3;
+};
+
+const moveDistSq = (move: Move): number => {
+  const [ax, ay] = squareCoords(move.from);
+  const [bx, by] = squareCoords(move.to);
+  return (ax - bx) ** 2 + (ay - by) ** 2;
+};
+
+const centerDist = (square: Square): number => {
+  const [x, y] = squareCoords(square);
+  return Math.hypot(x - 3.5, y - 3.5);
+};
+
+const verticalSymmetry = (game: Chess): number => {
+  const board = game.board();
+  let total = 0;
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 8; col++) {
+      const top = board[row][col];
+      const bottom = board[7 - row][col];
+      if (!top && !bottom) total += 1;
+      else if (top && bottom && top.color !== bottom.color) {
+        total += top.type === bottom.type ? 2 : 0.5;
+      }
+    }
+  }
+  return total;
+};
+
+const meanPairwiseDistance = (game: Chess): number => {
+  const coords = game
+    .board()
+    .flat()
+    .filter((piece): piece is NonNullable<typeof piece> => !!piece)
+    .map((piece) => squareCoords(piece.square));
+  if (coords.length < 2) return 0;
+  let total = 0;
+  let pairs = 0;
+  for (let i = 0; i < coords.length; i++) {
+    for (let j = i + 1; j < coords.length; j++) {
+      total += Math.hypot(
+        coords[i][0] - coords[j][0],
+        coords[i][1] - coords[j][1]
+      );
+      pairs++;
+    }
+  }
+  return total / pairs;
+};
+
+const suicideKingKey = (context: JokeContext, move: Move): number => {
+  const next = after(context.fen, move);
+  const own = kingSquare(next, move.color);
+  const enemy = kingSquare(next, next.turn());
+  const d = own && enemy ? distance(own, enemy) : 0;
+  return d * 2 + (move.piece === "k" ? 0 : 1);
+};
+
+const minOpponentMovesKey = (context: JokeContext, move: Move): number => {
+  const next = after(context.fen, move);
+  if (next.isCheckmate()) return -1;
+  return next.moves().length;
+};
+
+const stalemateSeekerKey = (context: JokeContext, move: Move): number => {
+  const next = after(context.fen, move);
+  if (next.isStalemate()) return -1000;
+  if (next.isCheckmate()) return 10000;
+  return next.moves().length + (givesCheck(move) ? 50 : 0);
+};
+
+const reverseStartingDelta = (move: Move): number => {
+  const fromRank = Number(move.from[1]);
+  const toRank = Number(move.to[1]);
+  return move.color === "w" ? fromRank - toRank : toRank - fromRank;
+};
+
+const greedyKey = (move: Move): number => {
+  const capture = move.captured ? PIECE_VALUES[move.captured] * 10 : 0;
+  const promo = move.promotion ? PIECE_VALUES[move.promotion] : 0;
+  return -(capture + promo);
+};
+
 export const JOKE_STRATEGIES: Record<JokeEngineName, JokeStrategy> = {
   [EngineName.Drawfish]: (context) =>
     rankBy(context, (move) => Math.abs(score(context, move))),
   [EngineName.Worstfish]: (context) =>
     rankBy(context, (move) => score(context, move)),
+  [EngineName.Secondfish]: (context) => {
+    const ranked = rankBy(context, (move) => -score(context, move));
+    if (ranked.length >= 2) [ranked[0], ranked[1]] = [ranked[1], ranked[0]];
+    return ranked;
+  },
+  [EngineName.Medianfish]: (context) => {
+    const ranked = rankBy(context, (move) => -score(context, move));
+    const mid = Math.floor((ranked.length - 1) / 2);
+    return ranked
+      .map((uci, index) => ({ uci, dist: Math.abs(index - mid) }))
+      .sort((a, b) => a.dist - b.dist)
+      .map((entry) => entry.uci);
+  },
+  [EngineName.Chokefish]: (context) => {
+    const best = context.moves.reduce(
+      (highest, move) => Math.max(highest, score(context, move)),
+      -Infinity
+    );
+    const choking = best >= 150;
+    return rankBy(context, (move) =>
+      choking ? score(context, move) : -score(context, move)
+    );
+  },
+  [EngineName.Roulette]: (context) => {
+    const blunder = context.random() < 1 / 6;
+    return rankBy(context, (move) =>
+      blunder ? score(context, move) : -score(context, move)
+    );
+  },
+  [EngineName.Anarchy]: (context) =>
+    rankBy(
+      context,
+      (move) =>
+        (move.isEnPassant()
+          ? 0
+          : move.promotion && move.promotion !== "n"
+            ? 2e7
+            : 1e7) - score(context, move)
+    ),
+  [EngineName.Berserker]: (context) =>
+    rankBy(
+      context,
+      (move) =>
+        (isCapture(move) || givesCheck(move) ? 0 : 1e7) - score(context, move)
+    ),
+  [EngineName.QueenLover]: (context) =>
+    rankBy(
+      context,
+      (move) => (move.piece === "q" ? 0 : 1e7) - score(context, move)
+    ),
+  [EngineName.Knightmare]: (context) =>
+    rankBy(
+      context,
+      (move) =>
+        (move.piece === "n" || move.promotion === "n"
+          ? 0
+          : move.promotion
+            ? 2e7
+            : 1e7) - score(context, move)
+    ),
   [EngineName.RandomMover]: (context) => rankBy(context, () => 0),
   [EngineName.Alphabetical]: (context) =>
     [...context.moves]
       .sort((a, b) => (a.san < b.san ? -1 : a.san > b.san ? 1 : 0))
+      .map(moveToUci),
+  [EngineName.ReverseAlphabetical]: (context) =>
+    [...context.moves]
+      .sort((a, b) => (a.san > b.san ? -1 : a.san < b.san ? 1 : 0))
       .map(moveToUci),
   [EngineName.Cccp]: (context) => rankBy(context, cccpClass),
   [EngineName.Pacifist]: (context) =>
@@ -157,6 +349,34 @@ export const JOKE_STRATEGIES: Record<JokeEngineName, JokeStrategy> = {
     rankBy(context, (move) => spread(context, move, "own")),
   [EngineName.Generous]: (context) =>
     rankBy(context, (move) => -biggestGift(context, move)),
+  [EngineName.MinOpponentMoves]: (context) =>
+    rankBy(context, (move) => minOpponentMovesKey(context, move)),
+  [EngineName.MaxOpponentMoves]: (context) =>
+    rankBy(context, (move) => -after(context.fen, move).moves().length),
+  [EngineName.Mirror]: (context) =>
+    rankBy(context, (move) => -verticalSymmetry(after(context.fen, move))),
+  [EngineName.SameColor]: (context) =>
+    rankBy(context, (move) => squareColorRank(move, move.color === "w")),
+  [EngineName.OppositeColor]: (context) =>
+    rankBy(context, (move) => squareColorRank(move, move.color === "b")),
+  [EngineName.SuicideKing]: (context) =>
+    rankBy(context, (move) => suicideKingKey(context, move)),
+  [EngineName.ReverseStarting]: (context) =>
+    rankBy(context, reverseStartingDelta),
+  [EngineName.StalemateSeeker]: (context) =>
+    rankBy(context, (move) => stalemateSeekerKey(context, move)),
+  [EngineName.Sniper]: (context) =>
+    rankBy(context, (move) => -moveDistSq(move)),
+  [EngineName.Lazy]: (context) => rankBy(context, moveDistSq),
+  [EngineName.EdgeLord]: (context) =>
+    rankBy(context, (move) => -(centerDist(move.to) - centerDist(move.from))),
+  [EngineName.Center]: (context) =>
+    rankBy(context, (move) => centerDist(move.to) - centerDist(move.from)),
+  [EngineName.SocialDistancer]: (context) =>
+    rankBy(context, (move) => -meanPairwiseDistance(after(context.fen, move))),
+  [EngineName.Greedy]: (context) => rankBy(context, greedyKey),
+  [EngineName.Aristocrat]: (context) =>
+    rankBy(context, (move) => ARISTOCRAT_ORDER[move.piece]),
 };
 
 export const isJokeEngineName = (name: string): name is JokeEngineName =>

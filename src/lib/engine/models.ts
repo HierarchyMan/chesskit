@@ -336,6 +336,46 @@ const ENTRIES: Record<EngineName, Entry> = {
     "Asks a real engine for the worst move and plays it. Every time.",
     { needsAdvisor: true }
   ),
+  [EngineName.Secondfish]: joke(
+    "Secondfish",
+    "Always plays the second-best move. Almost a grandmaster — until there is only one move that saves the game.",
+    { needsAdvisor: true }
+  ),
+  [EngineName.Medianfish]: joke(
+    "Medianfish",
+    "Sorts every legal move by evaluation and plays the exact median. Aggressively average.",
+    { needsAdvisor: true }
+  ),
+  [EngineName.Chokefish]: joke(
+    "Chokefish",
+    "Plays like a grandmaster while equal or losing, then plays the worst blunder on the board the moment it gets a winning edge (+1.50).",
+    { needsAdvisor: true }
+  ),
+  [EngineName.Roulette]: joke(
+    "Russian Roulette",
+    "Five times out of six it plays the best move. One time out of six it plays the worst.",
+    { needsAdvisor: true }
+  ),
+  [EngineName.Anarchy]: joke(
+    "Anarchy",
+    "En passant is strictly forced and pawns always underpromote to knights. Plays good chess the rest of the time.",
+    { needsAdvisor: true }
+  ),
+  [EngineName.Berserker]: joke(
+    "Berserker",
+    "The opposite of Pacifist: always plays the best capture or check when one exists, and only plays quietly when forced.",
+    { needsAdvisor: true }
+  ),
+  [EngineName.QueenLover]: joke(
+    "Queen Lover",
+    "Moves its queen whenever it legally can, as well as it can. Otherwise plays the best move.",
+    { needsAdvisor: true }
+  ),
+  [EngineName.Knightmare]: joke(
+    "Knightmare",
+    "Moves a knight whenever it legally can and always underpromotes to a knight. Otherwise plays the best move.",
+    { needsAdvisor: true }
+  ),
   [EngineName.RandomMover]: joke(
     "Random Mover",
     "Picks any legal move at random."
@@ -343,6 +383,10 @@ const ENTRIES: Record<EngineName, Entry> = {
   [EngineName.Alphabetical]: joke(
     "Alphabetical",
     "Plays the move that comes first in alphabetical order of its notation."
+  ),
+  [EngineName.ReverseAlphabetical]: joke(
+    "Reverse Alphabetical",
+    "Plays the move that comes last in alphabetical order of its notation."
   ),
   [EngineName.Cccp]: joke(
     "CCCP",
@@ -369,6 +413,66 @@ const ENTRIES: Record<EngineName, Entry> = {
   [EngineName.Generous]: joke(
     "Generous",
     "Leaves the most valuable thing it can for the opponent to take."
+  ),
+  [EngineName.MinOpponentMoves]: joke(
+    "Min Opponent Moves",
+    "Tom7's Elo World classic: plays whichever move leaves the opponent with the fewest legal replies (checkmating first)."
+  ),
+  [EngineName.MaxOpponentMoves]: joke(
+    "Max Opponent Moves",
+    "Maximum hospitality: plays whichever move gives the opponent the most legal replies."
+  ),
+  [EngineName.Mirror]: joke(
+    "Mirror",
+    "Copycat chess: plays whichever move makes the board most vertically symmetric with your pieces."
+  ),
+  [EngineName.SameColor]: joke(
+    "Same Color",
+    "Tom7's Elo World classic: White puts every piece on light squares, Black puts every piece on dark squares."
+  ),
+  [EngineName.OppositeColor]: joke(
+    "Opposite Color",
+    "Tom7's Elo World classic: White puts every piece on dark squares, Black puts every piece on light squares."
+  ),
+  [EngineName.SuicideKing]: joke(
+    "Suicide King",
+    "Tom7's Elo World classic: marches its own king straight toward the enemy king as fast as possible."
+  ),
+  [EngineName.ReverseStarting]: joke(
+    "Reverse Starting",
+    "Thinks the board is upside down and rushes every piece toward the opponent's back rank."
+  ),
+  [EngineName.StalemateSeeker]: joke(
+    "Stalemate Seeker",
+    "Desperately tries to stalemate you: plays stalemate-in-one on sight, refuses to checkmate if any other move exists, and squeezes your moves without giving check."
+  ),
+  [EngineName.Sniper]: joke(
+    "Sniper",
+    "Always plays the longest-distance move on the board."
+  ),
+  [EngineName.Lazy]: joke(
+    "Lazy",
+    "Always plays the shortest-distance move on the board."
+  ),
+  [EngineName.EdgeLord]: joke(
+    "Edge Lord",
+    "Pushes every piece as close to the rim and corners of the board as possible."
+  ),
+  [EngineName.Center]: joke(
+    "Center",
+    "Takes 'control the center' way too literally: shoves every piece as close to d4, d5, e4, e5 as possible."
+  ),
+  [EngineName.SocialDistancer]: joke(
+    "Social Distancer",
+    "Maximizes the average distance between all pieces on the board. Needs personal space."
+  ),
+  [EngineName.Greedy]: joke(
+    "Greedy",
+    "Always grabs the highest-value piece it can (or promotes to a queen), without checking if it is defended."
+  ),
+  [EngineName.Aristocrat]: joke(
+    "Aristocrat",
+    "Always moves its highest-ranking piece (queen, rook, bishop, knight, king) and refuses to touch pawns unless forced."
   ),
 };
 

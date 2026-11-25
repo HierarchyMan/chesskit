@@ -267,10 +267,187 @@ describe("joke strategies", () => {
     assert.equal(ranked[0], "e1e2");
   });
 
-  it("Alphabetical sorts by notation, capitals first", () => {
-    const ranked = JOKE_STRATEGIES[EngineName.Alphabetical](context(START));
-    assert.equal(ranked[0], "b1a3"); // Na3
-    assert.equal(ranked.at(-1), "h2h4");
+  it("Alphabetical and Reverse Alphabetical sort by notation", () => {
+    const alpha = JOKE_STRATEGIES[EngineName.Alphabetical](context(START));
+    assert.equal(alpha[0], "b1a3"); // Na3
+    assert.equal(alpha.at(-1), "h2h4");
+
+    const rev = JOKE_STRATEGIES[EngineName.ReverseAlphabetical](context(START));
+    assert.equal(rev[0], "h2h4");
+    assert.equal(rev.at(-1), "b1a3");
+  });
+
+  it("Secondfish plays the second-best move and Medianfish plays the median", () => {
+    const fen = "4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1";
+    const scores: Record<string, number> = {
+      e4d5: 900,
+      e1f2: -30,
+      e1f1: -790,
+      e1e2: -810,
+      e4e5: -850,
+    };
+    assert.equal(
+      JOKE_STRATEGIES[EngineName.Secondfish](context(fen, scores))[0],
+      "e1f2"
+    );
+    assert.equal(
+      JOKE_STRATEGIES[EngineName.Medianfish](context(fen, scores))[0],
+      "e1f1"
+    );
+  });
+
+  it("Chokefish plays best when equal/losing and blunders when winning (+150 cp)", () => {
+    const fen = "4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1";
+    const winning = {
+      e4d5: 900,
+      e1f2: -30,
+      e1f1: -790,
+      e1e2: -810,
+      e4e5: -850,
+    };
+    assert.equal(
+      JOKE_STRATEGIES[EngineName.Chokefish](context(fen, winning))[0],
+      "e4e5"
+    );
+    const equal = {
+      e4d5: 100,
+      e1f2: -30,
+      e1f1: -790,
+      e1e2: -810,
+      e4e5: -850,
+    };
+    assert.equal(
+      JOKE_STRATEGIES[EngineName.Chokefish](context(fen, equal))[0],
+      "e4d5"
+    );
+  });
+
+  it("Roulette plays best 5/6 of the time and worst 1/6 of the time", () => {
+    const fen = "4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1";
+    const scores = { e4d5: 900, e4e5: -850 };
+    const safe = { ...context(fen, scores), random: () => 0.5 };
+    const chamber = { ...context(fen, scores), random: () => 0.05 };
+    assert.equal(JOKE_STRATEGIES[EngineName.Roulette](safe)[0], "e4d5");
+    assert.equal(JOKE_STRATEGIES[EngineName.Roulette](chamber)[0], "e4e5");
+  });
+
+  it("Anarchy forces en passant and underpromotes to a knight", () => {
+    // White can capture en passant on d6 even though it is scored terribly.
+    const epFen =
+      "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3";
+    assert.equal(
+      JOKE_STRATEGIES[EngineName.Anarchy](context(epFen, { e5d6: -900 }))[0],
+      "e5d6"
+    );
+    // White can promote on a8; queen promotion is scored higher, but Anarchy chooses knight.
+    const promoFen = "7k/P7/8/8/8/8/8/4K3 w - - 0 1";
+    assert.equal(
+      JOKE_STRATEGIES[EngineName.Anarchy](
+        context(promoFen, { a7a8q: 900, a7a8n: 300 })
+      )[0],
+      "a7a8n"
+    );
+  });
+
+  it("Berserker prefers violent moves, QueenLover moves the queen, Knightmare moves knights", () => {
+    const fen = "4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1";
+    assert.equal(
+      JOKE_STRATEGIES[EngineName.Berserker](
+        context(fen, { e4d5: -100, e1f2: 500 })
+      )[0],
+      "e4d5"
+    );
+    const queenFen = "4k3/8/8/8/8/8/4P3/3QK3 w - - 0 1";
+    assert.ok(
+      JOKE_STRATEGIES[EngineName.QueenLover](context(queenFen))[0].startsWith(
+        "d1"
+      )
+    );
+    const knightFen = "4k3/8/8/8/8/8/4P3/1N2K3 w - - 0 1";
+    assert.ok(
+      JOKE_STRATEGIES[EngineName.Knightmare](context(knightFen))[0].startsWith(
+        "b1"
+      )
+    );
+  });
+
+  it("Mirror copies 1.e4 with 1...e5", () => {
+    const afterE4 =
+      "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+    assert.equal(JOKE_STRATEGIES[EngineName.Mirror](context(afterE4))[0], "e7e5");
+  });
+
+  it("MinOpponentMoves delivers mate in one, StalemateSeeker delivers stalemate and avoids mate", () => {
+    // Legal position with both mate-in-one (Qb7#, Qb8#) and stalemate-in-one (Qb6).
+    const fen = "k7/8/2K5/8/8/8/8/1Q6 w - - 0 1";
+    const minMove = JOKE_STRATEGIES[EngineName.MinOpponentMoves](context(fen))[0];
+    const afterMin = new Chess(fen);
+    afterMin.move({ from: minMove.slice(0, 2), to: minMove.slice(2, 4) });
+    assert.equal(afterMin.isCheckmate(), true, minMove);
+
+    const staleMove = JOKE_STRATEGIES[EngineName.StalemateSeeker](
+      context(fen)
+    )[0];
+    const afterStale = new Chess(fen);
+    afterStale.move({ from: staleMove.slice(0, 2), to: staleMove.slice(2, 4) });
+    assert.equal(afterStale.isStalemate(), true, staleMove);
+
+    // Checkmate sorts after non-mating moves for StalemateSeeker.
+    const ranked = JOKE_STRATEGIES[EngineName.StalemateSeeker](context(fen));
+    assert.ok(ranked.indexOf("b1b8") > ranked.indexOf("b1b2"));
+  });
+
+  it("SameColor puts White on light squares and OppositeColor on dark squares", () => {
+    // Only piece that can move is king on e1 (dark square): d1/f1/e2 are light, d2/f2 are dark.
+    const fen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1";
+    const same = JOKE_STRATEGIES[EngineName.SameColor](context(fen))[0];
+    assert.ok(["e1d1", "e1f1", "e1e2"].includes(same), same);
+    const opp = JOKE_STRATEGIES[EngineName.OppositeColor](context(fen))[0];
+    assert.ok(["e1d2", "e1f2"].includes(opp), opp);
+  });
+
+  it("SuicideKing marches toward the enemy king and ReverseStarting rushes the back rank", () => {
+    const fen = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
+    const suicide = JOKE_STRATEGIES[EngineName.SuicideKing](context(fen))[0];
+    assert.ok(["e1d2", "e1f2"].includes(suicide), suicide);
+
+    // Rook on a1 can rush all the way to a8 (7 ranks forward).
+    const rushFen = "4k3/8/8/8/8/8/8/R3K3 w - - 0 1";
+    assert.equal(
+      JOKE_STRATEGIES[EngineName.ReverseStarting](context(rushFen))[0],
+      "a1a8"
+    );
+  });
+
+  it("Sniper picks the longest move, Lazy picks a 1-square move, Greedy grabs the queen, Aristocrat moves the queen", () => {
+    const distFen = "4k3/8/8/8/8/8/8/R3K3 w - - 0 1";
+    assert.equal(JOKE_STRATEGIES[EngineName.Sniper](context(distFen))[0], "a1a8");
+    const lazy = JOKE_STRATEGIES[EngineName.Lazy](context(distFen))[0];
+    assert.ok(["a1a2", "a1b1", "e1d1", "e1f1", "e1e2"].includes(lazy), lazy);
+
+    const greedyFen = "4k3/8/8/3q1r2/4P3/8/8/4K3 w - - 0 1";
+    assert.equal(
+      JOKE_STRATEGIES[EngineName.Greedy](context(greedyFen))[0],
+      "e4d5"
+    );
+
+    const aristocratFen = "4k3/8/8/8/8/8/4P3/3QK3 w - - 0 1";
+    assert.ok(
+      JOKE_STRATEGIES[EngineName.Aristocrat](context(aristocratFen))[0].startsWith(
+        "d1"
+      )
+    );
+  });
+
+  it("Center moves toward the middle and EdgeLord moves toward the rim", () => {
+    // Knights moving from b1/g1 to c3/f3 give the largest drop in distance to the center.
+    const center = JOKE_STRATEGIES[EngineName.Center](context(START))[0];
+    assert.ok(["b1c3", "g1f3"].includes(center), center);
+
+    // Queen on d4 can flee all the way to a1 or h8 (corners).
+    const rimFen = "4k3/8/8/8/3Q4/8/8/4K3 w - - 0 1";
+    const rim = JOKE_STRATEGIES[EngineName.EdgeLord](context(rimFen))[0];
+    assert.ok(["d4a1", "d4h8"].includes(rim), rim);
   });
 
   it("every strategy returns each legal move exactly once", () => {
