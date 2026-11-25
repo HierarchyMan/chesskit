@@ -1,5 +1,5 @@
 import { Color, MoveClassification } from "@/types/enums";
-import { Grid2 as Grid, Typography } from "@mui/material";
+import { Box, ButtonBase, Stack, Tooltip, Typography } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { boardAtom, gameAtom, gameEvalAtom } from "../../../states";
 import Image from "next/image";
@@ -17,6 +17,8 @@ export default function ClassificationRow({ classification }: Props) {
   const game = useAtomValue(gameAtom);
   const { goToMove } = useChessActions(boardAtom);
   const moves = game.history({ verbose: true });
+  const label = classificationName(classification);
+  const colorHex = CLASSIFICATION_COLORS[classification];
 
   const whiteNb =
     gameEval?.positions.filter(
@@ -65,61 +67,98 @@ export default function ClassificationRow({ classification }: Props) {
   };
 
   return (
-    <Grid
-      container
-      justifyContent="space-evenly"
-      alignItems="center"
-      wrap="nowrap"
-      color={CLASSIFICATION_COLORS[classification]}
-      size={12}
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) 8.5rem minmax(0, 1fr)",
+        alignItems: "center",
+        columnGap: 1,
+        py: 0.2,
+      }}
     >
-      <Grid
-        container
-        justifyContent="center"
-        alignItems="center"
-        width={"3rem"}
-        style={{ cursor: whiteNb ? "pointer" : "default" }}
+      <CountPill
+        count={whiteNb}
+        colorHex={colorHex}
+        tooltip={whiteNb ? `Jump to next White ${label}` : `No White ${label}`}
         onClick={() => handleClick(Color.White)}
-        fontSize="0.9rem"
-      >
-        {whiteNb}
-      </Grid>
+      />
 
-      <Grid
-        container
-        justifyContent="start"
+      <Stack
+        direction="row"
         alignItems="center"
-        width={"7rem"}
-        gap={1}
-        wrap="nowrap"
+        justifyContent="flex-start"
+        gap={0.85}
+        sx={{ minWidth: 0 }}
       >
         <Image
           src={`/icons/${classification}.png`}
-          alt="move-icon"
+          alt=""
           width={18}
           height={18}
-          style={{
-            maxWidth: "3.5vw",
-            maxHeight: "3.5vw",
-          }}
+          style={{ flexShrink: 0 }}
         />
-
-        <Typography align="center" fontSize="0.9rem">
-          {classificationName(classification)}
+        <Typography
+          variant="body2"
+          fontWeight={500}
+          noWrap
+          sx={{ color: colorHex, fontSize: "0.84rem" }}
+        >
+          {label}
         </Typography>
-      </Grid>
+      </Stack>
 
-      <Grid
-        container
-        justifyContent="center"
-        alignItems="center"
-        width={"3rem"}
-        style={{ cursor: blackNb ? "pointer" : "default" }}
+      <CountPill
+        count={blackNb}
+        colorHex={colorHex}
+        tooltip={blackNb ? `Jump to next Black ${label}` : `No Black ${label}`}
         onClick={() => handleClick(Color.Black)}
-        fontSize="0.9rem"
-      >
-        {blackNb}
-      </Grid>
-    </Grid>
+      />
+    </Box>
+  );
+}
+
+function CountPill({
+  count,
+  colorHex,
+  tooltip,
+  onClick,
+}: {
+  count: number;
+  colorHex: string;
+  tooltip: string;
+  onClick: () => void;
+}) {
+  const disabled = count === 0;
+  return (
+    <Box sx={{ display: "flex", justifyContent: "center" }}>
+      <Tooltip title={tooltip} disableInteractive>
+        <span>
+          <ButtonBase
+            disabled={disabled}
+            onClick={onClick}
+            aria-label={tooltip}
+            sx={{
+              minWidth: 36,
+              height: 26,
+              px: 1,
+              borderRadius: 1,
+              fontSize: "0.84rem",
+              fontWeight: disabled ? 400 : 700,
+              fontVariantNumeric: "tabular-nums",
+              color: disabled ? "text.disabled" : colorHex,
+              bgcolor: disabled ? "transparent" : "action.hover",
+              transition: "background-color 120ms ease",
+              "&:hover": disabled ? undefined : { bgcolor: "action.selected" },
+              "&:focus-visible": {
+                outline: "2px solid",
+                outlineColor: "primary.main",
+              },
+            }}
+          >
+            {count}
+          </ButtonBase>
+        </span>
+      </Tooltip>
+    </Box>
   );
 }

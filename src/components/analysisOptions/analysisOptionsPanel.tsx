@@ -62,8 +62,16 @@ function OptionSwitch({
   const [checked, setChecked] = useAtom(atom);
 
   return (
-    <>
+    <Box>
       <FormControlLabel
+        labelPlacement="start"
+        sx={{
+          m: 0,
+          width: "100%",
+          minHeight: 34,
+          justifyContent: "space-between",
+          gap: 2,
+        }}
         control={
           <Switch
             size="small"
@@ -71,14 +79,19 @@ function OptionSwitch({
             onChange={(_, value) => setChecked(value)}
           />
         }
-        label={copy.label}
+        label={<Typography variant="body2">{copy.label}</Typography>}
       />
       {copy.help && (
-        <Typography variant="caption" sx={{ opacity: 0.7, pl: 5 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          display="block"
+          sx={{ mt: -0.25, mb: 0.5 }}
+        >
           {copy.help}
         </Typography>
       )}
-      {checked && detail && <Box sx={{ pl: 5 }}>{detail}</Box>}
-    </>
+      {checked && detail && <Box sx={{ mt: 0.5 }}>{detail}</Box>}
+    </Box>
   );
 }

@@ -12,7 +12,7 @@ export default function FlipBoardButton() {
     <ToolbarButton
       tooltip="Flip board (F)"
       onClick={() => setBoardOrientation((prev) => !prev)}
-      icon="eva:flip-fill"
+      icon="mdi:swap-vertical"
     />
   );
 }

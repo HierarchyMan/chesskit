@@ -14,7 +14,7 @@ export default function ModelMenuLabel({ view }: { view: ModelView }) {
 
   return (
     <Box sx={{ minWidth: 0 }}>
-      <Typography variant="body1">
+      <Typography variant="body2" fontWeight={600}>
         {engineLabel(view.model.name).full}
       </Typography>
       <Typography
@@ -23,6 +23,7 @@ export default function ModelMenuLabel({ view }: { view: ModelView }) {
           display: "block",
           color: statusColor(status.tone),
           opacity: status.tone === "default" ? 0.75 : 1,
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {status.text}

@@ -1,4 +1,4 @@
-import { Grid2 as Grid, Typography } from "@mui/material";
+import { Stack, Typography } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { gameAtom } from "../states";
 
@@ -10,36 +10,38 @@ export default function GamePanel() {
 
   if (!hasGameInfo) return null;
 
-  const termination = gameHeaders.Termination || "?";
+  const termination = gameHeaders.Termination || "";
   const result =
     termination.split(" ").length > 2 ? termination : gameHeaders.Result || "?";
 
+  const entries = [
+    { label: "Event", value: gameHeaders.Event },
+    { label: "Site", value: gameHeaders.Site },
+    { label: "Date", value: gameHeaders.Date },
+    { label: "Result", value: result },
+  ].filter((entry) => entry.value && entry.value !== "?");
+
+  if (!entries.length) return null;
+
   return (
-    <Grid
-      container
-      justifyContent="space-evenly"
-      alignItems="center"
-      rowGap={1}
-      columnGap={3}
-      size={11}
+    <Stack
+      direction="row"
+      flexWrap="wrap"
+      columnGap={2}
+      rowGap={0.5}
+      sx={{ pt: 0.75 }}
     >
-      <Grid container justifyContent="center" alignItems="center" size="grow">
-        <Typography noWrap fontSize="0.9rem">
-          Site : {gameHeaders.Site || "?"}
+      {entries.map((entry) => (
+        <Typography
+          key={entry.label}
+          variant="caption"
+          color="text.secondary"
+          noWrap
+        >
+          <strong style={{ fontWeight: 600 }}>{entry.label}: </strong>
+          {entry.value}
         </Typography>
-      </Grid>
-
-      <Grid container justifyContent="center" alignItems="center" size="grow">
-        <Typography noWrap fontSize="0.9rem">
-          Date : {gameHeaders.Date || "?"}
-        </Typography>
-      </Grid>
-
-      <Grid container justifyContent="center" alignItems="center" size="grow">
-        <Typography noWrap fontSize="0.9rem">
-          Result : {result}
-        </Typography>
-      </Grid>
-    </Grid>
+      ))}
+    </Stack>
   );
 }

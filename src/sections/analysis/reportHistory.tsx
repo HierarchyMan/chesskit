@@ -1,27 +1,48 @@
 import { AnalysisLine, replayAnalysis } from "@/lib/analysisSession";
 import { classificationName } from "@/lib/classificationLabels";
 import { getLineEvalLabel, moveLineUciToSan } from "@/lib/chess";
+import { CLASSIFICATION_COLORS } from "@/constants";
 import MiniBoard from "@/components/board/miniBoard";
+import PrettyMoveSan from "@/components/prettyMoveSan";
+import { Icon } from "@iconify/react";
 import {
+  Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   MenuItem,
   Slider,
   Stack,
   TextField,
+  Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCopyText } from "@/hooks/useCopyText";
 import { Chess } from "chess.js";
 import { recordedDrawAtEnd } from "@/lib/boardDraw";
 
+const formatMovePrefix = (fen: string, plyIndex: number, turn: "w" | "b") => {
+  const startMove = Number(fen.split(" ")[5]) || 1;
+  const startTurn = fen.split(" ")[1] === "b" ? "b" : "w";
+  const moveNum =
+    startMove + Math.floor((plyIndex + (startTurn === "b" ? 1 : 0)) / 2);
+  if (turn === "w") return `${moveNum}.`;
+  return plyIndex === 0 ? `${moveNum}...` : "";
+};
+
 /** Read-only report playback has no connection to the study's move-recording atoms. */
 export default function ReportHistory({ line }: { line: AnalysisLine }) {
   const reports = line.reports ?? [];
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const [open, setOpen] = useState(false);
   const [reportIndex, setReportIndex] = useState(0);
   const [ply, setPly] = useState(0);
@@ -31,33 +52,104 @@ export default function ReportHistory({ line }: { line: AnalysisLine }) {
     () => (report ? replayAnalysis(report) : undefined),
     [report]
   );
-  const cursor = Math.min(ply, full?.history().length ?? 0);
+  const verboseHistory = useMemo(
+    () => full?.history({ verbose: true }) ?? [],
+    [full]
+  );
+  const maxPly = verboseHistory.length;
+  const cursor = Math.min(ply, maxPly);
   const board = useMemo(
     () => (report ? replayAnalysis(report, cursor) : undefined),
     [report, cursor]
   );
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        setPly((value) => Math.max(0, value - 1));
+      } else if (event.key === "ArrowRight") {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        setPly((value) => Math.min(maxPly, value + 1));
+      } else if (event.key === "Home") {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        setPly(0);
+      } else if (event.key === "End") {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        setPly(maxPly);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [open, maxPly]);
+
   if (!reports.length || !report || !board || !full) return null;
+
   const position = report.evaluation.positions[cursor];
+  const currentMove = cursor > 0 ? verboseHistory[cursor - 1] : undefined;
+  const currentMoveNumber = currentMove
+    ? Number(currentMove.before.split(" ")[5]) || 1
+    : 1;
+
   return (
     <>
       <Button
         size="small"
+        variant="text"
+        startIcon={<Icon icon="mdi:history" height={16} />}
         onClick={() => {
           setReportIndex(reports.length - 1);
           setPly(0);
           setOpen(true);
         }}
+        sx={{
+          minWidth: 0,
+          px: 0.75,
+          py: 0.25,
+          fontSize: "0.75rem",
+          whiteSpace: "nowrap",
+        }}
       >
-        Past reports ({reports.length})
+        Reports ({reports.length})
       </Button>
       <Dialog
         open={open}
         onClose={() => setOpen(false)}
         fullWidth
         maxWidth="sm"
+        fullScreen={isSmall}
       >
-        <DialogTitle>Saved analysis reports</DialogTitle>
-        <DialogContent>
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            py: 1.5,
+          }}
+        >
+          <Stack direction="row" alignItems="center" gap={1}>
+            <Icon icon="mdi:history" height={22} />
+            <Typography variant="h6" fontWeight={600} component="span">
+              Saved analysis reports
+            </Typography>
+          </Stack>
+          <Tooltip title="Close">
+            <IconButton
+              size="small"
+              onClick={() => setOpen(false)}
+              aria-label="Close saved reports"
+            >
+              <Icon icon="mdi:close" height={20} />
+            </IconButton>
+          </Tooltip>
+        </DialogTitle>
+        <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
               select
@@ -77,15 +169,23 @@ export default function ReportHistory({ line }: { line: AnalysisLine }) {
                 </MenuItem>
               ))}
             </TextField>
-            <Typography variant="body2">
+            <Typography
+              variant="body2"
+              sx={{ fontVariantNumeric: "tabular-nums" }}
+            >
               Accuracy: White{" "}
-              {report.evaluation.accuracy.white?.toFixed(1) ?? "—"}% · Black{" "}
-              {report.evaluation.accuracy.black?.toFixed(1) ?? "—"}%
+              <strong>
+                {report.evaluation.accuracy.white?.toFixed(1) ?? "—"}%
+              </strong>{" "}
+              · Black{" "}
+              <strong>
+                {report.evaluation.accuracy.black?.toFixed(1) ?? "—"}%
+              </strong>
             </Typography>
             <Stack alignItems="center">
               <div
                 style={{
-                  width: "min(100%, 360px)",
+                  width: "min(100%, 340px)",
                   aspectRatio: "1",
                   position: "relative",
                 }}
@@ -101,21 +201,83 @@ export default function ReportHistory({ line }: { line: AnalysisLine }) {
               aria-label="Report replay position"
               value={cursor}
               min={0}
-              max={Math.max(1, full.history().length)}
-              disabled={!full.history().length}
+              max={Math.max(1, maxPly)}
+              disabled={!maxPly}
               step={1}
               onChange={(_, value) => setPly(value as number)}
             />
-            <Stack direction="row" justifyContent="space-between">
-              <Button disabled={!cursor} onClick={() => setPly(cursor - 1)}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              gap={1}
+            >
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={!cursor}
+                startIcon={<Icon icon="mdi:chevron-left" height={18} />}
+                onClick={() => setPly(cursor - 1)}
+              >
                 Previous
               </Button>
-              <Typography>
-                {cursor ? full.history()[cursor - 1] : "Starting position"} ·{" "}
-                {cursor}/{full.history().length}
-              </Typography>
+              <Stack
+                direction="row"
+                alignItems="center"
+                gap={1}
+                flexWrap="wrap"
+                justifyContent="center"
+                sx={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {currentMove ? (
+                  <Stack direction="row" alignItems="center" gap={0.5}>
+                    <Typography variant="body2" color="text.secondary">
+                      {currentMoveNumber}
+                      {currentMove.color === "w" ? "." : "..."}
+                    </Typography>
+                    <PrettyMoveSan
+                      san={currentMove.san}
+                      color={currentMove.color}
+                      typographyProps={{ fontWeight: 600, fontSize: "0.9rem" }}
+                    />
+                  </Stack>
+                ) : (
+                  <Typography variant="body2" fontWeight={600}>
+                    Starting position
+                  </Typography>
+                )}
+                <Typography variant="caption" color="text.secondary">
+                  ({cursor}/{maxPly})
+                </Typography>
+                {position?.moveClassification && (
+                  <Chip
+                    size="small"
+                    icon={
+                      <Image
+                        src={`/icons/${position.moveClassification}.png`}
+                        alt=""
+                        width={14}
+                        height={14}
+                      />
+                    }
+                    label={classificationName(position.moveClassification)}
+                    sx={{
+                      height: 22,
+                      fontSize: "0.72rem",
+                      fontWeight: 600,
+                      borderColor:
+                        CLASSIFICATION_COLORS[position.moveClassification],
+                      color: CLASSIFICATION_COLORS[position.moveClassification],
+                    }}
+                    variant="outlined"
+                  />
+                )}
+              </Stack>
               <Button
-                disabled={cursor >= full.history().length}
+                size="small"
+                variant="outlined"
+                disabled={cursor >= maxPly}
+                endIcon={<Icon icon="mdi:chevron-right" height={18} />}
                 onClick={() => setPly(cursor + 1)}
               >
                 Next
@@ -124,30 +286,81 @@ export default function ReportHistory({ line }: { line: AnalysisLine }) {
             {board.getComment() && (
               <Typography variant="body2">{board.getComment()}</Typography>
             )}
-            {position?.moveClassification && (
-              <Typography>
-                {classificationName(position.moveClassification)}
-              </Typography>
+            {!!position?.lines.length && (
+              <Stack spacing={0.5}>
+                {position.lines.map((pvLine) => {
+                  const fen = board.fen();
+                  const san = moveLineUciToSan(fen);
+                  const startTurn = board.turn();
+                  return (
+                    <Stack
+                      key={pvLine.multiPv}
+                      direction="row"
+                      alignItems="baseline"
+                      gap={1}
+                    >
+                      <Box
+                        component="span"
+                        sx={{
+                          fontVariantNumeric: "tabular-nums",
+                          fontWeight: 600,
+                          fontSize: "0.8rem",
+                          minWidth: 48,
+                          color: "text.primary",
+                        }}
+                      >
+                        {getLineEvalLabel(pvLine)}
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        component="div"
+                        sx={{ lineHeight: 1.5 }}
+                      >
+                        {pvLine.pv.slice(0, 8).map((move, i) => {
+                          const color =
+                            i % 2 === 0
+                              ? startTurn
+                              : startTurn === "w"
+                                ? "b"
+                                : "w";
+                          const prefix = formatMovePrefix(fen, i, color);
+                          return (
+                            <Box
+                              component="span"
+                              key={i}
+                              sx={{ mr: 0.6, display: "inline-block" }}
+                            >
+                              {prefix ? `${prefix} ` : ""}
+                              <PrettyMoveSan
+                                san={san(move)}
+                                color={color}
+                                typographyProps={{ fontSize: "0.82rem" }}
+                              />
+                            </Box>
+                          );
+                        })}
+                      </Typography>
+                    </Stack>
+                  );
+                })}
+              </Stack>
             )}
-            {position?.lines.map((line) => {
-              const san = moveLineUciToSan(board.fen());
-              return (
-                <Typography variant="body2" key={line.multiPv}>
-                  {getLineEvalLabel(line)} ·{" "}
-                  {line.pv.map((move) => san(move)).join(" ")}
-                </Typography>
-              );
-            })}
-            <Typography variant="caption">
+            <Typography variant="caption" color="text.secondary">
               {report.evaluation.settings.engine} · depth{" "}
-              {report.evaluation.settings.depth}. This report describes its
-              saved prefix; playback leaves the current study where it was.
+              {report.evaluation.settings.depth}. Use ← / → to step through this
+              saved report; playback leaves your active study untouched.
             </Typography>
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => void copy(report.pgn, "Report line PGN")}>
-            Copy report line PGN
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<Icon icon="mdi:content-copy" height={16} />}
+            onClick={() => void copy(report.pgn, "Report line PGN")}
+          >
+            Copy report PGN
           </Button>
           <Button onClick={() => setOpen(false)}>Close</Button>
         </DialogActions>

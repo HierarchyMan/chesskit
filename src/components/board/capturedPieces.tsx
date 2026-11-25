@@ -1,7 +1,7 @@
-import { getCapturedPieces, getMaterialDifference } from "@/lib/chess";
+import { getMaterialDifference, getNetMaterialPieces } from "@/lib/chess";
 import { Color } from "@/types/enums";
-import { Box, Grid2 as Grid, Stack, Typography } from "@mui/material";
-import { ReactElement, useMemo } from "react";
+import { Box, Stack, Typography } from "@mui/material";
+import { useMemo } from "react";
 import { Chess } from "chess.js";
 
 export interface Props {
@@ -10,72 +10,98 @@ export interface Props {
   game?: Chess;
 }
 
-const PIECE_SCALE = 0.55;
+const PIECE_SIZE = 16;
 
 export default function CapturedPieces({ fen, color, game }: Props) {
-  const piecesComponents = useMemo(() => {
-    const capturedPieces = game ? getCapturedPieces(game, color) : [];
-    return capturedPieces.map(({ piece, count }) =>
-      getCapturedPiecesComponents(piece, count)
-    );
-  }, [game, color]);
+  const activeFen = fen || game?.fen() || "";
+
+  const netPieces = useMemo(
+    () => (activeFen ? getNetMaterialPieces(activeFen, color) : []),
+    [activeFen, color]
+  );
 
   const materialDiff = useMemo(() => {
-    const materialDiff = getMaterialDifference(fen);
-    return color === Color.White ? materialDiff : -materialDiff;
-  }, [fen, color]);
+    if (!activeFen) return 0;
+    try {
+      const diff = getMaterialDifference(activeFen);
+      return color === Color.White ? diff : -diff;
+    } catch {
+      return 0;
+    }
+  }, [activeFen, color]);
 
-  return (
-    <Grid
-      container
-      alignItems="end"
-      wrap="nowrap"
-      spacing={0.7}
-      size="auto"
-      marginLeft={`-${0.3 * PIECE_SCALE}rem`}
-      sx={{ height: 18, overflow: "hidden", flexShrink: 0 }}
-      aria-label={`Captured by ${color === Color.White ? "White" : "Black"}`}
-    >
-      <Stack direction="row" spacing={0.1}>
-        {piecesComponents}
-      </Stack>
-
-      {materialDiff > 0 && (
-        <Typography
-          lineHeight={`${PIECE_SCALE * 1.5}rem`}
-          fontSize={`${PIECE_SCALE * 1.5}rem`}
-          marginLeft={0.3}
-        >
-          +{materialDiff}
-        </Typography>
-      )}
-    </Grid>
-  );
-}
-
-const getCapturedPiecesComponents = (
-  pieceSymbol: string,
-  pieceCount: number | undefined
-): ReactElement | null => {
-  if (!pieceCount) return null;
+  const isEmpty = !netPieces.length && materialDiff <= 0;
 
   return (
     <Stack
       direction="row"
-      key={pieceSymbol}
-      spacing={`-${1.2 * PIECE_SCALE}rem`}
+      alignItems="center"
+      spacing={0.5}
+      sx={{
+        height: PIECE_SIZE,
+        minHeight: PIECE_SIZE,
+        maxHeight: PIECE_SIZE,
+        flexShrink: 0,
+        minWidth: 0,
+        overflow: "hidden",
+        visibility: isEmpty ? "hidden" : "visible",
+      }}
+      aria-hidden={isEmpty || undefined}
+      aria-label={
+        isEmpty
+          ? undefined
+          : `Material advantage for ${color === Color.White ? "White" : "Black"}`
+      }
     >
-      {new Array(pieceCount).fill(0).map((_, index) => (
-        <Box
-          key={`${pieceSymbol}-${index}`}
-          width={`${2 * PIECE_SCALE}rem`}
-          height={`${2 * PIECE_SCALE}rem`}
+      <Stack direction="row" alignItems="center" spacing={0.35}>
+        {netPieces.map(({ piece, count }) => {
+          const isBlackPiece = piece.startsWith("b");
+          return (
+            <Stack
+              direction="row"
+              alignItems="center"
+              key={piece}
+              sx={{ "& > *:not(:first-of-type)": { ml: "-7px" } }}
+            >
+              {Array.from({ length: count }).map((_, index) => (
+                <Box
+                  key={`${piece}-${index}`}
+                  sx={(theme) => ({
+                    width: PIECE_SIZE,
+                    height: PIECE_SIZE,
+                    flexShrink: 0,
+                    backgroundImage: `url(/piece/cardinal/${piece}.svg)`,
+                    backgroundSize: "contain",
+                    backgroundPosition: "center",
+                    backgroundRepeat: "no-repeat",
+                    filter:
+                      theme.palette.mode === "dark" && isBlackPiece
+                        ? "drop-shadow(0 0 1.25px rgba(255, 255, 255, 0.78)) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45))"
+                        : "drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2))",
+                  })}
+                />
+              ))}
+            </Stack>
+          );
+        })}
+      </Stack>
+
+      {materialDiff > 0 && (
+        <Typography
+          component="span"
+          variant="caption"
+          color="text.secondary"
           sx={{
-            backgroundImage: `url(/piece/cardinal/${pieceSymbol}.svg)`,
-            backgroundRepeat: "no-repeat",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            lineHeight: 1,
+            fontVariantNumeric: "tabular-nums",
+            flexShrink: 0,
           }}
-        />
-      ))}
+        >
+          +{materialDiff}
+        </Typography>
+      )}
     </Stack>
   );
-};
+}

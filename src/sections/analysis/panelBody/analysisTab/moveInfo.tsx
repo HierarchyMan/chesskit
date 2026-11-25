@@ -48,29 +48,23 @@ export default function MoveInfo() {
   const canShowWhy = !!commentary?.story;
 
   const frameSx = {
-    mt: 0.5,
-    pl: 1.5,
+    pl: 1.25,
     pr: 1,
-    py: 0.85,
-    height: 112,
-    minHeight: 112,
-    maxHeight: 112,
+    py: 0.75,
     boxSizing: "border-box" as const,
-    overflowY: "auto" as const,
-    scrollbarGutter: "stable" as const,
-    borderLeft: "2.5px solid",
+    borderLeft: "3px solid",
     borderColor: accentColor ?? "divider",
     borderRadius: "0 8px 8px 0",
     bgcolor: (theme: { palette: { mode: string } }) =>
       theme.palette.mode === "dark"
-        ? "rgba(255, 255, 255, 0.025)"
+        ? "rgba(255, 255, 255, 0.03)"
         : "rgba(0, 0, 0, 0.025)",
   };
 
   if (cascadeNarration) {
     return (
       <Box data-analysis-move-feedback sx={frameSx}>
-        <Stack spacing={0.6}>
+        <Stack spacing={0.5}>
           <Stack
             direction="row"
             alignItems="center"
@@ -103,7 +97,7 @@ export default function MoveInfo() {
           </Stack>
           <Typography
             variant="body2"
-            sx={{ fontSize: "0.84rem", lineHeight: 1.45 }}
+            sx={{ fontSize: "0.82rem", lineHeight: 1.45 }}
           >
             {cascadeNarration.san ? (
               <strong>{cascadeNarration.san}: </strong>
@@ -116,73 +110,57 @@ export default function MoveInfo() {
   }
 
   if (plyCount === 0) {
-    return (
-      <Box data-analysis-move-feedback sx={frameSx}>
-        <Typography
-          variant="body2"
-          sx={{
-            fontSize: "0.82rem",
-            color: "text.secondary",
-            lineHeight: 1.45,
-          }}
-        >
-          Starting position. Step forward or play a move on the board to see
-          move feedback here.
-        </Typography>
-      </Box>
-    );
+    return null;
   }
 
   if (!position.eval) {
     return (
       <Box data-analysis-move-feedback sx={frameSx}>
-        <Stack spacing={0.75}>
+        <Stack spacing={0.5}>
           <Skeleton
             variant="rounded"
             animation="wave"
-            width="58%"
-            height={20}
+            width="52%"
+            height={18}
           />
           <Skeleton
             variant="rounded"
             animation="wave"
-            width="90%"
-            height={16}
-          />
-          <Skeleton
-            variant="rounded"
-            animation="wave"
-            width="72%"
-            height={16}
+            width="84%"
+            height={14}
           />
         </Stack>
       </Box>
     );
   }
 
+  if (!moveClassification && !commentary?.sentence && !previousBestMove) {
+    return null;
+  }
+
   return (
     <Box data-analysis-move-feedback sx={frameSx}>
-      <Stack spacing={0.6}>
+      <Stack spacing={0.5}>
         <Stack
           direction="row"
           alignItems="center"
           justifyContent="space-between"
-          columnGap={1.25}
+          columnGap={1}
           rowGap={0.5}
           flexWrap="wrap"
         >
           {moveClassification && (
-            <Stack direction="row" alignItems="center" spacing={0.85}>
+            <Stack direction="row" alignItems="center" spacing={0.75}>
               <Image
                 src={`/icons/${moveClassification}.png`}
-                alt="move-icon"
+                alt=""
                 width={16}
                 height={16}
               />
 
               <PrettyMoveSan
                 typographyProps={{
-                  fontSize: "0.88rem",
+                  fontSize: "0.86rem",
                   fontWeight: 600,
                 }}
                 san={position.lastMove?.san ?? ""}
@@ -215,7 +193,7 @@ export default function MoveInfo() {
           <Typography
             variant="body2"
             sx={{
-              fontSize: "0.82rem",
+              fontSize: "0.81rem",
               lineHeight: 1.45,
               color: "text.secondary",
             }}
@@ -240,7 +218,7 @@ export default function MoveInfo() {
                 alignItems="center"
                 spacing={0.5}
                 flexWrap="wrap"
-                sx={{ color: "text.secondary", opacity: 0.85 }}
+                sx={{ color: "text.secondary", opacity: 0.9 }}
               >
                 <Icon icon="mdi:history" height={14} />
                 <Typography variant="caption">
@@ -249,6 +227,7 @@ export default function MoveInfo() {
                 <PrettyMoveSan
                   typographyProps={{
                     variant: "caption",
+                    fontWeight: 600,
                   }}
                   san={previousBestMove.alternative.san}
                   color={previousBestMove.alternative.color}

@@ -22,7 +22,7 @@ import { replayChess } from "@/lib/chessHistory";
 import CoachStage from "./coachStage";
 import { usePlayOverlay } from "./usePlayOverlay";
 import {
-  activeCoachAtom,
+  activeGameModeAtom,
   boardFlippedAtom,
   botStrengthAtom,
   botThinkingAtom,
@@ -32,6 +32,7 @@ import {
   gameEndAtom,
   gameIdAtom,
   isGameInProgressAtom,
+  playArrowsWithCoachAtom,
   playCascadeActiveAtom,
   playEvalBarAtom,
   playerColorAtom,
@@ -85,8 +86,9 @@ export default function BoardContainer({
   );
   const flipped = useAtomValue(boardFlippedAtom);
   const isGameInProgress = useAtomValue(isGameInProgressAtom);
-  const coachActive = useAtomValue(activeCoachAtom);
+  const activeMode = useAtomValue(activeGameModeAtom);
   const evalBarEnabled = useAtomValue(playEvalBarAtom);
+  const arrowsWithCoach = useAtomValue(playArrowsWithCoachAtom);
   const setBotThinking = useSetAtom(botThinkingAtom);
   const setCascadeActive = useSetAtom(playCascadeActiveAtom);
   const { playMove, goToMove } = useChessActions(gameAtom);
@@ -255,7 +257,9 @@ export default function BoardContainer({
             : false
         }
         premoves={premoves}
-        threatMarks={!showCoachStage && overlay.engine.prefs.threats}
+        threatMarks={
+          (!showCoachStage || arrowsWithCoach) && overlay.engine.prefs.threats
+        }
         gameAtom={gameAtom}
         gameEnd={gameEnd}
         previewFen={
@@ -273,9 +277,8 @@ export default function BoardContainer({
         blackPlayer={black}
         boardOrientation={orientation}
         currentPositionAtom={overlay.positionAtom}
-        showEvaluationBar={
-          coachActive && evalBarEnabled && !review && !demonstrating
-        }
+        showEvaluationBar={!setup && activeMode === "casual" && evalBarEnabled}
+        reserveEvaluationBar
         arrows={
           demonstrating
             ? cascade.projection.arrows

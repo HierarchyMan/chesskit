@@ -1,4 +1,4 @@
-import { Box, Grid2 as Grid, Grid2Props as GridProps } from "@mui/material";
+import { Box, useTheme } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { useVisibleAtomValue } from "@/hooks/useVisibleAtomValue";
 import {
@@ -26,171 +26,152 @@ import { CLASSIFICATION_COLORS } from "@/constants";
 import CustomDot from "./dot";
 import { MoveClassification } from "@/types/enums";
 import { useChessActions } from "@/hooks/useChessActions";
+import { getPositionWinPercentage } from "@/lib/engine/helpers/winPercentage";
+import type { Move } from "chess.js";
 
-export default function GraphTab(props: GridProps) {
+const MARKED_CLASSIFICATIONS = new Set<MoveClassification>([
+  MoveClassification.Splendid,
+  MoveClassification.Perfect,
+  MoveClassification.Inaccuracy,
+  MoveClassification.Mistake,
+  MoveClassification.Blunder,
+]);
+
+export default function GraphTab({ hidden = false }: { hidden?: boolean }) {
+  const theme = useTheme();
   const gameEval = useAtomValue(gameEvalAtom);
-  const currentPosition = useVisibleAtomValue(
-    currentPositionAtom,
-    !props.hidden
-  );
+  const currentPosition = useVisibleAtomValue(currentPositionAtom, !hidden);
   const { goToMove } = useChessActions(boardAtom);
   const game = useAtomValue(gameAtom);
 
-  const chartData: ChartItemData[] = useMemo(
-    () => gameEval?.positions.map(formatEvalToChartData) ?? [],
-    [gameEval]
-  );
+  const verboseMoves = useMemo(() => game.history({ verbose: true }), [game]);
 
-  const bestDotIndices = useMemo(() => {
-    const bestItems = chartData.filter(
-      (item) => item.moveClassification === MoveClassification.Best
-    );
-    const count = Math.ceil(bestItems.length * 0.15);
-    const indices = bestItems.map((item) => item.moveNb);
-    for (let i = indices.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [indices[i], indices[j]] = [indices[j], indices[i]];
-    }
-    return new Set(indices.slice(0, count));
-  }, [chartData]);
+  const chartData: ChartItemData[] = useMemo(
+    () =>
+      gameEval?.positions.map((position, index) =>
+        formatEvalToChartData(position, index, verboseMoves[index - 1])
+      ) ?? [],
+    [gameEval, verboseMoves]
+  );
 
   const boardMoveColor = currentPosition.eval?.moveClassification
     ? CLASSIFICATION_COLORS[currentPosition.eval.moveClassification]
-    : "grey";
+    : theme.palette.primary.main;
 
-  // Render a dot only on selected classifications (always returns an element)
+  // Deterministically mark only meaningful classifications.
   const renderDot = useCallback(
     (
-      props: DotProps & { payload?: ChartItemData }
+      dotProps: DotProps & { payload?: ChartItemData }
     ): ReactElement<SVGElement> => {
-      const payload = props.payload;
+      const payload = dotProps.payload;
       const moveClass = payload?.moveClassification;
-      if (!moveClass) return <svg key={props.key} />;
-
-      if (
-        [
-          MoveClassification.Splendid,
-          MoveClassification.Perfect,
-          MoveClassification.Blunder,
-          MoveClassification.Mistake,
-        ].includes(moveClass) ||
-        (moveClass === MoveClassification.Best &&
-          bestDotIndices.has(payload.moveNb))
-      ) {
-        return <CustomDot {...props} key={props.key} payload={payload} />;
+      if (moveClass && MARKED_CLASSIFICATIONS.has(moveClass)) {
+        return <CustomDot {...dotProps} key={dotProps.key} payload={payload} />;
       }
-
-      return <svg key={props.key} />;
+      return <svg key={dotProps.key} />;
     },
-    [bestDotIndices]
+    []
   );
 
-  if (!gameEval) return null;
+  if (!gameEval || hidden) return null;
+
+  const isDark = theme.palette.mode === "dark";
+  const blackSideFill = isDark ? "#23262e" : "#3a3e47";
+  const whiteSideFill = isDark ? "#e6e8ec" : "#f7f8fa";
 
   return (
-    <Grid
-      container
-      justifyContent="center"
-      alignItems="center"
-      minHeight="min(10rem, 8vh)"
-      height={{ xs: "8rem", lg: "none" }}
-      maxHeight="10rem"
-      {...props}
-      sx={props.hidden ? { display: "none" } : props.sx}
-      size={12}
+    <Box
+      sx={{
+        width: "100%",
+        height: 160,
+        bgcolor: blackSideFill,
+        borderRadius: 1.5,
+        border: 1,
+        borderColor: "divider",
+        overflow: "hidden",
+      }}
     >
-      <Box
-        height="100%"
-        width={{ xs: "100%", lg: "90%" }}
-        sx={{
-          backgroundColor: "#2e2e2e",
-          borderRadius: "15px",
-          overflow: "hidden",
-        }}
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            width={500}
-            height={400}
-            data={chartData}
-            margin={{ top: 0, left: 0, right: 0, bottom: 0 }}
-            onClick={(e) => {
-              const payload = e?.activePayload?.[0]?.payload as
-                | ChartItemData
-                | undefined;
-              if (!payload) return;
-
-              goToMove(payload.moveNb, game);
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={chartData}
+          margin={{ top: 4, left: 0, right: 0, bottom: 0 }}
+          onClick={(e) => {
+            const payload = e?.activePayload?.[0]?.payload as
+              | ChartItemData
+              | undefined;
+            if (!payload) return;
+            goToMove(payload.moveNb, game);
+          }}
+          style={{ cursor: "pointer" }}
+        >
+          <XAxis dataKey="moveNb" hide />
+          <YAxis domain={[0, 100]} hide />
+          <Tooltip
+            content={<CustomTooltip />}
+            isAnimationActive={false}
+            cursor={{
+              stroke: theme.palette.primary.main,
+              strokeWidth: 1.5,
+              strokeOpacity: 0.45,
             }}
-            style={{ cursor: "pointer" }}
-          >
-            <XAxis dataKey="moveNb" hide stroke="red" />
-            <YAxis domain={[0, 20]} hide />
-            <Tooltip
-              content={<CustomTooltip />}
-              isAnimationActive={false}
-              cursor={{
-                stroke: "grey",
-                strokeWidth: 2,
-                strokeOpacity: 0.3,
-              }}
-            />
-            <Area
-              type="monotone"
-              dataKey="value"
-              stroke="none"
-              fill="#ffffff"
-              fillOpacity={1}
-              dot={renderDot}
-              activeDot={<CustomDot />}
-              isAnimationActive={false}
-            />
-            <ReferenceLine
-              y={10}
-              stroke="grey"
-              strokeWidth={2}
-              strokeOpacity={0.4}
-            />
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="none"
+            fill={whiteSideFill}
+            fillOpacity={1}
+            dot={renderDot}
+            activeDot={<CustomDot />}
+            isAnimationActive={false}
+          />
+          <ReferenceLine
+            y={50}
+            stroke={isDark ? "#9ca3af" : "#6b7280"}
+            strokeWidth={1.25}
+            strokeDasharray="3 3"
+            strokeOpacity={0.65}
+          />
+          {currentPosition.currentMoveIdx !== undefined && (
             <ReferenceLine
               x={currentPosition.currentMoveIdx}
               stroke={boardMoveColor}
-              strokeWidth={4}
-              strokeOpacity={0.6}
+              strokeWidth={3}
+              strokeOpacity={0.8}
             />
-          </AreaChart>
-        </ResponsiveContainer>
-      </Box>
-    </Grid>
+          )}
+        </AreaChart>
+      </ResponsiveContainer>
+    </Box>
   );
 }
 
+const formatMoveLabel = (index: number, move?: Move): string => {
+  if (index === 0 || !move) return "Start";
+  const moveNumber = Number(move.before.split(" ")[5]) || Math.ceil(index / 2);
+  return move.color === "w"
+    ? `${moveNumber}. ${move.san}`
+    : `${moveNumber}... ${move.san}`;
+};
+
 const formatEvalToChartData = (
   position: PositionEval,
-  index: number
+  index: number,
+  move?: Move
 ): ChartItemData => {
-  const line = position.lines[0];
+  const line = position.lines?.[0];
+  let value = 50;
 
-  const chartItem: ChartItemData = {
+  if (line && (line.cp !== undefined || line.mate !== undefined)) {
+    value = getPositionWinPercentage(position);
+  }
+
+  return {
     moveNb: index,
-    value: 10,
-    cp: line.cp,
-    mate: line.mate,
+    value,
+    cp: line?.cp,
+    mate: line?.mate,
     moveClassification: position.moveClassification,
+    moveLabel: formatMoveLabel(index, move),
   };
-
-  if (line.mate) {
-    return {
-      ...chartItem,
-      value: line.mate > 0 ? 20 : 0,
-    };
-  }
-
-  if (line.cp) {
-    return {
-      ...chartItem,
-      value: Math.max(Math.min(line.cp / 100, 10), -10) + 10,
-    };
-  }
-
-  return chartItem;
 };

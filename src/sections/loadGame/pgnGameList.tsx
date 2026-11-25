@@ -1,5 +1,5 @@
 import { ParsedGame } from "@/lib/pgn";
-import { List, ListItem, ListItemText } from "@mui/material";
+import { Box, List, ListItem, ListItemText } from "@mui/material";
 import {
   KeyboardEvent,
   ReactNode,
@@ -18,14 +18,14 @@ interface Props {
 export default function PgnGameList({
   games,
   renderActions,
-  actionsWidth = 120,
   maxHeight = 280,
 }: Props) {
   const viewport = useRef<HTMLUListElement>(null);
   const firstRow = useRef<HTMLLIElement>(null);
-  const [rowHeight, setRowHeight] = useState(60);
+  const [rowHeight, setRowHeight] = useState(64);
   const [scrollTop, setScrollTop] = useState(0);
   const pendingFocus = useRef<{ row: number; backwards: boolean } | null>(null);
+
   const moveFocus = (event: KeyboardEvent<HTMLUListElement>) => {
     if (event.key !== "Tab" || !(event.target instanceof HTMLElement)) return;
     const row = event.target.closest<HTMLElement>("[data-game-row]");
@@ -53,15 +53,18 @@ export default function PgnGameList({
     if (viewport.current) viewport.current.scrollTop = 0;
     setScrollTop(0);
   }, [games]);
+
   useLayoutEffect(() => {
     const height = firstRow.current?.getBoundingClientRect().height;
-    if (height && height !== rowHeight) setRowHeight(height);
+    if (height && Math.abs(height - rowHeight) > 2) setRowHeight(height);
   }, [games, rowHeight]);
+
   const start = Math.max(0, Math.floor(scrollTop / rowHeight) - 4);
   const end = Math.min(
     games.length,
     start + Math.ceil(maxHeight / rowHeight) + 9
   );
+
   useLayoutEffect(() => {
     const pending = pendingFocus.current;
     if (!pending) return;
@@ -77,6 +80,7 @@ export default function PgnGameList({
     });
     pendingFocus.current = null;
   }, [start, end]);
+
   return (
     <List
       ref={viewport}
@@ -89,7 +93,7 @@ export default function PgnGameList({
         overflowY: "auto",
         border: 1,
         borderColor: "divider",
-        borderRadius: 2,
+        borderRadius: 1,
         width: "100%",
       }}
     >
@@ -107,10 +111,18 @@ export default function PgnGameList({
           aria-setsize={games.length}
           key={game.index}
           divider
-          secondaryAction={game.error ? undefined : renderActions(game)}
-          sx={{ pr: game.error ? 2 : `${actionsWidth + 16}px` }}
+          sx={{
+            px: 1.5,
+            py: 0.75,
+            display: "flex",
+            flexWrap: { xs: "wrap", sm: "nowrap" },
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+          }}
         >
           <ListItemText
+            sx={{ minWidth: 0, flex: "1 1 180px", my: 0 }}
             primary={
               game.error
                 ? `Game ${game.index + 1} could not be read`
@@ -129,10 +141,17 @@ export default function PgnGameList({
                     .join(" · ")
             }
             slotProps={{
-              primary: { noWrap: true },
-              secondary: { noWrap: true },
+              primary: { variant: "body2", fontWeight: 600, noWrap: true },
+              secondary: {
+                variant: "caption",
+                noWrap: true,
+                sx: { fontVariantNumeric: "tabular-nums" },
+              },
             }}
           />
+          {!game.error && (
+            <Box sx={{ flexShrink: 0 }}>{renderActions(game)}</Box>
+          )}
         </ListItem>
       ))}
       {end < games.length && (

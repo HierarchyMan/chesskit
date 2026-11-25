@@ -24,7 +24,7 @@ export default function GoToLastPositionButton() {
     <ToolbarButton
       tooltip="Final position (↓ / End)"
       onClick={goToLastPosition}
-      icon="ri:skip-forward-line"
+      icon="mdi:skip-next"
       disabled={isButtonDisabled}
     />
   );

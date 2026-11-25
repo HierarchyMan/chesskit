@@ -10,11 +10,12 @@ import {
   Box,
   Button,
   FormControlLabel,
-  Switch,
-  TextField,
   IconButton,
+  MenuItem,
   Popover,
+  Select,
   Stack,
+  Switch,
   Typography,
 } from "@mui/material";
 import { ReactNode, useMemo, useState } from "react";
@@ -37,6 +38,8 @@ interface Props {
   /** Anything else the panel keeps with these controls, such as board display switches. */
   extra?: ReactNode;
 }
+
+export type ArrowOverlayControlsProps = Omit<Props, "view">;
 
 const countLabel = (count: number, word: string) =>
   `${count} ${word}${count === 1 ? "" : "s"}`;
@@ -85,24 +88,33 @@ function CountChoice({
       <Typography variant="body2" sx={{ opacity: disabled ? 0.5 : 1 }}>
         {label}
       </Typography>
-      <TextField
-        select
+      <Select
         size="small"
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
-        slotProps={{
-          select: { native: true },
-          htmlInput: { "aria-label": label },
+        inputProps={{ "aria-label": label }}
+        sx={{
+          minWidth: 74,
+          borderRadius: 1,
+          "& .MuiSelect-select": {
+            py: 0.5,
+            px: 1.25,
+            fontSize: "0.85rem",
+            fontVariantNumeric: "tabular-nums",
+          },
         }}
-        sx={{ width: 84, "& select": { py: 0.75 } }}
       >
         {options.map((count) => (
-          <option key={count} value={count}>
+          <MenuItem
+            key={count}
+            value={count}
+            sx={{ fontSize: "0.85rem", fontVariantNumeric: "tabular-nums" }}
+          >
             {count}
-          </option>
+          </MenuItem>
         ))}
-      </TextField>
+      </Select>
     </Stack>
   );
 }
@@ -130,7 +142,13 @@ function SwitchChip({
           onChange={(_, next) => onChange(next)}
         />
       }
-      sx={{ m: 0, minHeight: 34, justifyContent: "space-between", gap: 2 }}
+      sx={{
+        m: 0,
+        width: "100%",
+        minHeight: 34,
+        justifyContent: "space-between",
+        gap: 2,
+      }}
     />
   );
 }
@@ -140,7 +158,7 @@ function SwitchChip({
  * them. The legend lists only the arrows on the board. Pointing at an entry, or
  * tabbing to it, puts that role or candidate in the foreground.
  */
-function Controls({
+export function ArrowOverlayControls({
   prefs,
   capabilities,
   onChange,
@@ -149,7 +167,7 @@ function Controls({
   turn,
   onFocus,
   extra,
-}: Omit<Props, "view">) {
+}: ArrowOverlayControlsProps) {
   const legend = useMemo(
     () => legendFor(mergeArrows(arrows), nameOf),
     [arrows, nameOf]
@@ -159,7 +177,7 @@ function Controls({
   const { enabled } = prefs;
 
   return (
-    <Stack spacing={1.5} sx={{ minWidth: 0 }}>
+    <Stack spacing={1.25} sx={{ minWidth: 0 }}>
       <SwitchChip
         label="Engine arrows"
         checked={enabled}
@@ -208,7 +226,13 @@ function Controls({
       )}
 
       {legend.length > 0 && (
-        <Stack gap={1} onMouseLeave={() => onFocus(null)}>
+        <Stack
+          gap={0.75}
+          pt={0.5}
+          borderTop={1}
+          borderColor="divider"
+          onMouseLeave={() => onFocus(null)}
+        >
           <Stack direction="row" gap={2} flexWrap="wrap">
             <KeyChip color={palette.toMove} text={`${nameOf(turn)} move`} />
             <KeyChip color={palette.other} text={`${nameOf(other)} move`} />
@@ -226,7 +250,25 @@ function Controls({
         </Stack>
       )}
 
-      {extra}
+      {extra && (
+        <Box
+          sx={{
+            pt: 0.75,
+            borderTop: 1,
+            borderColor: "divider",
+            "& .MuiFormControlLabel-root": {
+              m: 0,
+              width: "100%",
+              minHeight: 34,
+              flexDirection: "row-reverse",
+              justifyContent: "space-between",
+              gap: 2,
+            },
+          }}
+        >
+          {extra}
+        </Box>
+      )}
     </Stack>
   );
 }
@@ -237,13 +279,15 @@ function KeyChip({ color, text }: { color: string; text: string }) {
       <Box
         aria-hidden
         sx={{
-          width: 12,
-          height: 12,
+          width: 11,
+          height: 11,
           borderRadius: "50%",
           backgroundColor: color,
         }}
       />
-      <Typography variant="body2">{text}</Typography>
+      <Typography variant="caption" color="text.secondary">
+        {text}
+      </Typography>
     </Stack>
   );
 }
@@ -284,10 +328,12 @@ function LegendRow({
         }
       }}
       sx={{
-        minHeight: 36,
+        minHeight: 32,
         borderRadius: 1,
-        px: 0.5,
+        px: 0.75,
+        cursor: "pointer",
         outlineOffset: 2,
+        "&:hover": { bgcolor: "action.hover" },
         "&:focus-visible": {
           outline: "2px solid",
           outlineColor: "primary.main",
@@ -301,9 +347,9 @@ function LegendRow({
 }
 
 /**
- * The overlay controls, as an inspector beside the board or as a summary above
- * it that opens the same controls in a popover. The shortcuts belong to the
- * board, so they work in either view.
+ * The overlay controls, as an inspector trigger or as a summary above the board
+ * that opens the same controls in a popover. The shortcuts belong to the board,
+ * so they work in either view.
  */
 export default function ArrowOverlay({ view, ...rest }: Props) {
   const [open, setOpen] = useState(false);
@@ -331,58 +377,97 @@ export default function ArrowOverlay({ view, ...rest }: Props) {
     rest.onFocus(null);
   };
 
+  const summary = overlaySummary(prefs, capabilities);
+  const isInspector = view === "inspector";
+
   return (
     <>
       <Button
         ref={setTrigger}
-        variant={view === "inspector" ? "text" : "outlined"}
+        size="small"
+        variant={isInspector ? "text" : "outlined"}
+        color="inherit"
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setOpen(true)}
-        startIcon={<Icon icon="mdi:arrow-top-right" height={18} />}
+        onClick={() => setOpen((prev) => !prev)}
+        startIcon={<Icon icon="mdi:arrow-top-right" height={17} />}
         endIcon={
           <Icon
-            icon={open ? "mdi:chevron-up" : "mdi:chevron-down"}
-            height={18}
+            icon={
+              isInspector
+                ? open
+                  ? "mdi:chevron-down"
+                  : "mdi:chevron-up"
+                : open
+                  ? "mdi:chevron-up"
+                  : "mdi:chevron-down"
+            }
+            height={17}
           />
         }
         sx={{
-          minHeight: 36,
-          width: view === "inspector" ? "100%" : undefined,
+          minHeight: 34,
+          width: isInspector ? "100%" : undefined,
           justifyContent: "flex-start",
+          px: 1.25,
+          py: 0.5,
           color: "text.primary",
           textTransform: "none",
-          fontSize: "0.85rem",
+          fontSize: "0.82rem",
           borderRadius: 1,
-          "& .MuiButton-endIcon": { ml: "auto" },
+          bgcolor: open ? "action.hover" : "transparent",
+          "&:hover": { bgcolor: "action.hover" },
+          "& .MuiButton-endIcon": { ml: "auto", color: "text.secondary" },
+          "& .MuiButton-startIcon": { color: "text.secondary" },
         }}
       >
-        <Box component="span" sx={{ textAlign: "left", minWidth: 0 }}>
-          <Box component="span" sx={{ display: "block", fontWeight: 600 }}>
-            Board overlays
+        <Stack
+          direction="row"
+          alignItems="center"
+          gap={1}
+          sx={{ minWidth: 0, flex: 1, overflow: "hidden" }}
+        >
+          <Box component="span" sx={{ fontWeight: 600, flexShrink: 0 }}>
+            Overlays
           </Box>
-          <Typography component="span" variant="caption" color="text.secondary">
-            {overlaySummary(prefs, capabilities)}
+          <Typography
+            component="span"
+            variant="caption"
+            color="text.secondary"
+            noWrap
+            sx={{ minWidth: 0 }}
+          >
+            {summary}
           </Typography>
-        </Box>
+        </Stack>
       </Button>
       <Popover
         open={open}
         anchorEl={trigger}
         onClose={close}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        marginThreshold={12}
+        anchorOrigin={{
+          vertical: isInspector ? "top" : "bottom",
+          horizontal: "left",
+        }}
+        transformOrigin={{
+          vertical: isInspector ? "bottom" : "top",
+          horizontal: "left",
+        }}
         slotProps={{
           paper: {
             // The paper clips its corners and holds the header still, so only
             // the controls scroll and every corner stays rounded.
             sx: {
-              width: "min(360px, calc(100vw - 32px))",
-              maxHeight: "min(70dvh, 560px)",
-              borderRadius: 2,
+              width: "min(340px, calc(100vw - 32px))",
+              maxHeight: "min(70dvh, 520px)",
+              borderRadius: 1.5,
+              border: 1,
+              borderColor: "divider",
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
+              my: 0.75,
             },
           },
         }}
@@ -391,17 +476,27 @@ export default function ArrowOverlay({ view, ...rest }: Props) {
           direction="row"
           alignItems="center"
           justifyContent="space-between"
-          sx={{ px: 2, pt: 1.5, pb: 1, flexShrink: 0 }}
+          sx={{
+            px: 2,
+            py: 1.25,
+            borderBottom: 1,
+            borderColor: "divider",
+            flexShrink: 0,
+          }}
         >
-          <Typography variant="subtitle1" fontWeight={600}>
+          <Typography variant="subtitle2" fontWeight={700}>
             Board overlays
           </Typography>
-          <IconButton aria-label="Close board overlays" onClick={close}>
-            <Icon icon="mdi:close" height={20} />
+          <IconButton
+            size="small"
+            aria-label="Close board overlays"
+            onClick={close}
+          >
+            <Icon icon="mdi:close" height={18} />
           </IconButton>
         </Stack>
-        <Box sx={{ px: 2, pb: 2, overflowY: "auto", minHeight: 0 }}>
-          <Controls {...rest} />
+        <Box sx={{ px: 2, py: 1.5, overflowY: "auto", minHeight: 0 }}>
+          <ArrowOverlayControls {...rest} />
         </Box>
       </Popover>
     </>

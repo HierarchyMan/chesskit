@@ -402,6 +402,8 @@ export const getHangingPieces = (game: Chess, color: Color): Square[] => {
   return hanging;
 };
 
+const PIECE_DISPLAY_ORDER = ["p", "n", "b", "r", "q"] as const;
+
 /** Captures come from this game's moves, not missing starting material.
  * Custom roots, promotions and en passant make a FEN-only inventory ambiguous. */
 export const getCapturedPieces = (
@@ -415,10 +417,46 @@ export const getCapturedPieces = (
     .history({ verbose: true })
     .filter((move) => move.color === color && move.captured);
   const opponent = color === Color.White ? "b" : "w";
-  return ["p", "b", "n", "r", "q"].map((piece) => ({
+  return PIECE_DISPLAY_ORDER.map((piece) => ({
     piece: `${opponent}${piece.toUpperCase()}`,
     count: captures.filter((move) => move.captured === piece).length,
   }));
+};
+
+/**
+ * Net material advantage for `color` derived directly from a FEN string.
+ * Works identically for full games, pasted FENs, puzzles, endgames, and previews,
+ * ordered by chess convention (pawns, knights, bishops, rooks, queens).
+ */
+export const getNetMaterialPieces = (
+  fen: string,
+  color: Color
+): {
+  piece: string;
+  count: number;
+}[] => {
+  const placement = fen.split(" ")[0] ?? "";
+  const counts: Record<"w" | "b", Record<string, number>> = {
+    w: { p: 0, n: 0, b: 0, r: 0, q: 0 },
+    b: { p: 0, n: 0, b: 0, r: 0, q: 0 },
+  };
+
+  for (const ch of placement) {
+    const lower = ch.toLowerCase();
+    if (lower in counts.w) {
+      const side = ch === lower ? "b" : "w";
+      counts[side][lower] += 1;
+    }
+  }
+
+  const mine = color === Color.White ? counts.w : counts.b;
+  const theirs = color === Color.White ? counts.b : counts.w;
+  const opponent = color === Color.White ? "b" : "w";
+
+  return PIECE_DISPLAY_ORDER.map((piece) => ({
+    piece: `${opponent}${piece.toUpperCase()}`,
+    count: Math.max(0, mine[piece] - theirs[piece]),
+  })).filter((entry) => entry.count > 0);
 };
 
 export const getLineEvalLabel = (

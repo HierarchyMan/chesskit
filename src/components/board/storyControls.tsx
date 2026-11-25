@@ -1,4 +1,4 @@
-import { Box, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { useInBoardCascade } from "@/lib/coachCascade";
 import CascadeBar from "./cascadeBar";
 
@@ -11,7 +11,7 @@ export default function StoryControls({
   if (!projection.active) return null;
 
   return (
-    <Box>
+    <Box sx={{ width: "100%" }}>
       <CascadeBar
         cascade={projection}
         onTogglePlay={story.togglePlay}
@@ -20,22 +20,8 @@ export default function StoryControls({
         onReplay={story.replay}
         onSwitchBranch={story.switchBranch}
         onExit={story.stop}
+        showCaption
       />
-      <Typography
-        component="div"
-        variant="body2"
-        aria-live="polite"
-        sx={{
-          height: 60,
-          overflowY: "auto",
-          overflowWrap: "anywhere",
-          px: 1,
-          py: 0.5,
-        }}
-      >
-        {projection.san && <strong>{projection.san}: </strong>}
-        {projection.caption}
-      </Typography>
     </Box>
   );
 }

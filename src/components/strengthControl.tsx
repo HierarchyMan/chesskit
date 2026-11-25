@@ -42,10 +42,7 @@ export default function StrengthControl({
   const maxElo = engineMaxElo(engineName);
   const profile = { nativeElo: model.nativeElo, maxElo, fullStrengthMs };
   const presets = STRENGTH_PRESETS.filter((preset) => preset.elo < maxElo);
-  const marks = [
-    ...presets.map(({ elo }) => ({ value: elo })),
-    { value: maxElo, label: "Full" },
-  ];
+  const marks = presets.map(({ elo }) => ({ value: elo }));
   const elo = Math.min(value.elo, maxElo);
 
   if (model.playsOwnMoves) {
@@ -75,7 +72,7 @@ export default function StrengthControl({
       </ToggleButtonGroup>
 
       {value.mode === "elo" && (
-        <>
+        <Stack spacing={1}>
           <Stack direction="row" flexWrap="wrap" gap={0.75}>
             {presets.map((preset) => (
               <Chip
@@ -85,66 +82,108 @@ export default function StrengthControl({
                 color={elo === preset.elo ? "primary" : "default"}
                 variant={elo === preset.elo ? "filled" : "outlined"}
                 onClick={() => onChange({ ...value, elo: preset.elo })}
+                sx={{ fontVariantNumeric: "tabular-nums" }}
               />
             ))}
-            <Chip
-              size="small"
-              label={`Full ${maxElo}`}
-              color={elo >= maxElo ? "primary" : "default"}
-              variant={elo >= maxElo ? "filled" : "outlined"}
-              onClick={() => onChange({ ...value, elo: maxElo })}
-            />
           </Stack>
 
-          <Box px={1}>
+          <Box px={0.5}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              mb={0.25}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Target rating
+              </Typography>
+              <Typography
+                variant="caption"
+                fontWeight={700}
+                sx={{
+                  fontVariantNumeric: "tabular-nums",
+                  px: 0.75,
+                  py: 0.15,
+                  borderRadius: 1,
+                  bgcolor: "action.hover",
+                }}
+              >
+                {elo} Elo
+              </Typography>
+            </Stack>
             <Slider
               value={elo}
               min={MIN_BOT_ELO}
               max={maxElo}
               step={10}
               marks={marks}
-              valueLabelDisplay="on"
+              valueLabelDisplay="auto"
               onChange={(_, next) =>
                 onChange({ ...value, elo: next as number })
               }
               aria-label="Bot Elo"
-              sx={{ mt: 3 }}
             />
           </Box>
-        </>
+        </Stack>
       )}
 
       {value.mode === "depth" && (
-        <Box px={1}>
+        <Box px={0.5}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            mb={0.25}
+          >
+            <Typography variant="caption" color="text.secondary">
+              Search depth
+            </Typography>
+            <Typography
+              variant="caption"
+              fontWeight={700}
+              sx={{
+                fontVariantNumeric: "tabular-nums",
+                px: 0.75,
+                py: 0.15,
+                borderRadius: 1,
+                bgcolor: "action.hover",
+              }}
+            >
+              Depth {value.depth}
+            </Typography>
+          </Stack>
           <Slider
             value={value.depth}
             min={MIN_BOT_DEPTH}
             max={MAX_BOT_DEPTH}
             step={1}
-            valueLabelDisplay="on"
+            valueLabelDisplay="auto"
             onChange={(_, depth) =>
               onChange({ ...value, depth: depth as number })
             }
             aria-label="Search depth"
-            sx={{ mt: 3 }}
           />
         </Box>
       )}
 
-      <Typography variant="body2" sx={{ opacity: 0.75 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: "block", lineHeight: 1.45 }}
+      >
         {describeStrength({ ...value, elo }, profile)}
         {value.mode === "elo" &&
           (model.rating
-            ? ` The top of the slider is ${model.label.small}'s own rating (${model.rating.source === "ccrl" ? "CCRL Blitz" : "its author's estimate"}), measured against other engines on a native build, so it is not a human rating.`
-            : " This engine has no published rating, so the slider tops out at 3200, where it plays at full strength.")}{" "}
+            ? ` (${model.rating.source === "ccrl" ? "CCRL" : "engine"} scale, not human Elo).`
+            : " (uncalibrated engine scale).")}{" "}
         <Link
           component="button"
           type="button"
-          variant="body2"
+          variant="caption"
           onClick={() => setGuideOpen(true)}
           sx={{ verticalAlign: "baseline" }}
         >
-          How to get maximum strength
+          Max strength tips
         </Link>
       </Typography>
 

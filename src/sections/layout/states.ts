@@ -11,7 +11,10 @@ export const navPreferenceAtom = storedAtom<boolean | null>(
 
 export const settingsOpenAtom = atom(false);
 export type SettingsTab = "engine" | "arrows" | "board" | "models";
-export const settingsTabAtom = atom<SettingsTab>("engine");
+export const settingsTabAtom = atom<SettingsTab>("board");
+export const engineAdvancedOpenAtom = atom(false);
+export const engineSettingsSectionAtom = atom<string>("analysis");
+export const modelsBridgeDocsOpenAtom = atom(false);
 export const importDialogAtom = atom<{
   open: boolean;
   initialText?: string;

@@ -1,5 +1,5 @@
 import { usePlayersData } from "@/hooks/usePlayersData";
-import { Grid2 as Grid, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { gameAtom, gameEvalAtom } from "../../../states";
 import { MoveClassification } from "@/types/enums";
 import ClassificationRow from "./classificationRow";
@@ -12,41 +12,57 @@ export default function MovesClassificationsRecap() {
   if (!gameEval?.positions.length) return null;
 
   return (
-    <Grid
-      container
-      justifyContent="center"
-      alignItems="center"
-      rowGap={0.7}
-      sx={{ minWidth: 0, mt: 2 }}
-      size={12}
+    <Stack
+      spacing={0.45}
+      sx={{
+        minWidth: 0,
+        width: "100%",
+        p: 1,
+        borderRadius: 1.5,
+        border: 1,
+        borderColor: "divider",
+      }}
     >
-      <Grid
-        container
-        alignItems="center"
-        justifyContent="space-evenly"
-        wrap="nowrap"
-        size={12}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) 8.5rem minmax(0, 1fr)",
+          alignItems: "center",
+          columnGap: 1,
+          pb: 0.5,
+          borderBottom: 1,
+          borderColor: "divider",
+        }}
       >
         <Typography
-          sx={{ flex: 1, minWidth: 0 }}
+          variant="caption"
+          fontWeight={600}
           align="center"
           noWrap
-          fontSize="0.9rem"
+          title={white.name}
         >
           {white.name}
         </Typography>
 
-        <Typography width="7rem" />
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          align="center"
+          fontWeight={600}
+        >
+          Classification
+        </Typography>
 
         <Typography
-          sx={{ flex: 1, minWidth: 0 }}
+          variant="caption"
+          fontWeight={600}
           align="center"
           noWrap
-          fontSize="0.9rem"
+          title={black.name}
         >
           {black.name}
         </Typography>
-      </Grid>
+      </Box>
 
       {sortedMoveClassfications.map((classification) => (
         <ClassificationRow
@@ -54,7 +70,7 @@ export default function MovesClassificationsRecap() {
           classification={classification}
         />
       ))}
-    </Grid>
+    </Stack>
   );
 }
 

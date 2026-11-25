@@ -1,17 +1,20 @@
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { getChessComUserRecentGames } from "@/lib/chessCom";
 import {
+  Alert,
+  Autocomplete,
+  Box,
   CircularProgress,
   FormControl,
-  Grid2 as Grid,
-  TextField,
+  IconButton,
   List,
-  Autocomplete,
+  Stack,
+  TextField,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { GameItem } from "./gameItem";
 
 interface Props {
@@ -33,18 +36,16 @@ export default function ChessComInput({ onSelect }: Props) {
         .map((s) => s.trim())
         .filter(Boolean);
     }
-
     return [];
   }, [rawStoredValue]);
 
-  if (
-    !hasEdited &&
-    storedValues.length &&
-    chessComUsername.trim().toLowerCase() !=
-      storedValues[0].trim().toLowerCase()
-  ) {
-    setChessComUsername(storedValues[0].trim());
-  }
+  useEffect(() => {
+    if (hasEdited || !storedValues.length) return;
+    const first = storedValues[0].trim();
+    if (chessComUsername.trim().toLowerCase() !== first.toLowerCase()) {
+      setChessComUsername(first);
+    }
+  }, [hasEdited, storedValues, chessComUsername]);
 
   const updateHistory = (username: string) => {
     const trimmed = username.trim();
@@ -85,10 +86,11 @@ export default function ChessComInput({ onSelect }: Props) {
   });
 
   return (
-    <>
-      <FormControl sx={{ my: 1, width: 300 }}>
+    <Stack spacing={2} width="100%">
+      <FormControl fullWidth size="small">
         <Autocomplete
           freeSolo
+          size="small"
           options={storedValues}
           inputValue={chessComUsername}
           onInputChange={handleChange}
@@ -107,21 +109,24 @@ export default function ChessComInput({ onSelect }: Props) {
                 }}
               >
                 <span>{option}</span>
-                <Icon
-                  icon="mdi:close"
-                  style={{ cursor: "pointer" }}
+                <IconButton
+                  size="small"
+                  aria-label={`Remove ${option}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteUsername(option);
                   }}
-                />
+                >
+                  <Icon icon="mdi:close" height={16} />
+                </IconButton>
               </li>
             );
           }}
           renderInput={(params) => (
             <TextField
               {...params}
-              label="Enter your Chess.com username..."
+              label="Chess.com username"
+              placeholder="Enter a Chess.com username…"
               variant="outlined"
             />
           )}
@@ -129,26 +134,27 @@ export default function ChessComInput({ onSelect }: Props) {
       </FormControl>
 
       {debouncedUsername && (
-        <Grid
-          container
-          gap={2}
-          justifyContent="center"
-          alignContent="center"
-          minHeight={100}
-          size={12}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: 88,
+            width: "100%",
+          }}
         >
           {isFetching ? (
-            <CircularProgress />
+            <CircularProgress size={28} />
           ) : isError ? (
-            <span style={{ color: "salmon" }}>
-              User not found. Please check your username.
-            </span>
+            <Alert severity="error" sx={{ width: "100%" }}>
+              User not found. Please check the Chess.com username.
+            </Alert>
           ) : !games?.length ? (
-            <span style={{ color: "salmon" }}>
-              No games found. Please check your username.
-            </span>
+            <Alert severity="info" sx={{ width: "100%" }}>
+              No recent games found for &ldquo;{debouncedUsername}&rdquo;.
+            </Alert>
           ) : (
-            <List sx={{ width: "100%" }}>
+            <List disablePadding sx={{ width: "100%" }}>
               {games.map((game) => {
                 const perspectiveUserColor =
                   game.white.name.toLowerCase() ===
@@ -173,8 +179,8 @@ export default function ChessComInput({ onSelect }: Props) {
               })}
             </List>
           )}
-        </Grid>
+        </Box>
       )}
-    </>
+    </Stack>
   );
 }

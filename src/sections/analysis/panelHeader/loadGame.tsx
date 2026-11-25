@@ -7,7 +7,7 @@ export default function LoadGame() {
   const { loadPgn } = useLoadAnalysisGame();
   return (
     <LoadGameButton
-      label="Load game"
+      label="Load"
       size="small"
       variant="outlined"
       setGame={async (game, pgn) => {

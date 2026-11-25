@@ -1,35 +1,50 @@
 import { setHandoff } from "@/lib/handoff";
+import { ToolbarButton } from "@/components/ToolbarButton";
 import { Icon } from "@iconify/react";
 import {
-  IconButton,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
   ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
-  Tooltip,
+  Typography,
 } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/router";
-import { useState } from "react";
-import { boardAtom } from "../states";
+import { useRef, useState } from "react";
+import { boardAtom, gameAtom } from "../states";
 import { displayedAnalysisPgnAtom, analysisSessionAtom } from "../sessionAtoms";
 import { exportAnalysisStudy } from "@/lib/analysisSession";
 import { useCopyText } from "@/hooks/useCopyText";
+import { useArrangeMode } from "../arrange/useArrangeMode";
+import { useLoadAnalysisGame } from "../hooks/useLoadAnalysisGame";
 
 export default function MoreMenu() {
   const pgn = useAtomValue(displayedAnalysisPgnAtom);
   const board = useAtomValue(boardAtom);
+  const game = useAtomValue(gameAtom);
   const session = useAtomValue(analysisSessionAtom);
   const { copy, feedback } = useCopyText();
+  const { enterArrange } = useArrangeMode();
+  const { clearMoves } = useLoadAnalysisGame();
   const router = useRouter();
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
-  const close = () => setAnchorEl(null);
+  const close = () => setOpen(false);
+  const hasMoves = game.history().length > 0 || board.history().length > 0;
 
   const openWithFen = (path: string) => {
     close();
     setHandoff({ kind: "fen", fen: board.fen() }, path);
-    router.push(path);
+    void router.push(path);
   };
 
   const downloadPgn = () => {
@@ -69,8 +84,11 @@ export default function MoreMenu() {
       : []),
     {
       icon: "mdi:pencil-ruler",
-      label: "Edit this position",
-      onClick: () => openWithFen("/editor"),
+      label: "Arrange this position",
+      onClick: () => {
+        close();
+        enterArrange();
+      },
     },
     {
       icon: "mdi:chess-pawn",
@@ -86,21 +104,20 @@ export default function MoreMenu() {
 
   return (
     <>
-      <Tooltip title="More actions" disableInteractive>
-        <IconButton
-          onClick={(event) => setAnchorEl(event.currentTarget)}
-          aria-label="More actions"
-          sx={{
-            padding: "8px",
-            borderRadius: "6px",
-            width: "40px",
-            height: "40px",
-          }}
-        >
-          <Icon icon="mdi:dots-horizontal" height={24} />
-        </IconButton>
-      </Tooltip>
-      <Menu anchorEl={anchorEl} open={!!anchorEl} onClose={close}>
+      <Box ref={anchorRef} component="span" sx={{ display: "inline-flex" }}>
+        <ToolbarButton
+          tooltip="More actions"
+          icon="mdi:dots-horizontal"
+          onClick={() => setOpen(true)}
+        />
+      </Box>
+      <Menu
+        anchorEl={anchorRef.current}
+        open={open}
+        onClose={close}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
         {items.map((item) => (
           <MenuItem key={item.label} onClick={item.onClick}>
             <ListItemIcon>
@@ -109,7 +126,52 @@ export default function MoreMenu() {
             <ListItemText primary={item.label} />
           </MenuItem>
         ))}
+        <Divider />
+        <MenuItem
+          disabled={!hasMoves}
+          onClick={() => {
+            close();
+            setConfirmReset(true);
+          }}
+          sx={{
+            color: hasMoves ? "error.main" : undefined,
+          }}
+        >
+          <ListItemIcon sx={{ color: "inherit" }}>
+            <Icon icon="mdi:eraser" height={20} />
+          </ListItemIcon>
+          <ListItemText primary="Reset from this position" />
+        </MenuItem>
       </Menu>
+
+      <Dialog
+        open={confirmReset}
+        onClose={() => setConfirmReset(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Reset from this position?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This clears the move history and game evaluation, starting a fresh
+            analysis session from the current board position.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmReset(false)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              setConfirmReset(false);
+              clearMoves();
+            }}
+          >
+            Reset position
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {feedback}
     </>
   );

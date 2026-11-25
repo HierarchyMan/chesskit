@@ -17,6 +17,7 @@ export interface ArenaSide {
 }
 
 export const ARENA_SPEEDS = [
+  { label: "Instant", ms: 0 },
   { label: "Fast", ms: 300 },
   { label: "Normal", ms: 1000 },
   { label: "Slow", ms: 2500 },

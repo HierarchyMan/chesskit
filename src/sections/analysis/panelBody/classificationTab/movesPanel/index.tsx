@@ -1,4 +1,4 @@
-import { Grid2 as Grid } from "@mui/material";
+import { Box } from "@mui/material";
 import { useVisibleAtomValue } from "@/hooks/useVisibleAtomValue";
 import { memo } from "react";
 import {
@@ -18,20 +18,23 @@ function MovesPanel({ visible }: { visible: boolean }) {
   const position = useVisibleAtomValue(currentPositionAtom, visible);
   const { goToMove } = useChessActions(boardAtom);
   const history = game.history({ verbose: true });
-  if (!history.length) return null;
+
   return (
-    <Grid size={12} sx={{ minWidth: 0 }} id="moves-panel">
+    <Box sx={{ minWidth: 0, width: "100%" }} id="moves-panel">
       <MovesList
         moves={history.map((move) => move.san)}
-        startsWithBlack={history[0].color === "b"}
-        firstMoveNumber={Number(history[0].before.split(" ")[5])}
+        startsWithBlack={history[0]?.color === "b"}
+        firstMoveNumber={
+          history[0] ? Number(history[0].before.split(" ")[5]) : 1
+        }
         currentPly={
           game === savedGame ? position.currentMoveIdx : history.length
         }
         onSelect={(ply) => goToMove(ply, game)}
         maxHeight="none"
+        emptyText="Play moves on the board or load a game to inspect moves here."
         annotations={
-          evaluation && game === savedGame
+          evaluation && game === savedGame && history.length > 0
             ? history.map((_, index) => ({
                 classification:
                   evaluation.positions[index + 1]?.moveClassification,
@@ -39,7 +42,7 @@ function MovesPanel({ visible }: { visible: boolean }) {
             : undefined
         }
       />
-    </Grid>
+    </Box>
   );
 }
 

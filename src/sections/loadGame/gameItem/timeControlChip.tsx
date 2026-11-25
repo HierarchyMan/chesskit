@@ -9,11 +9,13 @@ export default function TimeControlChip({ timeControl }: Props) {
   if (!timeControl) return null;
 
   return (
-    <Tooltip title="Time Control">
+    <Tooltip title="Time control">
       <Chip
-        icon={<Icon icon="material-symbols:timer-outline" />}
+        variant="outlined"
+        icon={<Icon icon="mdi:timer-outline" height={15} />}
         label={timeControl}
         size="small"
+        sx={{ fontVariantNumeric: "tabular-nums" }}
       />
     </Tooltip>
   );

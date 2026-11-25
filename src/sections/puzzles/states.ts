@@ -46,6 +46,13 @@ export const puzzleAutoNextAtom = storedAtom<boolean>(
   (value): value is boolean => typeof value === "boolean"
 );
 
+/** Whether solving a puzzle cleanly automatically advances to the next puzzle. */
+export const puzzleAutoJumpAtom = storedAtom<boolean>(
+  "puzzle-auto-jump",
+  false,
+  (value): value is boolean => typeof value === "boolean"
+);
+
 export const seenPuzzlesAtom = storedAtom<string[]>(
   "puzzle-seen",
   [],

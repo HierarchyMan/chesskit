@@ -1,16 +1,13 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
 import {
   Avatar,
   Box,
   Button,
+  ButtonBase,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   ListItemAvatar,
   ListItemText,
@@ -22,6 +19,7 @@ import {
   ToggleButtonGroup,
   Tooltip,
   Typography,
+  alpha,
 } from "@mui/material";
 import { useAtom, useAtomValue } from "jotai";
 import { CLASSIFICATION_COLORS } from "@/constants";
@@ -60,6 +58,18 @@ interface Props {
   onCascadeTryAgain?: () => void;
 }
 
+const COMPACT_ACTION_SX = {
+  py: 0.25,
+  px: 1.05,
+  minHeight: 28,
+  fontSize: "0.75rem",
+  fontWeight: 600,
+  borderRadius: 1,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  textTransform: "none",
+} as const;
+
 export default function CoachStage({
   moveCoach,
   interactive,
@@ -88,49 +98,64 @@ export default function CoachStage({
     def: CoachDefinition | null;
   } | null>(null);
 
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [textOverflows, setTextOverflows] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const shownMessages = interactive.replyMessages;
-  const replyKey = cascade.active
-    ? `cascade:${cascade.branch}:${cascade.stepIndex}`
-    : shownMessages[0]?.id;
+  const stickToBottomRef = useRef(true);
+  const prevReplyStartRef = useRef(interactive.replyStart);
+  const prevMessageCountRef = useRef(0);
+  const [scrolledUp, setScrolledUp] = useState(false);
 
-  const fitText = useCallback(() => {
-    const body = bodyRef.current;
-    if (!body) return;
-    const top = body.scrollTop;
-    body.style.setProperty("--coach-text-size", "0.95rem");
-    const compact = body.scrollHeight > body.clientHeight;
-    if (compact) body.style.setProperty("--coach-text-size", "0.875rem");
-    const overflow = body.scrollHeight > body.clientHeight;
-    body.dataset.coachFit = overflow
-      ? "scroll"
-      : compact
-        ? "compact"
-        : "normal";
-    body.scrollTop = overflow ? top : 0;
-    setTextOverflows(overflow);
+  const allMessages = interactive.messages;
+  const replyStart = interactive.replyStart;
+  const lastWiggle = allMessages[allMessages.length - 1]?.wiggleTick ?? 0;
+
+  const scrollToBottom = useCallback((smooth: boolean) => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: smooth ? "smooth" : "auto",
+    });
+    stickToBottomRef.current = true;
+    setScrolledUp(false);
   }, []);
 
-  useLayoutEffect(() => {
-    fitText();
-  }, [fitText, shownMessages, cascade.caption]);
+  const handleFeedScroll = useCallback(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distanceFromBottom < 28;
+    stickToBottomRef.current = atBottom;
+    setScrolledUp(!atBottom && el.scrollHeight > el.clientHeight + 8);
+  }, []);
 
-  useLayoutEffect(() => {
-    const body = bodyRef.current;
-    const content = contentRef.current;
-    if (!body || !content) return;
-    const observer = new ResizeObserver(fitText);
-    observer.observe(body);
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, [fitText]);
+  // Auto-scroll smoothly when new coach commentary arrives (unless user scrolled up mid-turn).
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
 
-  useLayoutEffect(() => {
-    if (bodyRef.current) bodyRef.current.scrollTop = 0;
-  }, [replyKey]);
+    if (cascade.active) {
+      el.scrollTop = 0;
+      setScrolledUp(false);
+      return;
+    }
+
+    const startedNewTurn = replyStart !== prevReplyStartRef.current;
+    const hadPreviousMessages = prevMessageCountRef.current > 0;
+    prevReplyStartRef.current = replyStart;
+    prevMessageCountRef.current = allMessages.length;
+
+    if (startedNewTurn || stickToBottomRef.current) {
+      scrollToBottom(hadPreviousMessages);
+    }
+  }, [
+    allMessages.length,
+    replyStart,
+    lastWiggle,
+    cascade.active,
+    cascade.branch,
+    cascade.stepIndex,
+    scrollToBottom,
+  ]);
 
   const persona =
     COACH_PERSONAS.find((p) => p.id === personaId) ?? COACH_PERSONAS[0];
@@ -216,23 +241,23 @@ export default function CoachStage({
             type="button"
             title={`Highlight square ${seg.square}`}
             onClick={() => interactive.highlightSquare(seg.square)}
-            sx={{
+            sx={(theme) => ({
               display: "inline",
               px: 0.45,
               py: 0,
               mx: 0.15,
               border: "1px solid",
-              borderColor: "rgba(99, 130, 246, 0.45)",
-              borderRadius: 1,
-              bgcolor: "rgba(99, 130, 246, 0.12)",
+              borderColor: alpha(theme.palette.primary.main, 0.4),
+              borderRadius: 0.75,
+              bgcolor: alpha(theme.palette.primary.main, 0.12),
               font: "inherit",
               fontWeight: 700,
-              color: "#6382f6",
+              color: "primary.main",
               cursor: "pointer",
               "&:hover": {
-                bgcolor: "rgba(99, 130, 246, 0.24)",
+                bgcolor: alpha(theme.palette.primary.main, 0.24),
               },
-            }}
+            })}
           >
             {seg.label}
           </Box>
@@ -248,27 +273,28 @@ export default function CoachStage({
   return (
     <Box
       data-coach-stage
-      sx={{
+      sx={(theme) => ({
         width: "100%",
-        height: { xs: 236, sm: 248 },
-        "@media (max-height: 550px)": { height: 214 },
+        height: { xs: 196, sm: 216 },
+        "@media (max-height: 680px)": { height: 176 },
+        "@media (max-height: 550px)": { height: 152 },
         flexShrink: 0,
         boxSizing: "border-box",
         overflow: "hidden",
         display: "flex",
-        borderRadius: 2.5,
-        border: "1px solid",
-        borderColor: cascade.active ? "rgba(245, 184, 46, 0.55)" : "divider",
-        bgcolor: (theme) =>
-          theme.palette.mode === "dark" ? "rgba(28, 28, 35, 0.92)" : "#ffffff",
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 6px 20px rgba(0, 0, 0, 0.32)"
-            : "0 4px 16px rgba(15, 23, 42, 0.07)",
+        borderBottom: "1px solid",
+        borderColor: cascade.active
+          ? alpha("#f5b82e", 0.55)
+          : theme.palette.divider,
+        bgcolor: cascade.active
+          ? alpha("#f5b82e", theme.palette.mode === "dark" ? 0.08 : 0.09)
+          : theme.palette.mode === "dark"
+            ? alpha(theme.palette.common.white, 0.022)
+            : alpha(theme.palette.primary.main, 0.025),
         px: 1.5,
-        py: 1.15,
-        transition: "border-color 200ms ease, box-shadow 200ms ease",
-      }}
+        py: 1,
+        transition: "border-color 200ms ease, background-color 200ms ease",
+      })}
     >
       <Box
         sx={{
@@ -277,68 +303,92 @@ export default function CoachStage({
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
-          gap: 0.65,
+          gap: 0.75,
         }}
       >
+        {/* Header: discoverable coach persona switcher + move verdict + voice toggle */}
         <Stack
           direction="row"
           alignItems="center"
           justifyContent="space-between"
-          gap={1}
-          sx={{ height: 32, minHeight: 32, flexShrink: 0 }}
+          gap={0.75}
+          sx={{ height: 30, minHeight: 30, flexShrink: 0 }}
         >
           <Stack
             direction="row"
             alignItems="center"
-            gap={0.85}
+            gap={0.75}
             minWidth={0}
             flexWrap="nowrap"
             sx={{ overflow: "hidden" }}
           >
-            <Tooltip title={`${persona.name} — click to switch coach`}>
-              <Box
-                component="button"
-                type="button"
+            <Tooltip title="Switch coach">
+              <ButtonBase
                 aria-label="Switch coach"
+                aria-haspopup="menu"
+                aria-expanded={!!personaMenuAnchor}
                 onClick={(e) => setPersonaMenuAnchor(e.currentTarget)}
                 sx={{
-                  p: 0,
-                  border: "2px solid",
-                  borderColor: cascade.active ? "#f5b82e" : accentColor,
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  width: 29,
-                  height: 29,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.7,
+                  pl: 0.25,
+                  pr: 0.65,
+                  py: 0.25,
+                  ml: -0.25,
+                  borderRadius: 1,
+                  minWidth: 0,
                   flexShrink: 0,
-                  alignSelf: "center",
-                  cursor: "pointer",
-                  background: "none",
-                  transition: "transform 160ms ease, border-color 200ms ease",
-                  "&:hover": { transform: "scale(1.05)" },
+                  transition: "background-color 140ms ease",
+                  "&:hover": { bgcolor: "action.hover" },
+                  "&:focus-visible": {
+                    outline: "2px solid",
+                    outlineColor: "primary.main",
+                  },
                 }}
               >
-                <Image
-                  src={persona.avatar}
-                  alt={persona.name}
-                  width={29}
-                  height={29}
-                  style={{
-                    objectFit: "cover",
-                    display: "block",
-                    width: "100%",
-                    height: "100%",
+                <Box
+                  sx={{
+                    border: "2px solid",
+                    borderColor: cascade.active ? "#f5b82e" : accentColor,
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    width: 26,
+                    height: 26,
+                    flexShrink: 0,
+                    transition: "border-color 200ms ease",
                   }}
+                >
+                  <Image
+                    src={persona.avatar}
+                    alt={persona.name}
+                    width={26}
+                    height={26}
+                    style={{
+                      objectFit: "cover",
+                      display: "block",
+                      width: "100%",
+                      height: "100%",
+                    }}
+                  />
+                </Box>
+                <Typography
+                  variant="caption"
+                  fontWeight={700}
+                  noWrap
+                  sx={{ fontSize: "0.78rem", letterSpacing: 0.1 }}
+                >
+                  {interactive.positionCoaching
+                    ? "Position coach"
+                    : persona.name}
+                </Typography>
+                <Icon
+                  icon="mdi:chevron-down"
+                  width={15}
+                  style={{ opacity: 0.65, flexShrink: 0 }}
                 />
-              </Box>
+              </ButtonBase>
             </Tooltip>
-            <Typography
-              variant="caption"
-              fontWeight={700}
-              noWrap
-              sx={{ letterSpacing: 0.2 }}
-            >
-              {interactive.positionCoaching ? "Position coach" : persona.name}
-            </Typography>
 
             {!cascade.active &&
               feedback?.status === "done" &&
@@ -355,19 +405,30 @@ export default function CoachStage({
                       style={{ marginLeft: 5 }}
                     />
                   }
-                  sx={{
-                    height: 20,
-                    maxWidth: 190,
-                    fontSize: "0.69rem",
+                  sx={(theme) => ({
+                    height: 21,
+                    maxWidth: 185,
+                    fontSize: "0.7rem",
                     fontWeight: 700,
-                    color: "#fff",
-                    backgroundColor: CLASSIFICATION_COLORS[classification],
+                    color:
+                      theme.palette.mode === "dark"
+                        ? theme.palette.common.white
+                        : theme.palette.text.primary,
+                    bgcolor: alpha(
+                      CLASSIFICATION_COLORS[classification],
+                      theme.palette.mode === "dark" ? 0.24 : 0.16
+                    ),
+                    border: "1px solid",
+                    borderColor: alpha(
+                      CLASSIFICATION_COLORS[classification],
+                      0.45
+                    ),
                     "& .MuiChip-label": {
-                      px: 0.85,
+                      px: 0.75,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                     },
-                  }}
+                  })}
                 />
               )}
 
@@ -378,25 +439,27 @@ export default function CoachStage({
                   cascade.branch === "better" ? "Stronger line" : "Showing why"
                 } · ${cascade.stepIndex}/${cascade.maxStep}`}
                 sx={{
-                  height: 20,
-                  fontSize: "0.69rem",
+                  height: 21,
+                  fontSize: "0.7rem",
                   fontWeight: 700,
-                  bgcolor: "rgba(245, 184, 46, 0.22)",
+                  bgcolor: alpha("#f5b82e", 0.2),
                   color: "#f5b82e",
+                  border: "1px solid",
+                  borderColor: alpha("#f5b82e", 0.4),
                   fontVariantNumeric: "tabular-nums",
-                  "& .MuiChip-label": { px: 0.85 },
+                  "& .MuiChip-label": { px: 0.8 },
                 }}
               />
             )}
 
             {!cascade.active &&
               interactive.coachBusy &&
-              shownMessages.length > 0 && (
+              allMessages.length > 0 && (
                 <Stack
                   direction="row"
                   alignItems="center"
                   gap={0.5}
-                  sx={{ flexShrink: 0, ml: 0.25 }}
+                  sx={{ flexShrink: 0 }}
                 >
                   <CircularProgress size={11} thickness={5} />
                   <Typography
@@ -410,175 +473,251 @@ export default function CoachStage({
               )}
           </Stack>
 
-          <Stack direction="row" alignItems="center" gap={0.25} flexShrink={0}>
-            <Button
-              size="small"
-              aria-label="Coach reply history"
-              disabled={!interactive.messages.length}
-              onClick={() => setHistoryOpen(true)}
-              sx={{ minWidth: 0, px: 0.65, fontSize: "0.72rem" }}
-            >
-              History
-            </Button>
-            <Tooltip
-              title={
-                voiceEnabled ? "Mute coach voice" : "Read coach messages aloud"
-              }
-            >
-              <IconButton
-                size="small"
-                aria-label={
-                  voiceEnabled ? "Mute coach voice" : "Enable coach voice"
-                }
-                onClick={() => {
-                  if (
-                    voiceEnabled &&
-                    typeof window !== "undefined" &&
-                    "speechSynthesis" in window
-                  ) {
-                    window.speechSynthesis.cancel();
-                  }
-                  setVoiceEnabled(!voiceEnabled);
-                }}
-                sx={{
-                  p: 0.35,
-                  flexShrink: 0,
-                  color: voiceEnabled ? "primary.main" : "text.secondary",
-                }}
-              >
-                <Icon
-                  icon={voiceEnabled ? "mdi:volume-high" : "mdi:volume-off"}
-                  width={17}
-                />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        </Stack>
-        <Box
-          ref={bodyRef}
-          data-coach-transcript
-          role="region"
-          aria-label={
-            cascade.active ? "Coach demonstration" : "Current coach reply"
-          }
-          tabIndex={textOverflows ? 0 : undefined}
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: "auto",
-            overflowX: "hidden",
-            scrollbarGutter: "stable",
-            overscrollBehaviorY: textOverflows ? "contain" : "auto",
-            overflowWrap: "anywhere",
-          }}
-        >
-          <Stack
-            ref={contentRef}
-            spacing={0.55}
-            role={cascade.active ? undefined : "log"}
-            aria-label={cascade.active ? undefined : "Coach reply"}
+          <Tooltip
+            title={
+              voiceEnabled ? "Mute coach voice" : "Read coach messages aloud"
+            }
           >
-            {cascade.active ? (
-              <Box
-                sx={{
-                  px: 1.35,
-                  py: 0.75,
-                  borderRadius: 2,
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.045)"
-                      : "rgba(15, 23, 42, 0.04)",
-                }}
-              >
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontSize: "var(--coach-text-size, 0.95rem)",
-                    lineHeight: 1.4,
-                    whiteSpace: "pre-line",
-                  }}
+            <IconButton
+              size="small"
+              aria-label={
+                voiceEnabled ? "Mute coach voice" : "Enable coach voice"
+              }
+              aria-pressed={voiceEnabled}
+              onClick={() => {
+                if (
+                  voiceEnabled &&
+                  typeof window !== "undefined" &&
+                  "speechSynthesis" in window
+                ) {
+                  window.speechSynthesis.cancel();
+                }
+                setVoiceEnabled(!voiceEnabled);
+              }}
+              sx={{
+                p: 0.4,
+                borderRadius: 1,
+                flexShrink: 0,
+                color: voiceEnabled ? "primary.main" : "text.secondary",
+                bgcolor: voiceEnabled
+                  ? (theme) => alpha(theme.palette.primary.main, 0.12)
+                  : "transparent",
+              }}
+            >
+              <Icon
+                icon={voiceEnabled ? "mdi:volume-high" : "mdi:volume-off"}
+                width={17}
+              />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+
+        {/* Scrollable live commentary feed (full game history + latest highlighted at bottom) */}
+        <Box
+          sx={{ position: "relative", flex: 1, minHeight: 0, display: "flex" }}
+        >
+          <Box
+            ref={bodyRef}
+            onScroll={handleFeedScroll}
+            data-coach-transcript
+            role="region"
+            aria-label={
+              cascade.active ? "Coach demonstration" : "Coach commentary feed"
+            }
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              overflowX: "hidden",
+              scrollbarGutter: "stable",
+              overscrollBehaviorY: "contain",
+              overflowWrap: "anywhere",
+              pr: 0.25,
+            }}
+          >
+            <Stack
+              spacing={0.6}
+              role={cascade.active ? undefined : "log"}
+              aria-live={cascade.active ? undefined : "polite"}
+              aria-label={cascade.active ? undefined : "Coach commentary"}
+            >
+              {cascade.active ? (
+                <Box
+                  sx={(theme) => ({
+                    px: 1.2,
+                    py: 0.75,
+                    borderRadius: 1,
+                    borderLeft: "2.5px solid #f5b82e",
+                    bgcolor:
+                      theme.palette.mode === "dark"
+                        ? alpha(theme.palette.common.white, 0.05)
+                        : alpha(theme.palette.common.black, 0.04),
+                  })}
                 >
-                  {cascade.san ? <strong>{cascade.san}: </strong> : null}
-                  {cascade.caption ?? "Step through the line on the board."}
-                </Typography>
-              </Box>
-            ) : (
-              <>
-                {shownMessages.length === 0 ? (
-                  <Box
+                  <Typography
+                    variant="body2"
                     sx={{
-                      px: 1.35,
-                      py: 0.75,
-                      borderRadius: 2,
-                      bgcolor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(255, 255, 255, 0.045)"
-                          : "rgba(15, 23, 42, 0.04)",
+                      fontSize: "0.875rem",
+                      lineHeight: 1.45,
+                      whiteSpace: "pre-line",
                     }}
                   >
-                    <Stack direction="row" alignItems="center" gap={1}>
-                      {!interactive.ready && (
-                        <CircularProgress size={13} thickness={5} />
+                    {cascade.san ? <strong>{cascade.san}: </strong> : null}
+                    {cascade.caption ?? "Step through the line on the board."}
+                  </Typography>
+                </Box>
+              ) : allMessages.length === 0 ? (
+                <Box
+                  sx={(theme) => ({
+                    px: 1.2,
+                    py: 0.75,
+                    borderRadius: 1,
+                    bgcolor:
+                      theme.palette.mode === "dark"
+                        ? alpha(theme.palette.common.white, 0.035)
+                        : alpha(theme.palette.common.black, 0.035),
+                  })}
+                >
+                  <Stack direction="row" alignItems="center" gap={1}>
+                    {!interactive.ready && (
+                      <CircularProgress size={13} thickness={5} />
+                    )}
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontSize: "0.875rem",
+                        lineHeight: 1.45,
+                        color: "text.secondary",
+                      }}
+                    >
+                      {!interactive.ready
+                        ? "Connecting to your coach…"
+                        : interactive.positionCoaching
+                          ? "Position coaching gives move feedback and hints for this game."
+                          : "Play a move to start live coaching."}
+                    </Typography>
+                  </Stack>
+                </Box>
+              ) : (
+                allMessages.map((msg, index) => {
+                  const isCurrentReply = index >= replyStart;
+                  const showTurnDivider =
+                    index > 0 && (msg.startsGroup || index === replyStart);
+
+                  return (
+                    <Box key={msg.id}>
+                      {showTurnDivider && (
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          gap={0.75}
+                          sx={{ my: 0.45 }}
+                        >
+                          <Box
+                            sx={{
+                              flex: 1,
+                              height: "1px",
+                              bgcolor: "divider",
+                              opacity: isCurrentReply ? 0.9 : 0.55,
+                            }}
+                          />
+                          {msg.moveTag && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontSize: "0.66rem",
+                                fontWeight: 600,
+                                color: isCurrentReply
+                                  ? "text.secondary"
+                                  : "text.disabled",
+                                fontVariantNumeric: "tabular-nums",
+                                letterSpacing: 0.2,
+                              }}
+                            >
+                              {msg.moveTag}
+                            </Typography>
+                          )}
+                          <Box
+                            sx={{
+                              flex: 1,
+                              height: "1px",
+                              bgcolor: "divider",
+                              opacity: isCurrentReply ? 0.9 : 0.55,
+                            }}
+                          />
+                        </Stack>
                       )}
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontSize: "var(--coach-text-size, 0.95rem)",
-                          color: "text.secondary",
-                        }}
-                      >
-                        {!interactive.ready
-                          ? "Connecting to your coach…"
-                          : interactive.positionCoaching
-                            ? "Position coaching gives move feedback and hints for this game."
-                            : "Play a move to get feedback."}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                ) : (
-                  shownMessages.map((msg, i) => {
-                    const isLatest = i === shownMessages.length - 1;
-                    return (
                       <Box
-                        key={msg.id}
                         data-coach-message
                         className={msg.wiggleTick ? "ck-wiggle" : undefined}
-                        sx={{
+                        sx={(theme) => ({
                           position: "relative",
-                          px: 1.35,
-                          py: 0.7,
-                          borderRadius: 2,
-                          bgcolor: (theme) =>
-                            theme.palette.mode === "dark"
-                              ? isLatest
-                                ? "rgba(255, 255, 255, 0.055)"
-                                : "rgba(255, 255, 255, 0.03)"
-                              : isLatest
-                                ? "rgba(15, 23, 42, 0.05)"
-                                : "rgba(15, 23, 42, 0.025)",
-                          opacity: isLatest ? 1 : 0.78,
-                        }}
+                          px: isCurrentReply ? 1.15 : 1.05,
+                          py: isCurrentReply ? 0.65 : 0.5,
+                          borderRadius: 1,
+                          borderLeft: isCurrentReply
+                            ? "2.5px solid"
+                            : "2.5px solid transparent",
+                          borderLeftColor: isCurrentReply
+                            ? accentColor
+                            : "transparent",
+                          bgcolor: isCurrentReply
+                            ? theme.palette.mode === "dark"
+                              ? alpha(theme.palette.common.white, 0.06)
+                              : alpha(theme.palette.common.black, 0.045)
+                            : theme.palette.mode === "dark"
+                              ? alpha(theme.palette.common.white, 0.024)
+                              : alpha(theme.palette.common.black, 0.022),
+                          opacity: isCurrentReply ? 1 : 0.68,
+                          transition:
+                            "opacity 150ms ease, background-color 150ms ease",
+                          "&:hover": { opacity: 1 },
+                        })}
                       >
                         <Typography
                           variant="body2"
                           sx={{
-                            fontSize: "var(--coach-text-size, 0.95rem)",
-                            lineHeight: 1.4,
+                            fontSize: "0.875rem",
+                            lineHeight: 1.45,
                             whiteSpace: "pre-line",
                           }}
                         >
                           {renderRichText(msg.html)}
                         </Typography>
                       </Box>
-                    );
-                  })
-                )}
-              </>
-            )}
-          </Stack>
+                    </Box>
+                  );
+                })
+              )}
+            </Stack>
+          </Box>
+
+          {!cascade.active && scrolledUp && (
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => scrollToBottom(true)}
+              endIcon={<Icon icon="mdi:arrow-down" width={13} />}
+              sx={{
+                position: "absolute",
+                right: 10,
+                bottom: 4,
+                minHeight: 22,
+                py: 0.15,
+                px: 0.9,
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                borderRadius: 999,
+                boxShadow: 2,
+                textTransform: "none",
+              }}
+            >
+              Latest
+            </Button>
+          )}
         </Box>
 
-        {/* Fixed single-row action bar: never wraps or changes height; Hint stays anchored on the left */}
+        {/* Coach Action Row */}
         <Stack
           direction="row"
           alignItems="center"
@@ -608,9 +747,9 @@ export default function CoachStage({
                   sx={{
                     flexShrink: 0,
                     "& .MuiToggleButton-root": {
-                      py: 0.1,
-                      px: 0.8,
-                      fontSize: "0.7rem",
+                      py: 0.15,
+                      px: 0.85,
+                      fontSize: "0.72rem",
                       lineHeight: 1.4,
                       textTransform: "none",
                       whiteSpace: "nowrap",
@@ -635,7 +774,7 @@ export default function CoachStage({
                       onClick={onCascadePrev}
                       disabled={cascade.stepIndex <= 0}
                       aria-label="Previous step"
-                      sx={{ p: 0.35 }}
+                      sx={{ p: 0.35, borderRadius: 1 }}
                     >
                       <Icon icon="mdi:chevron-left" width={18} />
                     </IconButton>
@@ -648,7 +787,7 @@ export default function CoachStage({
                     aria-label={
                       cascade.playing ? "Pause cascade" : "Play cascade"
                     }
-                    sx={{ p: 0.35 }}
+                    sx={{ p: 0.35, borderRadius: 1 }}
                   >
                     <Icon
                       icon={cascade.playing ? "mdi:pause" : "mdi:play"}
@@ -663,7 +802,7 @@ export default function CoachStage({
                       onClick={onCascadeNext}
                       disabled={cascade.stepIndex >= cascade.maxStep}
                       aria-label="Next step"
-                      sx={{ p: 0.35 }}
+                      sx={{ p: 0.35, borderRadius: 1 }}
                     >
                       <Icon icon="mdi:chevron-right" width={18} />
                     </IconButton>
@@ -674,7 +813,7 @@ export default function CoachStage({
                     size="small"
                     onClick={onCascadeReplay}
                     aria-label="Replay cascade"
-                    sx={{ p: 0.35 }}
+                    sx={{ p: 0.35, borderRadius: 1 }}
                   >
                     <Icon icon="mdi:replay" width={16} />
                   </IconButton>
@@ -688,15 +827,7 @@ export default function CoachStage({
                   size="small"
                   variant="contained"
                   onClick={onCascadeTryAgain}
-                  sx={{
-                    py: 0.2,
-                    px: 1.05,
-                    minHeight: 26,
-                    fontSize: "0.74rem",
-                    borderRadius: 999,
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
+                  sx={COMPACT_ACTION_SX}
                 >
                   Try again
                 </Button>
@@ -704,15 +835,11 @@ export default function CoachStage({
               <Button
                 size="small"
                 variant="outlined"
+                color="inherit"
                 onClick={onCascadeExit}
                 sx={{
-                  py: 0.2,
-                  px: 1.05,
-                  minHeight: 26,
-                  fontSize: "0.74rem",
-                  borderRadius: 999,
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
+                  ...COMPACT_ACTION_SX,
+                  borderColor: "divider",
                 }}
               >
                 {cascade.exitLabel}
@@ -721,52 +848,47 @@ export default function CoachStage({
           ) : (
             <>
               {isInProgress && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  disabled={!interactive.canRequestHint}
-                  startIcon={
-                    <Icon icon="mdi:lightbulb-on-outline" width={15} />
-                  }
-                  onClick={() => void interactive.requestHint()}
-                  sx={{
-                    py: 0.2,
-                    px: 1.1,
-                    minHeight: 26,
-                    fontSize: "0.75rem",
-                    borderRadius: 999,
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
-                >
-                  Hint
-                </Button>
+                <Tooltip title="Ask coach for a hint (H)">
+                  <span>
+                    <Button
+                      size="small"
+                      variant="text"
+                      disabled={!interactive.canRequestHint}
+                      startIcon={
+                        <Icon icon="mdi:lightbulb-on-outline" width={15} />
+                      }
+                      onClick={() => void interactive.requestHint()}
+                      sx={(theme) => ({
+                        ...COMPACT_ACTION_SX,
+                        bgcolor: theme.palette.action.hover,
+                        color: theme.palette.text.primary,
+                        "&:hover": {
+                          bgcolor: alpha(theme.palette.primary.main, 0.16),
+                          color: theme.palette.primary.main,
+                        },
+                      })}
+                    >
+                      Hint
+                    </Button>
+                  </span>
+                </Tooltip>
               )}
 
-              {interactive.choices.map((choice, idx) => (
-                <Button
-                  key={choice.action}
-                  size="small"
-                  variant={idx === 0 ? "contained" : "outlined"}
-                  color={
-                    choice.action.toLowerCase().includes("undo")
-                      ? "warning"
-                      : "primary"
-                  }
-                  onClick={() => void interactive.sendChoice(choice)}
-                  sx={{
-                    py: 0.2,
-                    px: 1.15,
-                    minHeight: 26,
-                    fontSize: "0.75rem",
-                    borderRadius: 999,
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
-                >
-                  {choice.title}
-                </Button>
-              ))}
+              {interactive.choices.map((choice, idx) => {
+                const isUndo = choice.action.toLowerCase().includes("undo");
+                return (
+                  <Button
+                    key={choice.action}
+                    size="small"
+                    variant={idx === 0 ? "contained" : "outlined"}
+                    color={isUndo ? "warning" : "primary"}
+                    onClick={() => void interactive.sendChoice(choice)}
+                    sx={COMPACT_ACTION_SX}
+                  >
+                    {choice.title}
+                  </Button>
+                );
+              })}
 
               {canShowWhy && (
                 <Button
@@ -774,15 +896,7 @@ export default function CoachStage({
                   variant="contained"
                   startIcon={<Icon icon="mdi:play-circle-outline" width={15} />}
                   onClick={onShowWhy}
-                  sx={{
-                    py: 0.2,
-                    px: 1.15,
-                    minHeight: 26,
-                    fontSize: "0.75rem",
-                    borderRadius: 999,
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
+                  sx={COMPACT_ACTION_SX}
                 >
                   Show why
                 </Button>
@@ -795,15 +909,7 @@ export default function CoachStage({
                   color="warning"
                   startIcon={<Icon icon="mdi:undo-variant" width={15} />}
                   onClick={() => goToMove(moveCoach.playerMoveIndex, game)}
-                  sx={{
-                    py: 0.2,
-                    px: 1.1,
-                    minHeight: 26,
-                    fontSize: "0.75rem",
-                    borderRadius: 999,
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
+                  sx={COMPACT_ACTION_SX}
                 >
                   Try again
                 </Button>
@@ -813,42 +919,20 @@ export default function CoachStage({
         </Stack>
       </Box>
 
-      <Dialog
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        fullWidth
-        maxWidth="sm"
-        aria-labelledby="coach-reply-history-title"
-      >
-        <DialogTitle id="coach-reply-history-title">
-          Coach reply history
-        </DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={1.25}>
-            {interactive.messages.map((message) => (
-              <Typography
-                key={message.id}
-                variant="body2"
-                sx={{ overflowWrap: "anywhere", whiteSpace: "pre-line" }}
-              >
-                {message.plain}
-              </Typography>
-            ))}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button autoFocus onClick={() => setHistoryOpen(false)}>
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Coach Persona Switcher Menu */}
       <Menu
         anchorEl={personaMenuAnchor}
         open={!!personaMenuAnchor}
         onClose={() => setPersonaMenuAnchor(null)}
-        slotProps={{ paper: { sx: { maxHeight: 320, width: 240 } } }}
+        slotProps={{
+          paper: {
+            sx: {
+              maxHeight: 320,
+              width: 244,
+              borderRadius: 1.5,
+            },
+          },
+        }}
       >
         {COACH_PERSONAS.map((p) => (
           <MenuItem
@@ -890,7 +974,7 @@ export default function CoachStage({
             sx: {
               p: 1.5,
               maxWidth: 310,
-              borderRadius: 2.5,
+              borderRadius: 1.5,
               border: "1px solid",
               borderColor: "divider",
             },

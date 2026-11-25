@@ -87,3 +87,7 @@ export const analysisCascadeNarrationAtom = atom<{
 
 /** Restrained board highlight(s) synced to the current Analysis editorial note. */
 export const analysisHighlightsAtom = atom<SquareHighlight[]>([]);
+
+/** Persist Analysis disclosure states across Arrange ↔ Analyze mode switches. */
+export const engineLinesExpandedAtom = atom(true);
+export const gameDetailsOpenAtom = atom(false);

@@ -26,9 +26,9 @@ export default function NextMoveButton() {
     <ToolbarButton
       tooltip="Next move (→)"
       onClick={goNext}
-      icon="ri:arrow-right-s-line"
+      icon="mdi:chevron-right"
       disabled={!canGoNext}
-      iconHeight={30}
+      iconHeight={28}
     />
   );
 }

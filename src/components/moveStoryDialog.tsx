@@ -15,9 +15,12 @@ import {
   Alert,
   Box,
   Button,
+  ButtonBase,
   Chip,
   Dialog,
+  DialogActions,
   DialogContent,
+  DialogTitle,
   IconButton,
   LinearProgress,
   Stack,
@@ -30,7 +33,14 @@ import {
 } from "@mui/material";
 import { useAtom } from "jotai";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { arrowFromUci } from "@/lib/arrows/uci";
 import { BoardArrow } from "@/lib/arrows/types";
 
@@ -70,8 +80,8 @@ export default function MoveStoryDialog() {
       <DialogContent dividers>
         {state.loading && (
           <Stack spacing={1.5} py={4} alignItems="center">
-            <LinearProgress sx={{ width: "60%" }} />
-            <Typography sx={{ opacity: 0.75 }}>
+            <LinearProgress sx={{ width: "60%", borderRadius: 1 }} />
+            <Typography color="text.secondary">
               Asking the engine what happens next…
             </Typography>
           </Stack>
@@ -89,6 +99,9 @@ export default function MoveStoryDialog() {
           />
         )}
       </DialogContent>
+      <DialogActions>
+        <Button onClick={close}>Close</Button>
+      </DialogActions>
     </Dialog>
   );
 }
@@ -103,16 +116,18 @@ function Header({
   const { story, classification } = state;
 
   return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      justifyContent="space-between"
-      gap={1}
-      sx={{ px: 3, py: 1.5 }}
+    <DialogTitle
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 1,
+        py: 1.5,
+      }}
     >
       <Stack direction="row" alignItems="center" gap={1.25} flexWrap="wrap">
-        <Icon icon="mdi:eye-outline" height={24} />
-        <Typography variant="h6" fontWeight={700}>
+        <Icon icon="mdi:eye-outline" height={22} />
+        <Typography variant="h6" fontWeight={700} component="span">
           {story ? (
             <>
               Visualize{" "}
@@ -136,18 +151,20 @@ function Header({
             }
             sx={{
               textTransform: "capitalize",
-              color: "#fff",
-              backgroundColor: CLASSIFICATION_COLORS[classification],
+              fontWeight: 600,
+              color: CLASSIFICATION_COLORS[classification],
+              borderColor: CLASSIFICATION_COLORS[classification],
             }}
+            variant="outlined"
           />
         )}
       </Stack>
       <Tooltip title="Close (Esc)">
-        <IconButton onClick={onClose} aria-label="Close">
-          <Icon icon="mdi:close" />
+        <IconButton size="small" onClick={onClose} aria-label="Close">
+          <Icon icon="mdi:close" height={20} />
         </IconButton>
       </Tooltip>
-    </Stack>
+    </DialogTitle>
   );
 }
 
@@ -172,6 +189,18 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
     ? { from: current.uci.slice(0, 2), to: current.uci.slice(2, 4) }
     : undefined;
 
+  const startFenParts = (line.steps[0]?.fen ?? "").split(" ");
+  const startFullmove = Number(startFenParts[5]) || 1;
+  const startTurn: "w" | "b" = startFenParts[1] === "b" ? "b" : "w";
+
+  const stepMoveNumberLabel = (stepIndex: number, moveColor?: "w" | "b") => {
+    if (stepIndex === 0 || !moveColor) return "•";
+    const moveIdx = stepIndex - 1;
+    const moveNum =
+      startFullmove + Math.floor((moveIdx + (startTurn === "b" ? 1 : 0)) / 2);
+    return moveColor === "w" ? `${moveNum}.` : `${moveNum}...`;
+  };
+
   const arrows = useMemo<BoardArrow[]>(() => {
     const upcoming = line.steps[step + 1];
     if (!upcoming?.uci || step >= visibleEnd) return [];
@@ -185,14 +214,29 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
     setPlaying(false);
   };
 
-  const goTo = (index: number) => {
-    setStep(Math.max(0, Math.min(visibleEnd, index)));
-    setPlaying(false);
-  };
-  const moveBy = (delta: number) => {
-    setStep((value) => Math.max(0, Math.min(visibleEnd, value + delta)));
-    setPlaying(false);
-  };
+  const goTo = useCallback(
+    (index: number) => {
+      setStep(Math.max(0, Math.min(visibleEnd, index)));
+      setPlaying(false);
+    },
+    [visibleEnd]
+  );
+
+  const moveBy = useCallback(
+    (delta: number) => {
+      setStep((value) => Math.max(0, Math.min(visibleEnd, value + delta)));
+      setPlaying(false);
+    },
+    [visibleEnd]
+  );
+
+  const togglePlay = useCallback(() => {
+    setPlaying((currentlyPlaying) => {
+      if (currentlyPlaying) return false;
+      setStep((currentStep) => (currentStep >= visibleEnd ? 0 : currentStep));
+      return true;
+    });
+  }, [visibleEnd]);
 
   useEffect(() => {
     if (!playing) return;
@@ -209,18 +253,41 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
     return () => clearTimeout(timer);
   }, [playing, step, visibleEnd]);
 
-  const moveByRef = useRef(moveBy);
+  const actionsRef = useRef({ moveBy, goTo, togglePlay, visibleEnd });
   useEffect(() => {
-    moveByRef.current = moveBy;
+    actionsRef.current = { moveBy, goTo, togglePlay, visibleEnd };
   });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        return;
+      }
 
-      event.stopImmediatePropagation();
-      event.preventDefault();
-      moveByRef.current(event.key === "ArrowRight" ? 1 : -1);
+      if (event.key === "ArrowRight") {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        actionsRef.current.moveBy(1);
+      } else if (event.key === "ArrowLeft") {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        actionsRef.current.moveBy(-1);
+      } else if (event.key === "Home") {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        actionsRef.current.goTo(0);
+      } else if (event.key === "End") {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        actionsRef.current.goTo(actionsRef.current.visibleEnd);
+      } else if (event.key === " ") {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        actionsRef.current.togglePlay();
+      }
     };
 
     window.addEventListener("keydown", onKeyDown, true);
@@ -234,7 +301,23 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
       ?.scrollIntoView({ block: "nearest" });
   }, [step, lineKey]);
 
-  const boardSize = compact ? Math.min(340, window.innerWidth - 56) : 380;
+  const boardWrapRef = useRef<HTMLDivElement>(null);
+  const maxBoardSize = compact ? 340 : 380;
+  const [boardSize, setBoardSize] = useState(maxBoardSize);
+
+  useLayoutEffect(() => {
+    const el = boardWrapRef.current;
+    if (!el) return;
+    const measure = () => {
+      const width = Math.floor(el.clientWidth);
+      if (width > 0) setBoardSize(Math.min(maxBoardSize, width));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [maxBoardSize]);
+
   const orientation = story.mover === "w" ? Color.White : Color.Black;
 
   const moverWinPercentage = Math.round(line.moverWinPercentage);
@@ -254,15 +337,29 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
       <Stack
         gap={1.5}
         alignItems="center"
-        sx={{ flexShrink: 0, width: boardSize }}
+        sx={{
+          flexShrink: 0,
+          width: { xs: "100%", md: maxBoardSize },
+          maxWidth: maxBoardSize,
+          mx: { xs: "auto", md: 0 },
+        }}
       >
-        <MiniBoard
-          fen={current.fen}
-          size={boardSize}
-          orientation={orientation}
-          lastMove={lastMove}
-          arrows={arrows}
-        />
+        <Box
+          ref={boardWrapRef}
+          sx={{
+            width: "100%",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <MiniBoard
+            fen={current.fen}
+            size={boardSize}
+            orientation={orientation}
+            lastMove={lastMove}
+            arrows={arrows}
+          />
+        </Box>
 
         <Stack
           direction="row"
@@ -270,7 +367,7 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
           justifyContent="center"
           gap={0.5}
         >
-          <Tooltip title="Start">
+          <Tooltip title="Start (Home)">
             <span>
               <IconButton
                 onClick={() => goTo(0)}
@@ -292,14 +389,11 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={playing ? "Pause" : "Play it out"}>
+          <Tooltip title={playing ? "Pause (Space)" : "Play it out (Space)"}>
             <span>
               <IconButton
                 color="primary"
-                onClick={() => {
-                  if (reachedEnd) setStep(0);
-                  setPlaying((value) => !value);
-                }}
+                onClick={togglePlay}
                 aria-label={playing ? "Pause" : "Play it out"}
               >
                 <Icon
@@ -320,7 +414,7 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title="End">
+          <Tooltip title="End (End)">
             <span>
               <IconButton
                 onClick={() => goTo(visibleEnd)}
@@ -333,7 +427,11 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
           </Tooltip>
         </Stack>
 
-        <Typography variant="body2" sx={{ opacity: 0.8, textAlign: "center" }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ textAlign: "center", fontVariantNumeric: "tabular-nums" }}
+        >
           {story.kind === "continuation"
             ? "Evaluation at the starting position"
             : lineKey === "played"
@@ -365,11 +463,21 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
             value={lineKey}
             onChange={(_, value: LineKey | null) => value && switchLine(value)}
             aria-label="Which line to show"
+            sx={{
+              "& .MuiToggleButton-root": {
+                textTransform: "none",
+                minHeight: 34,
+              },
+            }}
           >
             <ToggleButton value="played">
-              What happens: {story.playedSan}
+              What happens:&nbsp;
+              <PrettyMoveSan san={story.playedSan} color={story.mover} />
             </ToggleButton>
-            <ToggleButton value="better">Better: {story.bestSan}</ToggleButton>
+            <ToggleButton value="better">
+              Better:&nbsp;
+              <PrettyMoveSan san={story.bestSan ?? ""} color={story.mover} />
+            </ToggleButton>
           </ToggleButtonGroup>
         )}
 
@@ -381,54 +489,73 @@ function StoryBody({ story, compact }: { story: MoveStory; compact: boolean }) {
             overflowY: "auto",
             border: 1,
             borderColor: "divider",
-            borderRadius: 2,
+            borderRadius: 1,
           }}
         >
-          {line.steps.slice(0, visibleEnd + 1).map((entry) => (
-            <Box
-              key={entry.index}
-              data-current={entry.index === step}
-              onClick={() => goTo(entry.index)}
-              sx={{
-                display: "flex",
-                gap: 1.25,
-                alignItems: "flex-start",
-                px: 1.25,
-                py: 0.75,
-                cursor: "pointer",
-                backgroundColor:
-                  entry.index === step ? "action.selected" : undefined,
-                "&:hover": { backgroundColor: "action.hover" },
-                borderBottom: 1,
-                borderColor: "divider",
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ minWidth: 22, opacity: 0.6, pt: 0.25 }}
+          {line.steps.slice(0, visibleEnd + 1).map((entry) => {
+            const isCurrent = entry.index === step;
+            return (
+              <ButtonBase
+                key={entry.index}
+                data-current={isCurrent}
+                aria-current={isCurrent ? "step" : undefined}
+                onClick={() => goTo(entry.index)}
+                sx={{
+                  display: "flex",
+                  width: "100%",
+                  gap: 1.25,
+                  alignItems: "flex-start",
+                  justifyContent: "flex-start",
+                  textAlign: "left",
+                  px: 1.25,
+                  py: 0.75,
+                  backgroundColor: isCurrent ? "action.selected" : undefined,
+                  "&:hover": { backgroundColor: "action.hover" },
+                  "&:focus-visible": {
+                    outline: "2px solid",
+                    outlineColor: "primary.main",
+                    outlineOffset: -2,
+                  },
+                  borderBottom: 1,
+                  borderColor: "divider",
+                }}
               >
-                {entry.index === 0 ? "•" : entry.index}
-              </Typography>
-              <Box sx={{ minWidth: 0 }}>
-                {entry.san && entry.color && (
-                  <Typography fontWeight={700} component="div">
-                    <PrettyMoveSan san={entry.san} color={entry.color} />
-                  </Typography>
-                )}
                 <Typography
-                  variant="body2"
-                  sx={{ opacity: entry.index === 0 ? 0.65 : 0.9 }}
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    minWidth: 32,
+                    pt: 0.25,
+                    fontVariantNumeric: "tabular-nums",
+                    flexShrink: 0,
+                  }}
                 >
-                  {entry.note}
+                  {stepMoveNumberLabel(entry.index, entry.color)}
                 </Typography>
-              </Box>
-            </Box>
-          ))}
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  {entry.san && entry.color && (
+                    <Typography fontWeight={700} component="div">
+                      <PrettyMoveSan san={entry.san} color={entry.color} />
+                    </Typography>
+                  )}
+                  <Typography
+                    variant="body2"
+                    color={
+                      entry.index === 0 ? "text.secondary" : "text.primary"
+                    }
+                  >
+                    {entry.note}
+                  </Typography>
+                </Box>
+              </ButtonBase>
+            );
+          })}
 
           <Box sx={{ px: 1.25, py: 1 }}>
             <Typography
               variant="body2"
-              sx={{ opacity: 0.75, fontStyle: "italic" }}
+              color="text.secondary"
+              sx={{ fontStyle: "italic" }}
             >
               {CASCADE_END_TEXT[endReason]}
             </Typography>

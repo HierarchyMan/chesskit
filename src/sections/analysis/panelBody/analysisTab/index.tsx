@@ -1,88 +1,49 @@
-import {
-  Grid2 as Grid,
-  Grid2Props as GridProps,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Stack, Typography } from "@mui/material";
+import { Icon } from "@iconify/react";
 import { useAtomValue } from "jotai";
-import { boardAtom, gameEvalAtom } from "../../states";
-import PlayersMetric from "./playersMetric";
+import { boardAtom } from "../../states";
+import { getGameResult } from "@/lib/gameResult";
 import MoveInfo from "./moveInfo";
 import Opening from "./opening";
-import EngineLines from "./engineLines";
-import VisualizeContinuation from "./visualizeContinuation";
+import MovesPanel from "../classificationTab/movesPanel";
 
-export default function AnalysisTab(props: GridProps) {
-  const gameEval = useAtomValue(gameEvalAtom);
+export default function AnalysisTab({ hidden = false }: { hidden?: boolean }) {
   const board = useAtomValue(boardAtom);
-
   const isGameOver = board.isGameOver();
+  const result = isGameOver ? getGameResult(board, null) : null;
 
   return (
-    <Grid
-      container
-      size={12}
-      justifyContent={{ xs: "center", lg: gameEval ? "start" : "center" }}
-      alignItems="center"
-      flexWrap="wrap"
-      gap={2}
-      marginY={{ lg: gameEval ? 1 : undefined }}
-      paddingX={0}
-      {...props}
-      sx={props.hidden ? { display: "none" } : props.sx}
+    <Stack
+      spacing={1}
+      sx={{
+        display: hidden ? "none" : "flex",
+        minWidth: 0,
+        width: "100%",
+      }}
     >
-      <Stack
-        justifyContent="center"
-        alignItems="stretch"
-        rowGap={1}
-        minWidth={0}
-        width="100%"
-      >
-        <VisualizeContinuation />
-        {gameEval && (
-          <PlayersMetric
-            title="Accuracy"
-            whiteValue={
-              gameEval.accuracy.white === null
-                ? "—"
-                : `${gameEval.accuracy.white.toFixed(1)} %`
-            }
-            blackValue={
-              gameEval.accuracy.black === null
-                ? "—"
-                : `${gameEval.accuracy.black.toFixed(1)} %`
-            }
-          />
-        )}
-
-        {gameEval?.estimatedElo && (
-          <PlayersMetric
-            title="Game Rating"
-            whiteValue={
-              gameEval.estimatedElo.white === null
-                ? "—"
-                : Math.round(gameEval.estimatedElo.white)
-            }
-            blackValue={
-              gameEval.estimatedElo.black === null
-                ? "—"
-                : Math.round(gameEval.estimatedElo.black)
-            }
-          />
-        )}
-
-        <MoveInfo />
-
-        <Opening />
-
-        {isGameOver && (
-          <Typography align="center" fontSize="0.9rem" noWrap>
-            Game is over
+      <MoveInfo />
+      <Opening />
+      <MovesPanel visible={!hidden} />
+      {result && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="center"
+          gap={0.75}
+          sx={{
+            py: 0.75,
+            px: 1.25,
+            borderRadius: 1,
+            bgcolor: "action.hover",
+          }}
+        >
+          <Icon icon="mdi:flag-checkered" height={16} />
+          <Typography variant="body2" fontWeight={600}>
+            {result.reason} ·{" "}
+            {result.result === "1/2-1/2" ? "½-½" : result.result}
           </Typography>
-        )}
-      </Stack>
-
-      <EngineLines size={12} />
-    </Grid>
+        </Stack>
+      )}
+    </Stack>
   );
 }

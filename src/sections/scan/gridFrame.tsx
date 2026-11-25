@@ -1,5 +1,6 @@
 import { GridRect, RawImage } from "@/lib/scan/gridDetect";
-import { Box } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { KeyboardEvent, PointerEvent, useRef } from "react";
 
 type Mode = "move" | "tl" | "tr" | "bl" | "br";
@@ -153,73 +154,126 @@ export default function GridFrame({ src, raw, grid, onChange }: Props) {
     );
   };
 
-  return (
-    <Box
-      ref={wrapperRef}
-      sx={{
-        position: "relative",
-        lineHeight: 0,
-        userSelect: "none",
-        touchAction: "none",
-        borderRadius: 2,
-        overflow: "hidden",
-        border: 1,
-        borderColor: "divider",
-      }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt="Picture of a chess board"
-        draggable={false}
-        style={{ width: "100%", display: "block" }}
-      />
+  const frameBox = {
+    left: `${(grid.x / raw.width) * 100}%`,
+    top: `${(grid.y / raw.height) * 100}%`,
+    width: `${(grid.size / raw.width) * 100}%`,
+    height: `${(grid.size / raw.height) * 100}%`,
+  };
 
+  return (
+    <Stack spacing={0.75}>
       <Box
-        tabIndex={0}
-        role="group"
-        aria-label="Board frame. Drag to move, drag the corners to resize, or use the arrow keys."
-        onPointerDown={startDrag("move")}
-        onPointerMove={onMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onKeyDown={onKeyDown}
         sx={{
-          position: "absolute",
-          left: `${(grid.x / raw.width) * 100}%`,
-          top: `${(grid.y / raw.height) * 100}%`,
-          width: `${(grid.size / raw.width) * 100}%`,
-          height: `${(grid.size / raw.height) * 100}%`,
-          border: "2px solid #22ac38",
-          boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.35)",
-          cursor: "move",
-          outline: "none",
-          "&:focus-visible": { borderColor: "#3894eb" },
-          backgroundImage: `
-            repeating-linear-gradient(to right, rgba(34,172,56,0.7) 0 1px, transparent 1px 12.5%),
-            repeating-linear-gradient(to bottom, rgba(34,172,56,0.7) 0 1px, transparent 1px 12.5%)`,
+          p: 1.5,
+          borderRadius: 1.5,
+          border: 1,
+          borderColor: "divider",
+          bgcolor: "action.hover",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          overflow: "visible",
         }}
       >
-        {CORNERS.map((corner) => (
+        <Box
+          ref={wrapperRef}
+          sx={{
+            position: "relative",
+            display: "inline-block",
+            maxWidth: "100%",
+            lineHeight: 0,
+            userSelect: "none",
+            touchAction: "none",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt="Picture of a chess board"
+            draggable={false}
+            style={{
+              display: "block",
+              maxWidth: "100%",
+              maxHeight: "62vh",
+              width: "auto",
+              height: "auto",
+              objectFit: "contain",
+              borderRadius: 4,
+            }}
+          />
+
+          {/* Clip only the dimming veil to the image bounds; corner handles remain unclipped */}
           <Box
-            key={corner.mode}
-            onPointerDown={startDrag(corner.mode)}
+            sx={{
+              position: "absolute",
+              inset: 0,
+              overflow: "hidden",
+              pointerEvents: "none",
+              borderRadius: "4px",
+            }}
+          >
+            <Box
+              sx={{
+                position: "absolute",
+                ...frameBox,
+                boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.38)",
+              }}
+            />
+          </Box>
+
+          <Box
+            tabIndex={0}
+            role="group"
+            aria-label="Board frame. Drag to move, drag the corners to resize, or use the arrow keys."
+            onPointerDown={startDrag("move")}
             onPointerMove={onMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
-            sx={{
-              position: "absolute",
-              width: HANDLE,
-              height: HANDLE,
-              borderRadius: "50%",
-              backgroundColor: "#22ac38",
-              border: "2px solid #fff",
-              cursor: corner.cursor,
-              ...corner.sx,
+            onKeyDown={onKeyDown}
+            sx={(theme) => {
+              const gridLine = alpha(theme.palette.success.main, 0.72);
+              return {
+                position: "absolute",
+                ...frameBox,
+                border: "2px solid",
+                borderColor: "success.main",
+                cursor: "move",
+                outline: "none",
+                "&:focus-visible": { borderColor: "primary.main" },
+                backgroundImage: `
+                  repeating-linear-gradient(to right, ${gridLine} 0 1px, transparent 1px 12.5%),
+                  repeating-linear-gradient(to bottom, ${gridLine} 0 1px, transparent 1px 12.5%)`,
+              };
             }}
-          />
-        ))}
+          >
+            {CORNERS.map((corner) => (
+              <Box
+                key={corner.mode}
+                onPointerDown={startDrag(corner.mode)}
+                onPointerMove={onMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                sx={{
+                  position: "absolute",
+                  width: HANDLE,
+                  height: HANDLE,
+                  borderRadius: "50%",
+                  backgroundColor: "success.main",
+                  border: "2px solid #fff",
+                  boxShadow: "0 1px 4px rgba(0, 0, 0, 0.45)",
+                  cursor: corner.cursor,
+                  ...corner.sx,
+                }}
+              />
+            ))}
+          </Box>
+        </Box>
       </Box>
-    </Box>
+
+      <Typography variant="caption" color="text.secondary" textAlign="center">
+        Arrows to move · Shift+Arrows 10px · +/− resize
+      </Typography>
+    </Stack>
   );
 }

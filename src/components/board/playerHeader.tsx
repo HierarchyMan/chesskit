@@ -1,6 +1,7 @@
 import { Color } from "@/types/enums";
 import { Player } from "@/types/game";
-import { Avatar, Grid2 as Grid, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Grid2 as Grid, Stack, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import CapturedPieces from "./capturedPieces";
 import { Atom, PrimitiveAtom, atom, useAtomValue } from "jotai";
 import { Chess } from "chess.js";
@@ -17,6 +18,17 @@ export interface Props {
 
 const NO_CLOCK_ATOM = atom<number | undefined>(undefined);
 
+const findLastCommentForFen = (
+  comments: { fen: string; comment: string }[],
+  targetFen: string | undefined
+): string | undefined => {
+  if (!targetFen) return undefined;
+  for (let i = comments.length - 1; i >= 0; i--) {
+    if (comments[i].fen === targetFen) return comments[i].comment;
+  }
+  return undefined;
+};
+
 export default function PlayerHeader({
   color,
   player,
@@ -28,27 +40,30 @@ export default function PlayerHeader({
   const liveClockMs = useAtomValue(clockMsAtom);
 
   const gameFen = game.fen();
+  const turn = game.turn();
+  const isActiveTurn = !previewFen && !game.isGameOver() && turn === color;
 
   const pgnClock = useMemo(() => {
-    const turn = game.turn();
+    const comments = game.getComments();
 
     if (turn === color) {
       const history = game.history({ verbose: true });
       const previousFen = history.at(-1)?.before;
-
-      const comment = game
-        .getComments()
-        .find(({ fen }) => fen === previousFen)?.comment;
-
+      const comment = findLastCommentForFen(comments, previousFen);
       return getClock(comment);
     }
 
-    const comment = game.getComment();
-    return getClock(comment);
-  }, [game, color]);
+    const currentComment =
+      game.getComment() ?? findLastCommentForFen(comments, gameFen);
+    return getClock(currentComment);
+  }, [game, gameFen, turn, color]);
 
   const clock = liveClockMs !== undefined ? msToClock(liveClockMs) : pgnClock;
   const isLowOnTime = liveClockMs !== undefined && liveClockMs < 10_000;
+
+  const displayName =
+    player.name?.trim() || (color === Color.White ? "White" : "Black");
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <Grid
@@ -56,10 +71,12 @@ export default function PlayerHeader({
       justifyContent="space-between"
       alignItems="center"
       size={12}
+      gap={1}
       sx={{
-        minHeight: 40,
-        height: 40,
-        maxHeight: 40,
+        height: 44,
+        minHeight: 44,
+        maxHeight: 44,
+        py: 0.25,
         flexShrink: 0,
         minWidth: 0,
         overflow: "hidden",
@@ -67,32 +84,99 @@ export default function PlayerHeader({
         flexWrap: "nowrap",
       }}
     >
-      <Stack direction="row" sx={{ minWidth: 0, overflow: "hidden" }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{ minWidth: 0, overflow: "hidden" }}
+      >
         <Avatar
           src={player.avatarUrl}
-          alt={player.name}
+          alt={displayName}
           variant="circular"
-          sx={{
-            width: 40,
-            height: 40,
-            backgroundColor: color === Color.White ? "white" : "black",
-            color: color === Color.White ? "black" : "white",
-            border: "1px solid black",
-          }}
+          sx={(theme) => ({
+            width: 34,
+            height: 34,
+            fontSize: "0.9rem",
+            fontWeight: 700,
+            flexShrink: 0,
+            backgroundColor: color === Color.White ? "#f3f4f6" : "#26262c",
+            color: color === Color.White ? "#18181b" : "#f4f4f5",
+            border: "1.5px solid",
+            borderColor: isActiveTurn
+              ? theme.palette.primary.main
+              : theme.palette.divider,
+            boxShadow: isActiveTurn
+              ? `0 0 0 2px ${alpha(theme.palette.primary.main, 0.25)}`
+              : "none",
+            transition: "border-color 160ms ease, box-shadow 160ms ease",
+          })}
         >
-          {player.name[0].toUpperCase()}
+          {initial}
         </Avatar>
 
-        <Stack marginLeft={1} sx={{ minWidth: 0 }}>
-          <Stack direction="row">
-            <Typography fontSize="0.9rem" noWrap>
-              {player.name}
+        <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+          <Stack direction="row" alignItems="center" spacing={0.6} minWidth={0}>
+            {player.title && (
+              <Box
+                component="span"
+                sx={(theme) => ({
+                  px: 0.5,
+                  py: "1px",
+                  borderRadius: "4px",
+                  fontSize: "0.68rem",
+                  fontWeight: 800,
+                  lineHeight: 1.25,
+                  letterSpacing: "0.02em",
+                  flexShrink: 0,
+                  bgcolor: alpha(theme.palette.warning.main, 0.16),
+                  color:
+                    theme.palette.mode === "dark"
+                      ? theme.palette.warning.light
+                      : theme.palette.warning.dark,
+                })}
+              >
+                {player.title}
+              </Box>
+            )}
+
+            <Typography
+              fontSize="0.88rem"
+              fontWeight={isActiveTurn ? 700 : 500}
+              lineHeight={1.25}
+              noWrap
+            >
+              {displayName}
             </Typography>
 
-            {player.rating && (
-              <Typography marginLeft={0.5} fontSize="0.9rem" fontWeight="200">
+            {player.rating !== undefined && player.rating > 0 && (
+              <Typography
+                component="span"
+                color="text.secondary"
+                sx={{
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  lineHeight: 1.25,
+                  fontVariantNumeric: "tabular-nums",
+                  flexShrink: 0,
+                }}
+              >
                 ({player.rating})
               </Typography>
+            )}
+
+            {isActiveTurn && !clock && (
+              <Box
+                aria-label="To move"
+                title="To move"
+                sx={(theme) => ({
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  bgcolor: theme.palette.primary.main,
+                  flexShrink: 0,
+                })}
+              />
             )}
           </Stack>
 
@@ -106,26 +190,52 @@ export default function PlayerHeader({
 
       {clock && (
         <Typography
-          align="center"
-          sx={{
-            backgroundColor: color === Color.White ? "white" : "black",
-            color: isLowOnTime
-              ? "#ff6b6b"
-              : color === Color.White
-                ? "black"
-                : "white",
-            height: 34,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            px: 1,
-            flexShrink: 0,
-            fontVariantNumeric: "tabular-nums",
+          component="div"
+          sx={(theme) => {
+            const isWhite = color === Color.White;
+            const bg = isLowOnTime
+              ? "#dc2626"
+              : isWhite
+                ? "#f3f4f6"
+                : "#26262c";
+            const fg = isLowOnTime
+              ? "#ffffff"
+              : isWhite
+                ? "#18181b"
+                : "#f4f4f5";
+            const borderColor = isLowOnTime
+              ? "#b91c1c"
+              : isActiveTurn
+                ? theme.palette.primary.main
+                : isWhite
+                  ? "rgba(0, 0, 0, 0.16)"
+                  : "rgba(255, 255, 255, 0.14)";
+            return {
+              backgroundColor: bg,
+              color: fg,
+              height: 32,
+              minWidth: 74,
+              px: 1.25,
+              borderRadius: 1,
+              border: "1.5px solid",
+              borderColor,
+              boxShadow:
+                isActiveTurn && !isLowOnTime
+                  ? `0 0 0 2px ${alpha(theme.palette.primary.main, 0.22)}`
+                  : "none",
+              opacity: isActiveTurn ? 1 : 0.62,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              flexShrink: 0,
+              fontSize: "0.92rem",
+              fontWeight: 700,
+              lineHeight: 1,
+              fontVariantNumeric: "tabular-nums",
+              transition:
+                "opacity 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease",
+            };
           }}
-          borderRadius="5px"
-          border="1px solid #424242"
-          width="5rem"
-          textAlign="right"
         >
           {clock.hours ? `${clock.hours}:` : ""}
           {getPaddedNumber(clock.minutes)}:{getPaddedNumber(clock.seconds)}

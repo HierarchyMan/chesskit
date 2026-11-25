@@ -58,6 +58,7 @@ function DownloadChip({ engineName }: { engineName: EngineId }) {
         variant="outlined"
         icon={<CircularProgress size={14} thickness={6} />}
         label={`Downloading ${label.small}: ${formatModelSize(view.progress.receivedBytes)} of ${formatModelSize(view.progress.totalBytes)}`}
+        sx={{ fontVariantNumeric: "tabular-nums" }}
       />
     );
   }
@@ -76,6 +77,7 @@ function DownloadChip({ engineName }: { engineName: EngineId }) {
         onClick={
           view?.canDownload ? () => void download(engineName) : undefined
         }
+        sx={{ fontVariantNumeric: "tabular-nums" }}
       />
     </Tooltip>
   );

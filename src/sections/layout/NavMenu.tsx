@@ -11,6 +11,7 @@ import {
   Stack,
   Tooltip,
   Typography,
+  alpha,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -57,30 +58,56 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
         selected={active}
         onClick={isDesktop ? undefined : onMobileClose}
         sx={{
-          borderRadius: 2,
+          position: "relative",
+          borderRadius: 1,
           mx: 1,
           my: 0.25,
-          minHeight: 44,
-          px: 1.5,
+          minHeight: 38,
+          py: 0.5,
+          px: expanded ? 1.5 : 0,
           justifyContent: expanded ? "flex-start" : "center",
-          borderLeft: "3px solid",
-          borderLeftColor: active ? item.accent : "transparent",
+          color: active ? "text.primary" : "text.secondary",
+          "&:hover": {
+            color: "text.primary",
+            bgcolor: "action.hover",
+          },
+          "&.Mui-selected": {
+            bgcolor: (t) => alpha(t.palette.primary.main, 0.14),
+            color: "text.primary",
+            "&:hover": {
+              bgcolor: (t) => alpha(t.palette.primary.main, 0.2),
+            },
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              left: 3,
+              top: 7,
+              bottom: 7,
+              width: 3,
+              borderRadius: 999,
+              bgcolor: "primary.main",
+            },
+          },
         }}
       >
         <ListItemIcon
           sx={{
-            minWidth: expanded ? 38 : 0,
-            color: active ? item.accent : "inherit",
+            minWidth: expanded ? 36 : 0,
+            color: active ? "primary.main" : "inherit",
             justifyContent: "center",
           }}
         >
-          <Icon icon={item.icon} height={22} />
+          <Icon icon={item.icon} height={20} />
         </ListItemIcon>
         {expanded && (
           <ListItemText
             primary={item.label}
             slotProps={{
-              primary: { fontSize: "0.95rem", fontWeight: active ? 600 : 400 },
+              primary: {
+                fontSize: "0.875rem",
+                fontWeight: active ? 600 : 500,
+                noWrap: true,
+              },
             }}
           />
         )}
@@ -96,39 +123,91 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
     );
   };
 
+  const shortcutsButton = (
+    <ListItemButton
+      aria-label="Keyboard shortcuts"
+      onClick={() => {
+        if (!isDesktop) onMobileClose();
+        setShortcutsOpen(true);
+      }}
+      sx={{
+        borderRadius: 1,
+        mx: 1,
+        my: 0.25,
+        minHeight: 38,
+        py: 0.5,
+        px: expanded ? 1.5 : 0,
+        flexGrow: 0,
+        justifyContent: expanded ? "flex-start" : "center",
+        color: "text.secondary",
+        "&:hover": {
+          color: "text.primary",
+          bgcolor: "action.hover",
+        },
+      }}
+    >
+      <ListItemIcon
+        sx={{
+          minWidth: expanded ? 36 : 0,
+          color: "inherit",
+          justifyContent: "center",
+        }}
+      >
+        <Icon icon="mdi:keyboard-outline" height={20} />
+      </ListItemIcon>
+      {expanded && (
+        <ListItemText
+          primary="Keyboard shortcuts"
+          slotProps={{
+            primary: {
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              noWrap: true,
+            },
+          }}
+        />
+      )}
+    </ListItemButton>
+  );
+
   const content = (
     <Stack height="100%" sx={{ overflowX: "hidden", userSelect: "none" }}>
       <Stack
         direction="row"
         alignItems="center"
-        gap={1.2}
+        gap={1.25}
         component={NextLink}
         href="/"
         prefetch={false}
         aria-label="Chesskit home"
         sx={{
-          px: expanded ? 2.5 : 0,
+          px: expanded ? 2 : 0,
           height: 56,
           flexShrink: 0,
           color: "inherit",
           textDecoration: "none",
+          borderBottom: 1,
+          borderColor: "divider",
+          boxSizing: "border-box",
         }}
         justifyContent={expanded ? "flex-start" : "center"}
       >
         <Image
           src="/favicon-32x32.png"
           alt="Chesskit logo"
-          width={30}
-          height={30}
+          width={28}
+          height={28}
         />
         {expanded && (
-          <Typography variant="h6" fontWeight={700} noWrap>
+          <Typography variant="h6" fontSize="1.05rem" fontWeight={700} noWrap>
             Chesskit
           </Typography>
         )}
       </Stack>
 
-      <Box sx={{ flexGrow: 1, overflowY: "auto", overflowX: "hidden" }}>
+      <Box
+        sx={{ flexGrow: 1, overflowY: "auto", overflowX: "hidden", py: 0.5 }}
+      >
         <List disablePadding>{renderItem(HOME_ITEM)}</List>
 
         {NAV_GROUPS.map((group) => (
@@ -141,18 +220,21 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
                   disableSticky
                   sx={{
                     background: "transparent",
-                    lineHeight: "30px",
-                    mt: 1,
+                    lineHeight: "26px",
+                    mt: 0.75,
+                    px: 2,
                     textTransform: "uppercase",
-                    fontSize: "0.7rem",
+                    fontSize: "0.68rem",
+                    fontWeight: 600,
                     letterSpacing: "0.08em",
+                    color: "text.secondary",
                   }}
                 >
                   {group}
                 </ListSubheader>
               ) : (
                 <Box
-                  sx={{ mx: 2, my: 1, borderTop: 1, borderColor: "divider" }}
+                  sx={{ mx: 2, my: 0.75, borderTop: 1, borderColor: "divider" }}
                 />
               )
             }
@@ -162,58 +244,79 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
         ))}
       </Box>
 
-      <Tooltip title="Keyboard shortcuts (?)" placement="right">
-        <ListItemButton
-          aria-label="Keyboard shortcuts"
-          onClick={() => {
-            if (!isDesktop) onMobileClose();
-            setShortcutsOpen(true);
-          }}
-          sx={{
-            mx: 1,
-            borderRadius: 2,
-            flexGrow: 0,
-            justifyContent: expanded ? "flex-start" : "center",
-          }}
-        >
-          <Typography
-            aria-hidden="true"
-            fontWeight={700}
-            sx={{ width: 22, textAlign: "center" }}
-          >
-            ?
-          </Typography>
-          {expanded && (
-            <ListItemText primary="Keyboard shortcuts" sx={{ ml: 1 }} />
-          )}
-        </ListItemButton>
-      </Tooltip>
-      {isDesktop && (
+      <Box
+        sx={{
+          flexShrink: 0,
+          borderTop: 1,
+          borderColor: "divider",
+          pt: 0.5,
+          pb: 0.75,
+        }}
+      >
+        {expanded ? (
+          shortcutsButton
+        ) : (
+          <Tooltip title="Keyboard shortcuts (?)" placement="right">
+            <Box>{shortcutsButton}</Box>
+          </Tooltip>
+        )}
+
         <Stack
-          alignItems={expanded ? "flex-end" : "center"}
-          sx={{ p: 1, flexShrink: 0 }}
+          direction={expanded ? "row" : "column"}
+          alignItems="center"
+          justifyContent={expanded ? "space-between" : "center"}
+          gap={0.5}
+          sx={{ px: 1.25, pt: 0.25 }}
         >
           <Tooltip
-            title={expanded ? "Collapse menu" : "Expand menu"}
-            placement="right"
+            title="Source on GitHub"
+            placement={expanded ? "top" : "right"}
           >
             <IconButton
               size="small"
-              onClick={() => setNavPreference(!expanded)}
-              aria-label={expanded ? "Collapse menu" : "Expand menu"}
+              aria-label="GitHub"
+              component="a"
+              href="https://github.com/GuillaumeSD/Chesskit"
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                color: "text.secondary",
+                borderRadius: 1,
+                "&:hover": { color: "text.primary" },
+              }}
             >
-              <Icon
-                icon={
-                  expanded
-                    ? "mdi:chevron-double-left"
-                    : "mdi:chevron-double-right"
-                }
-                height={20}
-              />
+              <Icon icon="mdi:github" height={20} />
             </IconButton>
           </Tooltip>
+
+          {isDesktop && (
+            <Tooltip
+              title={expanded ? "Collapse menu" : "Expand menu"}
+              placement={expanded ? "top" : "right"}
+            >
+              <IconButton
+                size="small"
+                onClick={() => setNavPreference(!expanded)}
+                aria-label={expanded ? "Collapse menu" : "Expand menu"}
+                sx={{
+                  color: "text.secondary",
+                  borderRadius: 1,
+                  "&:hover": { color: "text.primary" },
+                }}
+              >
+                <Icon
+                  icon={
+                    expanded
+                      ? "mdi:chevron-double-left"
+                      : "mdi:chevron-double-right"
+                  }
+                  height={20}
+                />
+              </IconButton>
+            </Tooltip>
+          )}
         </Stack>
-      )}
+      </Box>
     </Stack>
   );
 

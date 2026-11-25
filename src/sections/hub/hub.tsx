@@ -1,10 +1,8 @@
-import { engineLabel } from "@/constants";
-import { useRecentGames } from "@/hooks/useGameDatabase";
+import Panel from "@/components/panel";
 import { OPENING_LINES } from "@/data/openingLines";
+import { useRecentGames } from "@/hooks/useGameDatabase";
 import { ENDGAMES } from "@/lib/endgames";
-import { useModels } from "@/hooks/useModels";
 import { statsAtom } from "@/lib/stats";
-import { engineNameAtom } from "@/sections/analysis/states";
 import { Icon } from "@iconify/react";
 import {
   Box,
@@ -20,13 +18,8 @@ import {
 import { useAtomValue, useSetAtom } from "jotai";
 import NextLink from "next/link";
 import { useRouter } from "next/router";
-import { ReactNode, useEffect } from "react";
-import { NAV_GROUPS, NAV_ITEMS, NavItem } from "../layout/navItems";
-import {
-  importDialogAtom,
-  settingsOpenAtom,
-  settingsTabAtom,
-} from "../layout/states";
+import { useEffect } from "react";
+import { importDialogAtom } from "../layout/states";
 
 const greeting = (): string => {
   const hour = new Date().getHours();
@@ -41,32 +34,58 @@ const QUICK_ACTIONS: {
   title: string;
   subtitle: string;
   href: string;
+  icon: string;
 }[] = [
   {
     id: "play",
-    title: "Play a bot",
-    subtitle: "Any strength, from beginner to Reckless",
+    title: "Play vs Bot",
+    subtitle: "Any rating, with optional live coach feedback",
     href: "/play",
+    icon: "mdi:chess-pawn",
   },
   {
     id: "analysis",
-    title: "Analyze a game",
-    subtitle: "Paste a PGN or load from Lichess",
+    title: "Analyze Game",
+    subtitle: "Deep engine lines, accuracy, and move review",
     href: "/analysis",
+    icon: "mdi:chart-line",
   },
   {
     id: "puzzles",
-    title: "Solve puzzles",
-    subtitle: "Sharpen your tactics",
+    title: "Tactics Puzzles",
+    subtitle: "Rated puzzles, daily tactics, and your mistakes",
     href: "/puzzles",
+    icon: "mdi:puzzle-outline",
   },
   {
     id: "learn",
-    title: "Learn with a coach",
-    subtitle: "See why moves work",
+    title: "Training Hub",
+    subtitle: "Openings, endgames, board vision, and review",
     href: "/learn",
+    icon: "mdi:school-outline",
   },
 ];
+
+const formatPlayer = (name?: string, rating?: number): string => {
+  const label = name?.trim() || "Unknown";
+  return rating ? `${label} (${rating})` : label;
+};
+
+const formatResult = (result?: string): string => {
+  if (!result) return "—";
+  if (result === "1/2-1/2") return "½–½";
+  return result;
+};
+
+const formatTimeControl = (tc?: string): string | undefined => {
+  if (!tc || tc === "-" || tc === "?") return undefined;
+  const match = tc.match(/^(\d+)(?:\+(\d+))?$/);
+  if (!match) return tc;
+  const baseSec = Number(match[1]);
+  const inc = match[2] ? Number(match[2]) : 0;
+  if (baseSec >= 60 && baseSec % 60 === 0) return `${baseSec / 60}+${inc}`;
+  return inc ? `${baseSec}s+${inc}` : `${baseSec}s`;
+};
 
 export default function Hub() {
   const router = useRouter();
@@ -75,95 +94,120 @@ export default function Hub() {
   useEffect(() => {
     const { gameId, lichessGameId } = router.query;
     if (gameId || lichessGameId) {
-      router.replace({ pathname: "/analysis", query: router.query });
+      void router.replace({ pathname: "/analysis", query: router.query });
     }
   }, [router]);
 
-  const quickItems = QUICK_ACTIONS.map((action) => ({
-    ...action,
-    item: NAV_ITEMS.find((item) => item.id === action.id) as NavItem,
-  }));
-
   return (
-    <Stack spacing={3} sx={{ maxWidth: 1180, mx: "auto", py: 1 }}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "flex-start", sm: "center" }}
-        gap={1}
-      >
-        <Box>
-          <Typography variant="h4" fontWeight={700}>
-            <span suppressHydrationWarning>{greeting()}</span>
-          </Typography>
-          <Typography sx={{ opacity: 0.75 }}>
-            What would you like to work on today?
-          </Typography>
-        </Box>
-        <EngineStatus />
-      </Stack>
+    <Stack spacing={3} sx={{ maxWidth: 1120, mx: "auto", py: 1 }}>
+      <Box>
+        <Typography variant="h4" fontWeight={700}>
+          <span suppressHydrationWarning>{greeting()}</span>
+        </Typography>
+        <Typography color="text.secondary">
+          Chesskit — play, analyze, and sharpen your game.
+        </Typography>
+      </Box>
 
+      {/* Compact import strip */}
       <Card
         variant="outlined"
-        sx={{
+        sx={(theme) => ({
+          borderRadius: "12px",
           borderStyle: "dashed",
-          borderWidth: 2,
-          borderColor: "primary.main",
-          backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.06),
-        }}
+          borderColor: alpha(theme.palette.primary.main, 0.5),
+          bgcolor: alpha(theme.palette.primary.main, 0.06),
+        })}
       >
         <CardActionArea
           onClick={() => setImportDialog({ open: true })}
-          sx={{ p: { xs: 2, sm: 3 } }}
+          sx={{ px: { xs: 2, sm: 2.5 }, py: 1.5 }}
         >
           <Stack
             direction={{ xs: "column", sm: "row" }}
-            alignItems="center"
-            gap={2.5}
-            textAlign={{ xs: "center", sm: "left" }}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            gap={1.5}
           >
-            <Icon
-              icon="mdi:clipboard-plus-outline"
-              height={52}
-              color="#3B9AC6"
-            />
-            <Box flexGrow={1}>
-              <Typography variant="h6" fontWeight={600}>
-                Paste or drop anything chess
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: "8px",
+                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.14),
+                color: "primary.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Icon icon="mdi:clipboard-plus-outline" height={20} />
+            </Box>
+            <Box flexGrow={1} minWidth={0}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                Import a game, position, or board screenshot
               </Typography>
-              <Typography sx={{ opacity: 0.8 }}>
-                A PGN, a FEN, a Lichess link, a PGN file or a screenshot of a
-                board. You can also press Ctrl+V on any page.
+              <Typography variant="caption" color="text.secondary">
+                Drop a file, paste PGN / FEN / Lichess link with Ctrl/⌘+V, or
+                click to open Import.
               </Typography>
             </Box>
-            <Button variant="contained" component="span" size="large">
+            <Button
+              variant="contained"
+              component="span"
+              size="small"
+              startIcon={<Icon icon="mdi:import" height={16} />}
+            >
               Import
             </Button>
           </Stack>
         </CardActionArea>
       </Card>
 
+      {/* 4 Primary Quick Actions */}
       <Grid container spacing={2}>
-        {quickItems.map(({ id, title, subtitle, href, item }) => (
-          <Grid key={id} size={{ xs: 12, sm: 6, md: 3 }}>
+        {QUICK_ACTIONS.map((action) => (
+          <Grid key={action.id} size={{ xs: 12, sm: 6, md: 3 }}>
             <Card
               variant="outlined"
-              sx={{ height: "100%", borderColor: alpha(item.accent, 0.5) }}
+              sx={{
+                height: "100%",
+                borderRadius: "12px",
+                borderColor: "divider",
+                transition: "transform 0.15s, border-color 0.15s",
+                "&:hover": {
+                  transform: "translateY(-2px)",
+                  borderColor: "primary.main",
+                },
+              }}
             >
               <CardActionArea
                 component={NextLink}
                 prefetch={false}
-                href={href}
+                href={action.href}
                 sx={{ p: 2, height: "100%" }}
               >
-                <Stack gap={1.5}>
-                  <IconBadge icon={item.icon} accent={item.accent} />
+                <Stack spacing={1.25}>
+                  <Box
+                    sx={(theme) => ({
+                      width: 40,
+                      height: 40,
+                      borderRadius: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      bgcolor: alpha(theme.palette.primary.main, 0.12),
+                      color: "primary.main",
+                    })}
+                  >
+                    <Icon icon={action.icon} height={22} />
+                  </Box>
                   <Box>
-                    <Typography fontWeight={600} fontSize="1.1rem">
-                      {title}
+                    <Typography fontWeight={600} fontSize="1rem">
+                      {action.title}
                     </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                      {subtitle}
+                    <Typography variant="body2" color="text.secondary">
+                      {action.subtitle}
                     </Typography>
                   </Box>
                 </Stack>
@@ -173,7 +217,7 @@ export default function Hub() {
         ))}
       </Grid>
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} alignItems="stretch">
         <Grid size={{ xs: 12, md: 7 }}>
           <RecentGames />
         </Grid>
@@ -181,171 +225,146 @@ export default function Hub() {
           <Progress />
         </Grid>
       </Grid>
-
-      {NAV_GROUPS.map((group) => (
-        <Box key={group}>
-          <Typography
-            variant="overline"
-            sx={{ opacity: 0.7, letterSpacing: "0.1em" }}
-          >
-            {group}
-          </Typography>
-          <Grid container spacing={2} mt={0}>
-            {NAV_ITEMS.filter((item) => item.group === group).map((item) => (
-              <Grid key={item.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                <FeatureCard item={item} />
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-      ))}
     </Stack>
-  );
-}
-
-function IconBadge({ icon, accent }: { icon: string; accent: string }) {
-  return (
-    <Box
-      sx={{
-        width: 46,
-        height: 46,
-        borderRadius: 2.5,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: alpha(accent, 0.16),
-        color: accent,
-        flexShrink: 0,
-      }}
-    >
-      <Icon icon={icon} height={26} />
-    </Box>
-  );
-}
-
-function FeatureCard({ item }: { item: NavItem }) {
-  return (
-    <Card
-      variant="outlined"
-      sx={{
-        height: "100%",
-        transition: "transform 0.15s, border-color 0.15s",
-        "&:hover": { transform: "translateY(-2px)", borderColor: item.accent },
-      }}
-    >
-      <CardActionArea
-        component={NextLink}
-        prefetch={false}
-        href={item.href}
-        sx={{ p: 2, height: "100%" }}
-      >
-        <Stack direction="row" gap={2} alignItems="flex-start">
-          <IconBadge icon={item.icon} accent={item.accent} />
-          <Box>
-            <Typography fontWeight={600}>{item.label}</Typography>
-            <Typography variant="body2" sx={{ opacity: 0.75 }}>
-              {item.description}
-            </Typography>
-          </Box>
-        </Stack>
-      </CardActionArea>
-    </Card>
-  );
-}
-
-function Panel({
-  title,
-  icon,
-  action,
-  children,
-}: {
-  title: string;
-  icon: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <Card variant="outlined" sx={{ height: "100%", p: 2 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        mb={1.5}
-      >
-        <Stack direction="row" alignItems="center" gap={1}>
-          <Icon icon={icon} height={22} />
-          <Typography fontWeight={600}>{title}</Typography>
-        </Stack>
-        {action}
-      </Stack>
-      {children}
-    </Card>
   );
 }
 
 function RecentGames() {
   const recent = useRecentGames();
-  const router = useRouter();
+  const setImportDialog = useSetAtom(importDialogAtom);
 
   return (
     <Panel
-      title="Recent games"
-      icon="mdi:history"
-      action={
+      sx={{ height: "100%", borderRadius: "12px" }}
+      title={
+        <Stack direction="row" alignItems="center" gap={1}>
+          <Icon icon="mdi:history" height={20} />
+          <Typography fontWeight={600}>Recent games</Typography>
+        </Stack>
+      }
+      actions={
         <Button
           size="small"
           component={NextLink}
           prefetch={false}
           href="/database"
+          endIcon={<Icon icon="mdi:chevron-right" height={16} />}
         >
           All games
         </Button>
       }
     >
       {recent.length === 0 ? (
-        <Typography sx={{ opacity: 0.75 }}>
-          No saved games yet. Import a PGN, or play a bot and your games will
-          show up here, ready to analyze.
-        </Typography>
+        <Stack spacing={1.5} alignItems="flex-start" py={1}>
+          <Typography variant="body2" color="text.secondary">
+            No saved games yet. Play a bot or import a PGN and your recent games
+            will appear here for instant review.
+          </Typography>
+          <Stack direction="row" gap={1} flexWrap="wrap">
+            <Button
+              size="small"
+              variant="contained"
+              component={NextLink}
+              href="/play"
+              startIcon={<Icon icon="mdi:chess-pawn" height={16} />}
+            >
+              Play a game
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<Icon icon="mdi:import" height={16} />}
+              onClick={() => setImportDialog({ open: true })}
+            >
+              Import game
+            </Button>
+          </Stack>
+        </Stack>
       ) : (
         <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
-          {recent.map((game) => (
-            <Stack
-              key={game.id}
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              gap={1}
-              py={1}
-            >
-              <Box minWidth={0}>
-                <Typography noWrap fontWeight={500}>
-                  {game.white.name} vs {game.black.name}
-                </Typography>
-                <Typography variant="body2" noWrap sx={{ opacity: 0.7 }}>
-                  {[
-                    game.result,
-                    game.date,
-                    game.hasEvaluation ? "analyzed" : undefined,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Typography>
-              </Box>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() =>
-                  router.push({
-                    pathname: "/analysis",
-                    query: { gameId: game.id },
-                  })
-                }
+          {recent.map((game) => {
+            const tc = formatTimeControl(game.timeControl);
+            const meta = [
+              game.date && game.date !== "????.??.??" ? game.date : undefined,
+              tc,
+            ]
+              .filter(Boolean)
+              .join(" · ");
+
+            return (
+              <CardActionArea
+                key={game.id}
+                component={NextLink}
+                prefetch={false}
+                href={`/analysis?gameId=${game.id}`}
+                sx={{
+                  px: 1,
+                  py: 1.25,
+                  mx: -1,
+                  width: "calc(100% + 16px)",
+                  borderRadius: 1,
+                }}
               >
-                Open
-              </Button>
-            </Stack>
-          ))}
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  gap={1.5}
+                >
+                  <Box minWidth={0} flex={1}>
+                    <Typography
+                      variant="body2"
+                      fontWeight={600}
+                      noWrap
+                      sx={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {formatPlayer(game.white?.name, game.white?.rating)} vs{" "}
+                      {formatPlayer(game.black?.name, game.black?.rating)}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      noWrap
+                      display="block"
+                      sx={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {meta || "Saved game"}
+                    </Typography>
+                  </Box>
+
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    gap={0.75}
+                    flexShrink={0}
+                  >
+                    {game.hasEvaluation && (
+                      <Chip
+                        size="small"
+                        color="success"
+                        variant="outlined"
+                        label="Analyzed"
+                        sx={{ height: 22, fontSize: "0.72rem" }}
+                      />
+                    )}
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={formatResult(game.result)}
+                      sx={{
+                        height: 22,
+                        minWidth: 46,
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    />
+                    <Icon icon="mdi:chevron-right" height={18} />
+                  </Stack>
+                </Stack>
+              </CardActionArea>
+            );
+          })}
         </Stack>
       )}
     </Panel>
@@ -356,119 +375,125 @@ function Progress() {
   const stats = useAtomValue(statsAtom);
   const { puzzles, games, openings, endgames, vision } = stats;
 
-  const tiles: { label: string; value: string; icon: string; hint: string }[] =
-    [
-      {
-        label: "Puzzle rating",
-        value: String(puzzles.rating),
-        icon: "mdi:puzzle-outline",
-        hint: `${puzzles.solved} solved · best streak ${puzzles.bestStreak}`,
-      },
-      {
-        label: "Games vs bots",
-        value: `${games.won}-${games.drawn}-${games.lost}`,
-        icon: "mdi:chess-pawn",
-        hint: `${games.played} played (won-drawn-lost)`,
-      },
-      {
-        label: "Openings learned",
-        value: `${openings.learned.length}/${OPENING_LINES.length}`,
-        icon: "mdi:book-open-page-variant-outline",
-        hint: "A clean drill adds one",
-      },
-      {
-        label: "Endgames done",
-        value: `${endgames.completed.length}/${ENDGAMES.length}`,
-        icon: "mdi:chess-king",
-        hint: "Win it or hold the draw",
-      },
-      {
-        label: "Board vision",
-        value: String(vision.bestScore),
-        icon: "mdi:eye-outline",
-        hint: `best round · ${vision.sessions} played`,
-      },
-      {
-        label: "Streak",
-        value: String(puzzles.streak),
-        icon: "mdi:fire",
-        hint: `best puzzle streak ${puzzles.bestStreak}`,
-      },
-    ];
+  const openingsLearned = OPENING_LINES.filter(({ id }) =>
+    openings.learned.includes(id)
+  ).length;
+  const endgamesDone = ENDGAMES.filter(({ id }) =>
+    endgames.completed.includes(id)
+  ).length;
+
+  const tiles: {
+    label: string;
+    value: string;
+    icon: string;
+    hint: string;
+    href: string;
+    wide?: boolean;
+  }[] = [
+    {
+      label: "Puzzle rating",
+      value: String(puzzles.rating),
+      icon: "mdi:puzzle-outline",
+      hint: `${puzzles.solved} solved · streak ${puzzles.streak} (best ${puzzles.bestStreak})`,
+      href: "/puzzles",
+      wide: true,
+    },
+    {
+      label: "Games vs bots",
+      value: `${games.won}W · ${games.drawn}D · ${games.lost}L`,
+      icon: "mdi:chess-pawn",
+      hint: `${games.played} game${games.played === 1 ? "" : "s"} played`,
+      href: "/play",
+    },
+    {
+      label: "Openings",
+      value: `${openingsLearned}/${OPENING_LINES.length}`,
+      icon: "mdi:book-open-page-variant-outline",
+      hint: "Lines learned",
+      href: "/openings",
+    },
+    {
+      label: "Endgames",
+      value: `${endgamesDone}/${ENDGAMES.length}`,
+      icon: "mdi:chess-king",
+      hint: "Challenges completed",
+      href: "/endgames",
+    },
+    {
+      label: "Board vision",
+      value: String(vision.bestScore),
+      icon: "mdi:eye-outline",
+      hint: `Best round · ${vision.sessions} played`,
+      href: "/vision",
+    },
+  ];
 
   return (
-    <Panel title="Your progress" icon="mdi:trending-up">
-      <Grid container spacing={1.5}>
+    <Panel
+      sx={{ height: "100%", borderRadius: "12px" }}
+      title={
+        <Stack direction="row" alignItems="center" gap={1}>
+          <Icon icon="mdi:trending-up" height={20} />
+          <Typography fontWeight={600}>Your progress</Typography>
+        </Stack>
+      }
+    >
+      <Grid container spacing={1.25}>
         {tiles.map((tile) => (
-          <Grid key={tile.label} size={6}>
-            <Box
+          <Grid key={tile.label} size={{ xs: tile.wide ? 12 : 6 }}>
+            <Card
+              variant="outlined"
               sx={{
-                p: 1.5,
-                borderRadius: 2,
-                border: 1,
-                borderColor: "divider",
                 height: "100%",
+                borderRadius: "10px",
+                borderColor: "divider",
+                transition: "border-color 0.15s",
+                "&:hover": { borderColor: "primary.main" },
               }}
             >
-              <Stack
-                direction="row"
-                alignItems="center"
-                gap={0.75}
-                sx={{ opacity: 0.75 }}
+              <CardActionArea
+                component={NextLink}
+                prefetch={false}
+                href={tile.href}
+                sx={{ p: 1.5, height: "100%" }}
               >
-                <Icon icon={tile.icon} height={16} />
-                <Typography variant="caption">{tile.label}</Typography>
-              </Stack>
-              <Typography variant="h5" fontWeight={700}>
-                {tile.value}
-              </Typography>
-              <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                {tile.hint}
-              </Typography>
-            </Box>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  gap={0.5}
+                >
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    gap={0.75}
+                    color="text.secondary"
+                  >
+                    <Icon icon={tile.icon} height={16} />
+                    <Typography variant="caption">{tile.label}</Typography>
+                  </Stack>
+                  <Icon icon="mdi:chevron-right" height={14} />
+                </Stack>
+                <Typography
+                  variant="h6"
+                  fontWeight={700}
+                  mt={0.25}
+                  sx={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  {tile.value}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  {tile.hint}
+                </Typography>
+              </CardActionArea>
+            </Card>
           </Grid>
         ))}
       </Grid>
     </Panel>
-  );
-}
-
-function EngineStatus() {
-  const engineName = useAtomValue(engineNameAtom);
-  const setSettingsOpen = useSetAtom(settingsOpenAtom);
-  const setSettingsTab = useSetAtom(settingsTabAtom);
-  const { bridge, refresh } = useModels();
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  const openModels = () => {
-    setSettingsTab("models");
-    setSettingsOpen(true);
-  };
-
-  return (
-    <Stack direction="row" gap={1} flexWrap="wrap">
-      <Chip
-        icon={<Icon icon="mdi:chip" height={18} />}
-        label={`Analysis: ${engineLabel(engineName).small}`}
-        variant="outlined"
-        onClick={() => setSettingsOpen(true)}
-      />
-      <Chip
-        icon={<Icon icon="mdi:lightning-bolt" height={18} />}
-        label={
-          bridge === "up"
-            ? "Reckless: ready"
-            : bridge === "down"
-              ? "Reckless: bridge off"
-              : "Reckless: checking…"
-        }
-        color={bridge === "up" ? "success" : "default"}
-        variant="outlined"
-        onClick={openModels}
-      />
-    </Stack>
   );
 }

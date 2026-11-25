@@ -109,11 +109,17 @@ export const coachAtom = storedAtom<boolean>(
   (value): value is boolean => typeof value === "boolean"
 );
 
-/** Shown beside the board during a coached game. The coach's own evaluation
- * drives it, so it has no effect without the coach. */
+/** Shown beside the board during casual Play games, independently of Coach. */
 export const playEvalBarAtom = storedAtom<boolean>(
   "play-eval-bar",
   true,
+  (value): value is boolean => typeof value === "boolean"
+);
+
+/** Allow engine suggestion/threat arrows on the board even while Coach is active (off by default). */
+export const playArrowsWithCoachAtom = storedAtom<boolean>(
+  "play-arrows-with-coach",
+  false,
   (value): value is boolean => typeof value === "boolean"
 );
 

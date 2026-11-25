@@ -6,4 +6,5 @@ export interface ChartItemData {
   cp?: number;
   mate?: number;
   moveClassification?: MoveClassification;
+  moveLabel?: string;
 }

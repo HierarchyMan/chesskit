@@ -9,11 +9,13 @@ export default function MovesNbChip({ movesNb }: Props) {
   if (!movesNb) return null;
 
   return (
-    <Tooltip title="Number of Moves" sx={{ overflow: "hidden" }}>
+    <Tooltip title="Number of moves">
       <Chip
-        icon={<Icon icon="heroicons:hashtag-20-solid" />}
+        variant="outlined"
+        icon={<Icon icon="mdi:pound" height={15} />}
         label={`${Math.ceil(movesNb / 2)} moves`}
         size="small"
+        sx={{ fontVariantNumeric: "tabular-nums" }}
       />
     </Tooltip>
   );

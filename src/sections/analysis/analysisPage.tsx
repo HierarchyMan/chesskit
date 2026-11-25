@@ -1,37 +1,27 @@
 import Board from "@/sections/analysis/board";
 import PanelHeader from "@/sections/analysis/panelHeader";
-import GameDetails from "@/sections/analysis/panelHeader/gamePanel";
+import LoadGame from "@/sections/analysis/panelHeader/loadGame";
+import AnalyzeButton from "@/sections/analysis/panelHeader/analyzeButton";
 import BoardWorkspace from "@/components/boardWorkspace";
 import PanelToolBar from "@/sections/analysis/panelToolbar";
 import AnalysisOverlayPanel from "@/sections/analysis/overlayPanel";
 import { useAnalysisOverlay } from "@/sections/analysis/hooks/useAnalysisOverlay";
 import AnalysisTab from "@/sections/analysis/panelBody/analysisTab";
+import EngineLines from "@/sections/analysis/panelBody/analysisTab/engineLines";
 import ClassificationTab from "@/sections/analysis/panelBody/classificationTab";
-import {
-  arrangeModeAtom,
-  boardAtom,
-  gameAtom,
-  gameEvalAtom,
-} from "@/sections/analysis/states";
+import { arrangeModeAtom } from "@/sections/analysis/states";
 import {
   Box,
   Alert,
   Button,
   CircularProgress,
   Stack,
-  Divider,
   Tab,
   Tabs,
 } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { Activity, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
-import TopMovesSection from "@/sections/analysis/panelBody/topMovesSection";
-import dynamic from "next/dynamic";
-const GraphTab = dynamic(
-  () => import("@/sections/analysis/panelBody/graphTab"),
-  { ssr: false }
-);
 import { PageTitle } from "@/components/pageTitle";
 import { AnalysisEngineProvider } from "./engineContext";
 import ArrangeBoard from "./arrange/arrangeBoard";
@@ -40,7 +30,7 @@ import ModeSwitch from "./arrange/modeSwitch";
 import { useArrangeMode } from "./arrange/useArrangeMode";
 import { useAnalysisSources } from "./hooks/useAnalysisSources";
 import { useAnalysisPersistence } from "./hooks/useAnalysisPersistence";
-import SessionPanel from "./sessionPanel";
+import SessionPanel, { SessionBanners } from "./sessionPanel";
 
 interface Props {
   title: string;
@@ -83,19 +73,9 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
   const [visited, setVisited] = useState(() => new Set([0]));
 
   const arrange = useAtomValue(arrangeModeAtom);
-  const gameEval = useAtomValue(gameEvalAtom);
-  const game = useAtomValue(gameAtom);
-  const board = useAtomValue(boardAtom);
   const { enterArrange } = useArrangeMode();
   // One composition for the page: the board draws it and the overlay lists it.
   const overlay = useAnalysisOverlay();
-
-  const showMovesTab = game.history().length > 0 || board.history().length > 0;
-
-  useEffect(() => {
-    if (tab === 1 && !showMovesTab) setTab(0);
-    if (tab === 2 && !gameEval) setTab(0);
-  }, [showMovesTab, gameEval, tab]);
 
   const enteredWithMode = useRef(false);
   useEffect(() => {
@@ -122,42 +102,71 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
     <>
       <PageTitle title={title} />
       <BoardWorkspace
+        inspectorMinWidth={400}
         inspectorLabel="Analysis inspector"
         board={arrange ? <ArrangeBoard /> : <Board overlay={overlay} />}
         inspector={
           <>
+            {/* Slim unified top inspector header */}
             <Stack
-              spacing={1.25}
+              spacing={0.75}
               sx={{
-                p: 1.5,
+                px: 1.25,
+                py: 0.75,
                 flexShrink: 0,
                 borderBottom: 1,
                 borderColor: "divider",
                 userSelect: "none",
               }}
             >
-              <SessionPanel />
-              {!arrange && <PanelHeader />}
-              <ModeSwitch />
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                gap={0.75}
+              >
+                <SessionPanel />
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  gap={0.35}
+                  sx={{ flexShrink: 0 }}
+                >
+                  <ModeSwitch />
+                  {!arrange && <AnalysisOverlayPanel overlay={overlay} />}
+                </Stack>
+              </Stack>
               {!arrange && (
-                <AnalysisOverlayPanel overlay={overlay} view="inspector" />
+                <Stack direction="row" alignItems="center" gap={0.75}>
+                  <LoadGame />
+                  <AnalyzeButton />
+                </Stack>
               )}
             </Stack>
+
+            {/* Conditional 3px analysis progress bar (only while analyzing) */}
+            {!arrange && <PanelHeader />}
+
+            {/* Conditional alerts, undo banner, and variation selector */}
+            <SessionBanners />
+
             {arrange ? (
               <Box
-                data-inspector-scroller
                 sx={{
-                  p: 1.5,
+                  flex: 1,
                   minHeight: 0,
-                  overflowY: "auto",
-                  overscrollBehavior: "contain",
-                  scrollbarGutter: "stable",
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
                 <ArrangePanel />
               </Box>
             ) : (
               <>
+                {/* Pinned Engine Lines (always visible above Moves / Review, collapsible) */}
+                <EngineLines overlay={overlay} />
+
+                {/* 2 clean views: Moves (default) | Review (Accuracy + Graph + Recap) */}
                 <Tabs
                   value={tab}
                   onChange={(_, value: number) => {
@@ -167,41 +176,34 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
                   aria-label="Analysis views"
                   variant="fullWidth"
                   sx={{
-                    minHeight: 38,
+                    minHeight: 36,
                     flexShrink: 0,
                     borderBottom: 1,
                     borderColor: "divider",
                     "& .MuiTab-root": {
-                      minHeight: 38,
-                      py: 0.75,
+                      minHeight: 36,
+                      py: 0.5,
                       textTransform: "none",
+                      fontSize: "0.84rem",
                     },
                   }}
                 >
                   <Tab
-                    label="Position"
+                    label="Moves"
                     id="tab0"
                     aria-controls="tabContent0"
-                    icon={<Icon icon="mdi:magnify" height={16} />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label="Moves"
-                    id="tab1"
-                    aria-controls="tabContent1"
-                    disabled={!showMovesTab}
                     icon={<Icon icon="mdi:format-list-bulleted" height={16} />}
                     iconPosition="start"
                   />
                   <Tab
-                    label="Graph"
-                    id="tab2"
-                    aria-controls="tabContent2"
-                    disabled={!gameEval}
+                    label="Review"
+                    id="tab1"
+                    aria-controls="tabContent1"
                     icon={<Icon icon="mdi:chart-line" height={16} />}
                     iconPosition="start"
                   />
                 </Tabs>
+
                 <Box
                   sx={{
                     flex: 1,
@@ -211,7 +213,7 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
                     gridTemplateRows: "minmax(0, 1fr)",
                   }}
                 >
-                  {[0, 1, 2].map((view) => (
+                  {[0, 1].map((view) => (
                     <Box
                       key={view}
                       id={`tabContent${view}`}
@@ -225,49 +227,34 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
                         overflowY: "auto",
                         minWidth: 0,
                         minHeight: 0,
-                        p: 1.5,
+                        p: 1.25,
                         overscrollBehavior: "contain",
                         scrollbarGutter: "stable",
                       }}
                     >
                       <Activity mode={tab === view ? "visible" : "hidden"}>
                         {visited.has(view) && view === 0 && (
-                          <>
-                            {game.getHeaders().White &&
-                              game.getHeaders().White !== "?" && (
-                                <Box
-                                  component="details"
-                                  sx={{
-                                    mb: 1.5,
-                                    "& summary": {
-                                      cursor: "pointer",
-                                      fontSize: "0.85rem",
-                                      color: "text.secondary",
-                                      py: 0.5,
-                                      userSelect: "none",
-                                    },
-                                  }}
-                                >
-                                  <summary>Game details</summary>
-                                  <GameDetails />
-                                </Box>
-                              )}
-                            <AnalysisTab hidden={tab !== 0} />
-                            <TopMovesSection />
-                          </>
+                          <AnalysisTab hidden={tab !== 0} />
                         )}
                         {visited.has(view) && view === 1 && (
                           <ClassificationTab hidden={tab !== 1} />
-                        )}
-                        {visited.has(view) && view === 2 && gameEval && (
-                          <GraphTab hidden={tab !== 2} />
                         )}
                       </Activity>
                     </Box>
                   ))}
                 </Box>
-                <Box sx={{ px: 1, py: 0.5, flexShrink: 0, userSelect: "none" }}>
-                  <Divider sx={{ mb: 0.5 }} />
+
+                {/* Docked compact utility footer */}
+                <Box
+                  sx={{
+                    px: 1,
+                    py: 0.5,
+                    flexShrink: 0,
+                    borderTop: 1,
+                    borderColor: "divider",
+                    userSelect: "none",
+                  }}
+                >
                   <PanelToolBar />
                 </Box>
               </>

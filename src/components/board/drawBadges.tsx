@@ -1,8 +1,7 @@
 import { Orientation, squareCenter } from "@/lib/arrows/geometry";
 import { BoardDraw } from "@/lib/boardDraw";
-import { useAtomValue } from "jotai";
-import Image from "next/image";
-import { pieceSetAtom } from "./states";
+
+const clampPercent = (value: number) => Math.min(96.5, Math.max(3.5, value));
 
 /** A terminal result is board state, independent of engine/annotation toggles. */
 export default function DrawBadges({
@@ -12,10 +11,12 @@ export default function DrawBadges({
   result: BoardDraw | null;
   orientation: Orientation;
 }) {
-  const pieceSet = useAtomValue(pieceSetAtom);
   if (!result) return null;
   return result.kings.map((king) => {
     const { x, y } = squareCenter(king.square, orientation);
+    const left = clampPercent((x + 0.38) * 12.5);
+    const top = clampPercent((y - 0.38) * 12.5);
+
     return (
       <span
         key={king.square}
@@ -25,35 +26,30 @@ export default function DrawBadges({
         title={result.reason}
         style={{
           position: "absolute",
-          left: `${(x + 0.4) * 12.5}%`,
-          top: `${(y - 0.4) * 12.5}%`,
+          left: `${left}%`,
+          top: `${top}%`,
           transform: "translate(-50%, -50%)",
-          width: "max(12px, 4.75%)",
+          width: "max(16px, 5.2%)",
           aspectRatio: "1",
           borderRadius: "50%",
-          backgroundColor: "#a0a0a0",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.5)",
+          backgroundColor: "#6e737d",
+          color: "#ffffff",
+          border: "1.5px solid rgba(255, 255, 255, 0.92)",
+          boxShadow: "0 1px 4px rgba(0, 0, 0, 0.48)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          fontWeight: 800,
+          fontSize:
+            "max(9px, min(14px, calc(var(--board-size, 400px) * 0.027)))",
+          lineHeight: 1,
+          letterSpacing: "-0.04em",
           pointerEvents: "none",
           userSelect: "none",
           zIndex: 21,
         }}
       >
-        <Image
-          src={`/piece/${pieceSet}/${king.color}K.svg`}
-          alt=""
-          width={40}
-          height={40}
-          draggable={false}
-          style={{
-            width: "90%",
-            height: "90%",
-            objectFit: "contain",
-            transform: "rotate(90deg)",
-          }}
-        />
+        ½
       </span>
     );
   });

@@ -19,14 +19,19 @@ import {
 } from "../sessionAtoms";
 import { loadGameFromText } from "@/lib/pgn";
 import { useGameDatabase } from "@/hooks/useGameDatabase";
-import { LoadingButton } from "@mui/lab";
+import { Button, Tooltip } from "@mui/material";
 import { logAnalyticsEvent } from "@/lib/firebase";
 import { SavedEvals } from "@/types/eval";
 import { useEffect, useCallback } from "react";
 import { usePlayersData } from "@/hooks/usePlayersData";
 import { useAnalysisEngine } from "../engineContext";
 
-export default function AnalyzeButton() {
+interface Props {
+  label?: string;
+  fullWidth?: boolean;
+}
+
+export default function AnalyzeButton({ label, fullWidth = false }: Props) {
   const store = useStore();
   const setError = useSetAtom(analysisSourceErrorAtom);
   const activeRequest = useAtomValue(analysisFullRequestAtom);
@@ -45,8 +50,9 @@ export default function AnalyzeButton() {
   const setSavedEvals = useSetAtom(savedEvalsAtom);
   const { white, black } = usePlayersData(gameAtom);
 
-  const readyToAnalyse =
-    engine?.getIsReady() && game.history().length > 0 && !evaluationProgress;
+  const hasMoves = game.history().length > 0;
+  const engineReady = !!engine?.getIsReady();
+  const readyToAnalyse = engineReady && hasMoves && !evaluationProgress;
 
   const handleAnalyze = useCallback(async () => {
     if (store.get(analysisFullRequestAtom)) return;
@@ -150,42 +156,53 @@ export default function AnalyzeButton() {
     setEvaluationProgress(0);
   }, [engine, setEvaluationProgress]);
 
-  // Live position analysis is automatic; a full-line analysis is explicit so
-  // exploring a new continuation does not restart a game-wide search each move.
+  const isDisabled = !activeRequest && !readyToAnalyse;
+  const tooltip = activeRequest
+    ? "Stop full game analysis"
+    : !hasMoves
+      ? "Play or load moves to analyze"
+      : !engineReady
+        ? "Waiting for engine to start…"
+        : gameEval
+          ? "Re-run full game analysis"
+          : "Run full game analysis";
+
+  const idleLabel = label ?? (gameEval ? "Re-analyze" : "Analyze");
 
   return (
-    <LoadingButton
-      variant="contained"
-      size="small"
-      startIcon={
-        <Icon
-          icon={
-            activeRequest ? "mdi:stop" : "streamline:magnifying-glass-solid"
+    <Tooltip title={tooltip} disableInteractive>
+      <span style={{ display: fullWidth ? "block" : "inline-flex" }}>
+        <Button
+          fullWidth={fullWidth}
+          variant={activeRequest ? "outlined" : "contained"}
+          color={activeRequest ? "error" : "primary"}
+          size="small"
+          startIcon={
+            <Icon
+              icon={activeRequest ? "mdi:stop" : "mdi:chart-line"}
+              height={16}
+            />
           }
-          height={16}
-        />
-      }
-      onClick={() => {
-        if (activeRequest) {
-          store.set(analysisFullRequestAtom, null);
-          setEvaluationProgress(0);
-          engineState.retry();
-        } else void handleAnalyze();
-      }}
-      disabled={!activeRequest && !readyToAnalyse}
-      sx={{
-        minHeight: 36,
-        minWidth: 136,
-        borderRadius: "6px",
-        whiteSpace: "nowrap",
-        fontVariantNumeric: "tabular-nums",
-      }}
-    >
-      {activeRequest
-        ? `Stop${evaluationProgress ? ` (${Math.round(evaluationProgress)}%)` : " analysis"}`
-        : gameEval
-          ? "Analyze again"
-          : "Analyze line"}
-    </LoadingButton>
+          onClick={() => {
+            if (activeRequest) {
+              store.set(analysisFullRequestAtom, null);
+              setEvaluationProgress(0);
+              engineState.retry();
+            } else void handleAnalyze();
+          }}
+          disabled={isDisabled}
+          sx={{
+            minHeight: 32,
+            px: 1.25,
+            whiteSpace: "nowrap",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {activeRequest
+            ? `Stop${evaluationProgress ? ` (${Math.round(evaluationProgress)}%)` : ""}`
+            : idleLabel}
+        </Button>
+      </span>
+    </Tooltip>
   );
 }

@@ -43,7 +43,10 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
   const engine = engineState.engine;
 
   useEffect(() => {
-    setUpdate({ evaluations: new Map(), busy: false });
+    if (!started) {
+      setUpdate({ evaluations: new Map(), busy: false });
+      return;
+    }
     if (!engine || engine.name !== engineName || !enabled) return;
 
     const current = new ArenaAnalysisSession(
@@ -54,7 +57,14 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
           multiPv,
           useCloudEval: false,
         }),
-      (value) => setUpdate({ ...value, source: engine })
+      (value) =>
+        setUpdate((prev) => {
+          const merged =
+            prev.source === engine
+              ? new Map([...prev.evaluations, ...value.evaluations])
+              : value.evaluations;
+          return { ...value, evaluations: merged, source: engine };
+        })
     );
     session.current = current;
     return () => {
@@ -63,7 +73,7 @@ export function useArenaAnalysis(game: Chess, started: boolean) {
       // This instance belongs only to the evaluator, never either player.
       void engine.stopAllCurrentJobs();
     };
-  }, [engine, engineName, enabled, depth, multiPv]);
+  }, [started, engine, engineName, enabled, depth, multiPv]);
 
   useEffect(() => {
     if (enabled) session.current?.update(game, showAnnotations, showArrows);

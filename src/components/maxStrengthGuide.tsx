@@ -16,7 +16,11 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
+  IconButton,
+  InputLabel,
   MenuItem,
+  OutlinedInput,
   Select,
   Slider,
   Stack,
@@ -55,14 +59,17 @@ function Step({
           color: "primary.contrastText",
           display: "grid",
           placeItems: "center",
-          fontSize: 14,
-          fontWeight: 600,
+          fontSize: 13,
+          fontWeight: 700,
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {number}
       </Box>
       <Stack spacing={0.75} sx={{ minWidth: 0, flexGrow: 1 }}>
-        <Typography variant="subtitle2">{title}</Typography>
+        <Typography variant="subtitle2" fontWeight={700}>
+          {title}
+        </Typography>
         {children}
       </Stack>
     </Stack>
@@ -70,7 +77,11 @@ function Step({
 }
 
 const Note = ({ children }: { children: ReactNode }) => (
-  <Typography variant="body2" sx={{ opacity: 0.8 }}>
+  <Typography
+    variant="body2"
+    color="text.secondary"
+    sx={{ fontVariantNumeric: "tabular-nums" }}
+  >
     {children}
   </Typography>
 );
@@ -106,10 +117,21 @@ export default function MaxStrengthGuide({
       fullScreen={fullScreen}
       maxWidth="sm"
       fullWidth
+      scroll="paper"
     >
-      <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <DialogTitle
+        sx={{ display: "flex", alignItems: "center", gap: 1, pr: 2 }}
+      >
         <Icon icon="mdi:rocket-launch-outline" height={22} />
-        Getting maximum strength
+        <Box sx={{ flexGrow: 1 }}>Getting maximum strength</Box>
+        <IconButton
+          onClick={onClose}
+          aria-label="Close"
+          edge="end"
+          size="small"
+        >
+          <Icon icon="mdi:close" height={20} />
+        </IconButton>
       </DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2.5}>
@@ -148,6 +170,7 @@ export default function MaxStrengthGuide({
             </Note>
             <Box px={1}>
               <Slider
+                size="small"
                 value={thinkMs}
                 min={MIN_FULL_STRENGTH_MS}
                 max={MAX_FULL_STRENGTH_MS}
@@ -171,19 +194,22 @@ export default function MaxStrengthGuide({
               need more. Each engine keeps it within what it supports, and every
               analysis thread has its own.
             </Note>
-            <Select
-              size="small"
-              value={HASH_CHOICES.includes(hashMb) ? hashMb : 16}
-              onChange={(event) => setHashMb(Number(event.target.value))}
-              sx={{ width: 160 }}
-              aria-label="Engine hash size"
-            >
-              {HASH_CHOICES.map((mb) => (
-                <MenuItem key={mb} value={mb}>
-                  {mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`}
-                </MenuItem>
-              ))}
-            </Select>
+            <FormControl size="small" sx={{ width: 160 }}>
+              <InputLabel id="max-strength-hash-label">Hash size</InputLabel>
+              <Select
+                labelId="max-strength-hash-label"
+                input={<OutlinedInput label="Hash size" />}
+                value={HASH_CHOICES.includes(hashMb) ? hashMb : 16}
+                onChange={(event) => setHashMb(Number(event.target.value))}
+                sx={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {HASH_CHOICES.map((mb) => (
+                  <MenuItem key={mb} value={mb}>
+                    {mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Step>
 
           <Step number={5} title="Native engines: use more threads">
@@ -193,6 +219,7 @@ export default function MaxStrengthGuide({
             </Note>
             <Box px={1}>
               <Slider
+                size="small"
                 value={threads}
                 min={1}
                 max={Math.max(recommendedNativeThreads() + 1, 2)}
@@ -206,8 +233,8 @@ export default function MaxStrengthGuide({
 
           <Step number={6} title="For analysis: search deeper, use your engine">
             <Note>
-              Analysis stops at the search depth set in Settings (now {depth}
-              ). Lichess cloud evaluations are fast but come from another engine
+              Analysis stops at the search depth set in Settings (now {depth}).
+              Lichess cloud evaluations are fast but come from another engine
               and depth.
             </Note>
             <Stack direction="row" alignItems="center" gap={1}>
@@ -221,10 +248,11 @@ export default function MaxStrengthGuide({
           </Step>
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
+      <DialogActions sx={{ px: 2.5, py: 1.5, flexWrap: "wrap", gap: 1 }}>
         <Typography
           variant="caption"
-          sx={{ flexGrow: 1, opacity: 0.75, pl: 1 }}
+          color="text.secondary"
+          sx={{ flexGrow: 1, fontVariantNumeric: "tabular-nums" }}
         >
           Applies 10 s per move, 256 MB hash, {recommendedNativeThreads()}{" "}
           threads, depth {Math.max(depth, MAX_STRENGTH.depth)} and no cloud.

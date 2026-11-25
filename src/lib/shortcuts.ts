@@ -13,9 +13,11 @@ export type ShortcutScope =
   | "Global"
   | "Play"
   | "Analysis"
+  | "Arena"
   | "Puzzles"
   | "Openings"
   | "Vision"
+  | "Scan"
   | "Arrows overlay";
 
 export interface Shortcut {
@@ -27,9 +29,11 @@ export const SHORTCUT_SCOPES: readonly ShortcutScope[] = [
   "Global",
   "Play",
   "Analysis",
+  "Arena",
   "Puzzles",
   "Openings",
   "Vision",
+  "Scan",
   "Arrows overlay",
 ];
 
@@ -63,11 +67,19 @@ export const SHORTCUTS: Record<ShortcutScope, readonly Shortcut[]> = {
     { keys: ["Wheel over board"], label: "Step through moves" },
     { keys: ["f"], label: "Flip the board" },
     { keys: ["t"], label: "Show or hide the top moves" },
-    { keys: ["Mod+Z"], label: "Undo a change on the Arrange board" },
+    { keys: ["Mod+Z"], label: "Undo a change on the Board Editor" },
     {
       keys: ["Mod+Y", "Mod+Shift+Z"],
-      label: "Redo a change on the Arrange board",
+      label: "Redo a change on the Board Editor",
     },
+  ],
+  Arena: [
+    { keys: ["ArrowLeft"], label: "Previous move" },
+    { keys: ["ArrowRight"], label: "Next move" },
+    { keys: ["Home"], label: "Back to the start position" },
+    { keys: ["End"], label: "Jump to the live position" },
+    { keys: [" "], label: "Pause or resume auto-play" },
+    { keys: ["f"], label: "Flip the board" },
   ],
   Puzzles: [
     { keys: ["h"], label: "Show a hint while solving" },
@@ -86,8 +98,12 @@ export const SHORTCUTS: Record<ShortcutScope, readonly Shortcut[]> = {
   ],
   Vision: [
     { keys: ["a-h", "1-8"], label: "Name a square: type its file, then rank" },
-    { keys: ["l", "d"], label: "Square colour: light or dark" },
+    { keys: ["l", "d"], label: "Square color: light or dark" },
     { keys: ["Backspace"], label: "Knight route: undo the last square" },
+  ],
+  Scan: [
+    { keys: ["Mod+V"], label: "Paste a screenshot or photo of a chess board" },
+    { keys: ["Drop image"], label: "Load a board image from your computer" },
   ],
   "Arrows overlay": [
     { keys: ["a"], label: "Turn engine arrows on or off" },
@@ -106,13 +122,18 @@ export function scopeForPath(pathname: string): ShortcutScope | null {
     case "play":
       return "Play";
     case "analysis":
+    case "editor":
       return "Analysis";
+    case "arena":
+      return "Arena";
     case "puzzles":
       return "Puzzles";
     case "openings":
       return "Openings";
     case "vision":
       return "Vision";
+    case "scan":
+      return "Scan";
     default:
       return null;
   }

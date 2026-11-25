@@ -237,8 +237,8 @@ describe("pace", () => {
     assert.ok(!isMoveTime(undefined));
   });
 
-  it("gives about a second and a half before the opponent replies", () => {
-    assert.ok(PUZZLE_PACE.reply >= 1500);
+  it("uses a crisp, readable delay before the opponent replies", () => {
+    assert.ok(PUZZLE_PACE.reply >= 350 && PUZZLE_PACE.reply <= 1000);
   });
 });
 

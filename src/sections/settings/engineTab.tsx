@@ -1,5 +1,9 @@
 import { EngineField } from "@/components/enginePicker";
 import MaxStrengthGuide from "@/components/maxStrengthGuide";
+import {
+  engineAdvancedOpenAtom,
+  engineSettingsSectionAtom,
+} from "../layout/states";
 import { DEFAULT_ENGINE, engineLabel } from "@/constants";
 import {
   useEffectiveAdvice,
@@ -377,7 +381,7 @@ function InheritSettingsGroup<T extends SettingsInheritMode>({
           px: 1.25,
           py: 0.75,
           minHeight: 34,
-          borderRadius: 1.25,
+          borderRadius: 1,
           border: 1,
           borderStyle: inherited ? "dashed" : "solid",
           borderColor: inherited ? "divider" : "transparent",
@@ -407,7 +411,7 @@ function InheritSettingsGroup<T extends SettingsInheritMode>({
         aria-disabled={inherited}
         sx={{
           p: 1.5,
-          borderRadius: 1.5,
+          borderRadius: 1,
           border: 1,
           borderColor: "divider",
           bgcolor: inherited ? "action.disabledBackground" : "transparent",
@@ -485,9 +489,11 @@ function SectionHeader({
 export default function EngineTab() {
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("sm"));
-  const [section, setSection] = useState<EngineSectionId>("analysis");
+  const [rawSection, setRawSection] = useAtom(engineSettingsSectionAtom);
+  const section = rawSection as EngineSectionId;
+  const setSection = (next: EngineSectionId) => setRawSection(next);
   const [guideOpen, setGuideOpen] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
+  const [advanced, setAdvanced] = useAtom(engineAdvancedOpenAtom);
 
   // Analysis & Editor
   const [engineName, setEngineName] = useAtom(engineNameAtom);
@@ -1313,7 +1319,7 @@ export default function EngineTab() {
               </InputLabel>
               <Select
                 labelId="bot-reply-speed-label"
-                label="Play reply pace"
+                input={<OutlinedInput label="Play reply pace" />}
                 value={botSpeed}
                 onChange={(event) =>
                   setBotSpeed(event.target.value as BotReplySpeed)
@@ -1472,7 +1478,7 @@ export default function EngineTab() {
           Search presets
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Set search effort across ChessKit. Each role keeps its engine and
+          Set search effort across Chesskit. Each role keeps its engine and
           inheritance choices.
         </Typography>
       </Box>
@@ -1480,52 +1486,112 @@ export default function EngineTab() {
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
-          gap: 1,
+          gap: 1.25,
         }}
       >
-        {ENGINE_PRESET_IDS.map((id) => (
-          <ButtonBase
-            key={id}
-            aria-pressed={currentPreset === id}
-            onClick={() => applyPreset(id)}
-            sx={{
-              display: "block",
-              textAlign: "left",
-              p: 1.5,
-              border: 1,
-              borderRadius: 2,
-              borderColor: currentPreset === id ? "primary.main" : "divider",
-              bgcolor:
-                currentPreset === id ? "action.selected" : "background.paper",
-              "&:hover": { bgcolor: "action.hover" },
-              "&.Mui-focusVisible": {
-                outline: "2px solid",
-                outlineColor: "primary.main",
-                outlineOffset: 2,
-              },
-            }}
-          >
-            <Typography fontWeight={700} variant="body2">
-              {ENGINE_PRESET_LABELS[id]}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {ENGINE_PRESET_DESCRIPTIONS[id]}
-            </Typography>
-          </ButtonBase>
-        ))}
+        {ENGINE_PRESET_IDS.map((id) => {
+          const active = currentPreset === id;
+          return (
+            <ButtonBase
+              key={id}
+              aria-pressed={active}
+              onClick={() => applyPreset(id)}
+              sx={{
+                display: "block",
+                textAlign: "left",
+                p: 1.5,
+                border: 1,
+                borderRadius: 1,
+                borderColor: active ? "primary.main" : "divider",
+                bgcolor: active
+                  ? (t) => alpha(t.palette.primary.main, 0.12)
+                  : "background.paper",
+                "&:hover": {
+                  bgcolor: active
+                    ? (t) => alpha(t.palette.primary.main, 0.18)
+                    : "action.hover",
+                },
+                "&.Mui-focusVisible": {
+                  outline: "2px solid",
+                  outlineColor: "primary.main",
+                  outlineOffset: 2,
+                },
+              }}
+            >
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                gap={0.75}
+              >
+                <Typography
+                  fontWeight={700}
+                  variant="body2"
+                  color={active ? "primary.main" : "text.primary"}
+                >
+                  {ENGINE_PRESET_LABELS[id]}
+                </Typography>
+                {active && <Icon icon="mdi:check-circle" height={16} />}
+              </Stack>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.25, display: "block" }}
+              >
+                {ENGINE_PRESET_DESCRIPTIONS[id]}
+              </Typography>
+            </ButtonBase>
+          );
+        })}
       </Box>
-      <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="caption" role="status" color="text.secondary">
-          {currentPreset === "custom"
-            ? "Custom search settings"
-            : `${ENGINE_PRESET_LABELS[currentPreset]} search settings`}
-        </Typography>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={1}
+        flexWrap="wrap"
+      >
+        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+          <Typography variant="caption" role="status" color="text.secondary">
+            {currentPreset === "custom"
+              ? "Custom search settings"
+              : `${ENGINE_PRESET_LABELS[currentPreset]} search settings`}
+          </Typography>
+          <Button
+            size="small"
+            color="inherit"
+            startIcon={<Icon icon="mdi:rocket-launch-outline" height={16} />}
+            onClick={() => setGuideOpen(true)}
+            sx={{ fontSize: "0.78rem" }}
+          >
+            Max strength guide
+          </Button>
+          {modifiedCount > 0 && (
+            <Button
+              size="small"
+              color="warning"
+              startIcon={<Icon icon="mdi:restore" height={16} />}
+              onClick={resetAll}
+              sx={{ fontSize: "0.78rem" }}
+            >
+              Reset all ({modifiedCount})
+            </Button>
+          )}
+        </Stack>
         <Button
+          size="small"
+          variant={advanced ? "outlined" : "text"}
           aria-expanded={advanced}
           aria-controls="advanced-engine-settings"
+          endIcon={
+            <Icon
+              icon={advanced ? "mdi:chevron-up" : "mdi:chevron-down"}
+              height={18}
+            />
+          }
           onClick={() => setAdvanced(!advanced)}
         >
-          {advanced ? "Hide advanced settings" : "Advanced settings"}
+          {advanced ? "Hide advanced" : "Advanced settings"}
         </Button>
       </Stack>
       <Collapse in={advanced} unmountOnExit id="advanced-engine-settings">
@@ -1534,7 +1600,7 @@ export default function EngineTab() {
             display: "flex",
             flexDirection: isCompact ? "column" : "row",
             gap: isCompact ? 2 : 0,
-            minHeight: isCompact ? undefined : 480,
+            minHeight: isCompact ? undefined : 460,
             mx: isCompact ? 0 : -1,
           }}
         >
@@ -1557,7 +1623,26 @@ export default function EngineTab() {
                     clickable
                     size="small"
                     icon={<Icon icon={item.icon} height={15} />}
-                    label={item.shortLabel}
+                    label={
+                      <Stack direction="row" alignItems="center" gap={0.6}>
+                        <span>{item.shortLabel}</span>
+                        {item.modified && (
+                          <Box
+                            component="span"
+                            title="Customized from default"
+                            sx={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              bgcolor: active
+                                ? "primary.contrastText"
+                                : "primary.main",
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                      </Stack>
+                    }
                     color={active ? "primary" : "default"}
                     variant={active ? "filled" : "outlined"}
                     onClick={() => setSection(item.id)}
@@ -1592,7 +1677,7 @@ export default function EngineTab() {
                       selected={active}
                       onClick={() => setSection(item.id)}
                       sx={{
-                        borderRadius: 1.5,
+                        borderRadius: 1,
                         mb: 0.5,
                         px: 1.25,
                         py: 0.85,
@@ -1674,7 +1759,7 @@ export default function EngineTab() {
                       selected={active}
                       onClick={() => setSection(item.id)}
                       sx={{
-                        borderRadius: 1.5,
+                        borderRadius: 1,
                         mb: 0.5,
                         px: 1.25,
                         py: 0.85,

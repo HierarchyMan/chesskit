@@ -14,9 +14,16 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Stack,
+  Tab,
+  Tabs,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { useAtom } from "jotai";
 import Image from "next/image";
@@ -25,6 +32,11 @@ import { useEffect, useRef, useState } from "react";
 import { importDialogAtom } from "../layout/states";
 import { useParsedInput } from "@/hooks/useParsedInput";
 import PgnGameList from "../loadGame/pgnGameList";
+import ChessComInput from "../loadGame/chessComInput";
+import LichessInput from "../loadGame/lichessInput";
+
+type ImportTab = "paste" | "chesscom" | "lichess";
+type SourceAction = "analysis" | "learn" | "save";
 
 interface LichessState {
   status: "idle" | "loading" | "done" | "error";
@@ -32,12 +44,21 @@ interface LichessState {
   error?: string;
 }
 
+interface NoticeState {
+  severity: "success" | "info" | "error";
+  text: string;
+}
+
 export default function SmartImportDialog() {
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const [dialog, setDialog] = useAtom(importDialogAtom);
+  const [tab, setTab] = useState<ImportTab>("paste");
+  const [sourceAction, setSourceAction] = useState<SourceAction>("analysis");
   const [text, setText] = useState("");
   const [image, setImage] = useState<string | undefined>(undefined);
   const [lichess, setLichess] = useState<LichessState>({ status: "idle" });
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<NoticeState | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { addGames } = useGameDatabase();
@@ -45,18 +66,27 @@ export default function SmartImportDialog() {
   useEffect(() => {
     if (!dialog.open) return;
 
+    if (dialog.initialText || dialog.initialImage) {
+      setTab("paste");
+    }
     setText(dialog.initialText ?? "");
     setImage(dialog.initialImage);
     setLichess({ status: "idle" });
-    setNotice("");
+    setNotice(null);
   }, [dialog]);
 
   const {
     detected,
     loading: parsing,
     error: inputError,
-  } = useParsedInput(image ? "" : text, dialog.open);
-  const { detected: fetched } = useParsedInput(lichess.pgn ?? "", dialog.open);
+  } = useParsedInput(
+    tab === "paste" && !image ? text : "",
+    dialog.open && tab === "paste"
+  );
+  const { detected: fetched } = useParsedInput(
+    lichess.pgn ?? "",
+    dialog.open && tab === "paste"
+  );
 
   const lichessId = detected.kind === "lichess" ? detected.id : undefined;
 
@@ -89,13 +119,18 @@ export default function SmartImportDialog() {
     router.push(path);
   };
 
-  const openPgn = (pgn: string, path: string) => {
+  const openPgn = (
+    pgn: string,
+    path: string,
+    orientation?: "white" | "black"
+  ) => {
     setHandoff(
       {
         kind: "pgn",
         pgn,
         orientation:
-          detected.kind === "lichess" ? detected.orientation : undefined,
+          orientation ??
+          (detected.kind === "lichess" ? detected.orientation : undefined),
       },
       path
     );
@@ -107,17 +142,55 @@ export default function SmartImportDialog() {
     go(path);
   };
 
-  const saveGames = async (games: ParsedGame[]) => {
+  const savePgnStrings = async (pgns: string[]) => {
     try {
-      const { saved, errors } = await addGames(
-        games.filter((game) => !game.error).map((game) => game.pgn)
-      );
-      setNotice(
-        `Saved ${saved} game${saved === 1 ? "" : "s"} to your database.${errors.length ? ` ${errors.length} could not be saved.` : ""}`
-      );
+      const { saved, errors } = await addGames(pgns);
+      if (saved === 0 && errors.length > 0) {
+        setNotice({
+          severity: "error",
+          text: `Could not save game${pgns.length === 1 ? "" : "s"}: ${errors[0]}`,
+        });
+        return;
+      }
+      setNotice({
+        severity: errors.length > 0 ? "info" : "success",
+        text: `Saved ${saved} game${saved === 1 ? "" : "s"} to your database.${errors.length ? ` ${errors.length} could not be saved.` : ""}`,
+      });
     } catch (error) {
-      setNotice(String(error));
+      setNotice({
+        severity: "error",
+        text: error instanceof Error ? error.message : String(error),
+      });
     }
+  };
+
+  const saveGames = async (games: ParsedGame[]) => {
+    await savePgnStrings(
+      games.filter((game) => !game.error).map((game) => game.pgn)
+    );
+  };
+
+  const handleExternalGameSelect = async (
+    pgn: string,
+    boardOrientation?: boolean
+  ) => {
+    const orientation: "white" | "black" | undefined =
+      boardOrientation === undefined
+        ? undefined
+        : boardOrientation
+          ? "white"
+          : "black";
+
+    if (sourceAction === "save") {
+      await savePgnStrings([pgn]);
+      return;
+    }
+
+    openPgn(
+      pgn,
+      sourceAction === "learn" ? "/learn" : "/analysis",
+      orientation
+    );
   };
 
   const readFile = (file: File) => {
@@ -153,7 +226,10 @@ export default function SmartImportDialog() {
       setImage(undefined);
       setText(await navigator.clipboard.readText());
     } catch {
-      setNotice("Your browser blocked clipboard access. Press Ctrl+V instead.");
+      setNotice({
+        severity: "info",
+        text: "Your browser blocked clipboard access. Press Ctrl/⌘+V instead.",
+      });
     }
   };
 
@@ -170,174 +246,280 @@ export default function SmartImportDialog() {
     <Dialog
       open={dialog.open}
       onClose={close}
+      fullScreen={isSmall}
       fullWidth
       maxWidth="sm"
       scroll="paper"
     >
-      <DialogTitle>Import</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} pt={0.5}>
-          <TextField
-            autoFocus
-            multiline
-            minRows={4}
-            maxRows={9}
-            value={text}
-            onChange={(event) => {
-              setImage(undefined);
-              setText(event.target.value);
-            }}
-            placeholder="Paste a PGN, a FEN, or a Lichess game link. You can also drop a PGN file or a picture of a board anywhere."
-            slotProps={{ htmlInput: { "aria-label": "Text to import" } }}
-          />
+      <DialogTitle
+        sx={{ display: "flex", alignItems: "center", gap: 1, pb: 1, pr: 2 }}
+      >
+        <Icon icon="mdi:clipboard-plus-outline" height={22} />
+        <Box sx={{ flexGrow: 1 }}>Import</Box>
+        <IconButton onClick={close} aria-label="Close" edge="end" size="small">
+          <Icon icon="mdi:close" height={20} />
+        </IconButton>
+      </DialogTitle>
 
-          <Stack direction="row" gap={1} flexWrap="wrap">
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<Icon icon="mdi:content-paste" height={18} />}
-              onClick={pasteFromClipboard}
-            >
-              Paste from clipboard
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<Icon icon="mdi:upload" height={18} />}
-              onClick={() => fileInput.current?.click()}
-            >
-              Choose a file
-            </Button>
-            <input
-              ref={fileInput}
-              type="file"
-              hidden
-              accept=".pgn,.txt,image/*"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) readFile(file);
-                event.target.value = "";
-              }}
-            />
-          </Stack>
+      <Tabs
+        value={tab}
+        onChange={(_, next: ImportTab) => {
+          setTab(next);
+          setNotice(null);
+        }}
+        variant="fullWidth"
+        sx={{ px: 1, borderBottom: 1, borderColor: "divider", flexShrink: 0 }}
+      >
+        <Tab
+          value="paste"
+          label="Paste / File / Image"
+          icon={<Icon icon="mdi:content-paste" height={18} />}
+          iconPosition="start"
+          sx={{ minHeight: 44 }}
+        />
+        <Tab
+          value="chesscom"
+          label="Chess.com"
+          icon={<Icon icon="mdi:chess-pawn" height={18} />}
+          iconPosition="start"
+          sx={{ minHeight: 44 }}
+        />
+        <Tab
+          value="lichess"
+          label="Lichess"
+          icon={<Icon icon="mdi:chess-knight" height={18} />}
+          iconPosition="start"
+          sx={{ minHeight: 44 }}
+        />
+      </Tabs>
 
-          {inputError && <Alert severity="error">{inputError}</Alert>}
+      <DialogContent dividers>
+        <Stack spacing={2}>
           {notice && (
-            <Alert severity="info" onClose={() => setNotice("")}>
-              {notice}
+            <Alert severity={notice.severity} onClose={() => setNotice(null)}>
+              {notice.text}
             </Alert>
           )}
 
-          {image && (
-            <Stack spacing={1.5} alignItems="center">
-              <Box
-                sx={{
-                  position: "relative",
-                  width: "100%",
-                  height: 220,
-                  borderRadius: 2,
-                  overflow: "hidden",
-                  border: 1,
-                  borderColor: "divider",
+          <Box sx={{ display: tab === "paste" ? "block" : "none" }}>
+            <Stack spacing={2}>
+              <TextField
+                autoFocus={!isSmall}
+                multiline
+                minRows={4}
+                maxRows={9}
+                value={text}
+                onChange={(event) => {
+                  setImage(undefined);
+                  setText(event.target.value);
                 }}
-              >
-                <Image
-                  src={image}
-                  alt="Board to scan"
-                  fill
-                  style={{ objectFit: "contain" }}
-                  unoptimized
-                />
-              </Box>
-              <Button
-                variant="contained"
-                startIcon={<Icon icon="mdi:image-search-outline" height={20} />}
-                onClick={() => {
-                  setHandoff({ kind: "image", dataUrl: image }, "/scan");
-                  go("/scan");
-                }}
-              >
-                Scan this board
-              </Button>
-            </Stack>
-          )}
+                placeholder="Paste a PGN, a FEN, or a Lichess game link. You can also drop a PGN file or a picture of a board anywhere."
+                slotProps={{ htmlInput: { "aria-label": "Text to import" } }}
+              />
 
-          {detected.kind === "fen" && (
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              alignItems="center"
-            >
-              <MiniBoard fen={detected.fen} size={170} animationDuration={0} />
-              <Stack spacing={1} width="100%">
-                <Chip
-                  label="Position (FEN)"
-                  color="primary"
+              <Stack direction="row" gap={1} flexWrap="wrap">
+                <Button
                   size="small"
-                  sx={{ alignSelf: "flex-start" }}
+                  variant="outlined"
+                  startIcon={<Icon icon="mdi:content-paste" height={18} />}
+                  onClick={pasteFromClipboard}
+                >
+                  Paste from clipboard
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon icon="mdi:upload" height={18} />}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  Choose a file
+                </Button>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  hidden
+                  accept=".pgn,.txt,.fen,image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) readFile(file);
+                    event.target.value = "";
+                  }}
                 />
-                <Button
-                  variant="contained"
-                  onClick={() => openFen(detected.fen, "/editor")}
-                >
-                  Edit on the board
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => openPgn(fenToPgn(detected.fen), "/analysis")}
-                >
-                  Analyze this position
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => openFen(detected.fen, "/play")}
-                >
-                  Play it against a bot
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => openFen(detected.fen, "/arena")}
-                >
-                  Watch engines play it
-                </Button>
               </Stack>
+
+              {inputError && <Alert severity="error">{inputError}</Alert>}
+
+              {image && (
+                <Stack spacing={1.5} alignItems="center">
+                  <Box
+                    sx={{
+                      position: "relative",
+                      width: "100%",
+                      height: 220,
+                      borderRadius: 1.5,
+                      overflow: "hidden",
+                      border: 1,
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Image
+                      src={image}
+                      alt="Board to scan"
+                      fill
+                      style={{ objectFit: "contain" }}
+                      unoptimized
+                    />
+                  </Box>
+                  <Button
+                    variant="contained"
+                    startIcon={
+                      <Icon icon="mdi:image-search-outline" height={20} />
+                    }
+                    onClick={() => {
+                      setHandoff({ kind: "image", dataUrl: image }, "/scan");
+                      go("/scan");
+                    }}
+                  >
+                    Scan this board
+                  </Button>
+                </Stack>
+              )}
+
+              {detected.kind === "fen" && (
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={2}
+                  alignItems="center"
+                >
+                  <MiniBoard
+                    fen={detected.fen}
+                    size={170}
+                    animationDuration={0}
+                  />
+                  <Stack spacing={1} width="100%">
+                    <Chip
+                      label="Position (FEN)"
+                      color="primary"
+                      size="small"
+                      sx={{ alignSelf: "flex-start" }}
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={() =>
+                        openPgn(fenToPgn(detected.fen), "/analysis")
+                      }
+                    >
+                      Analyze this position
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={() => openFen(detected.fen, "/editor")}
+                    >
+                      Edit on board
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={() => openFen(detected.fen, "/play")}
+                    >
+                      Play against a bot
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={() => openFen(detected.fen, "/arena")}
+                    >
+                      Watch in Engine Arena
+                    </Button>
+                  </Stack>
+                </Stack>
+              )}
+
+              {lichess.status === "loading" && (
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <CircularProgress size={18} />
+                  <Typography variant="body2">
+                    Fetching the game from Lichess…
+                  </Typography>
+                </Stack>
+              )}
+              {lichess.status === "error" && (
+                <Alert severity="error">
+                  Could not fetch that Lichess game ({lichess.error}).
+                </Alert>
+              )}
+
+              {pgnGames && (
+                <PgnChoices
+                  games={pgnGames}
+                  onAnalyze={(game) => openPgn(game.pgn, "/analysis")}
+                  onReview={(game) => openPgn(game.pgn, "/learn")}
+                  onSave={saveGames}
+                />
+              )}
+
+              {!image &&
+                detected.kind === "unknown" &&
+                !parsing &&
+                lichess.status === "idle" &&
+                text.trim().length > 0 && (
+                  <Alert severity="warning">
+                    That doesn&apos;t look like a PGN, FEN, or Lichess link.
+                    Check that you copied the whole text.
+                  </Alert>
+                )}
             </Stack>
-          )}
+          </Box>
 
-          {lichess.status === "loading" && (
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <CircularProgress size={18} />
-              <Typography>Fetching the game from Lichess…</Typography>
+          <Box
+            sx={{
+              display:
+                tab === "chesscom" || tab === "lichess" ? "block" : "none",
+            }}
+          >
+            <Stack spacing={2}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                gap={1}
+                flexWrap="wrap"
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Click a game to:
+                </Typography>
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={sourceAction}
+                  aria-label="Action when selecting a game"
+                  onChange={(_, next: SourceAction | null) =>
+                    next && setSourceAction(next)
+                  }
+                  sx={{
+                    "& .MuiToggleButton-root": {
+                      py: 0.35,
+                      px: 1.25,
+                      fontSize: "0.78rem",
+                    },
+                  }}
+                >
+                  <ToggleButton value="analysis">Analyze</ToggleButton>
+                  <ToggleButton value="learn">Coach review</ToggleButton>
+                  <ToggleButton value="save">Save</ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+
+              <Box sx={{ display: tab === "chesscom" ? "block" : "none" }}>
+                <ChessComInput onSelect={handleExternalGameSelect} />
+              </Box>
+              <Box sx={{ display: tab === "lichess" ? "block" : "none" }}>
+                <LichessInput onSelect={handleExternalGameSelect} />
+              </Box>
             </Stack>
-          )}
-          {lichess.status === "error" && (
-            <Alert severity="error">
-              Could not fetch that Lichess game ({lichess.error}).
-            </Alert>
-          )}
-
-          {pgnGames && (
-            <PgnChoices
-              games={pgnGames}
-              onAnalyze={(game) => openPgn(game.pgn, "/analysis")}
-              onReview={(game) => openPgn(game.pgn, "/learn")}
-              onSave={saveGames}
-            />
-          )}
-
-          {!image &&
-            detected.kind === "unknown" &&
-            !parsing &&
-            lichess.status === "idle" &&
-            text.trim().length > 0 && (
-              <Alert severity="warning">
-                That doesn&apos;t look like a PGN, FEN or Lichess link. Check
-                that you copied the whole text.
-              </Alert>
-            )}
+          </Box>
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ m: 1 }}>
+
+      <DialogActions sx={{ px: 2.5, py: 1.5 }}>
         <Button onClick={close}>Close</Button>
       </DialogActions>
     </Dialog>
@@ -381,9 +563,8 @@ function PgnChoices({
 
       <PgnGameList
         games={games}
-        actionsWidth={170}
         renderActions={(game) => (
-          <Stack direction="row" gap={0.5}>
+          <Stack direction="row" gap={0.75}>
             <Button
               size="small"
               variant="contained"
@@ -396,7 +577,7 @@ function PgnChoices({
               variant="outlined"
               onClick={() => onReview(game)}
             >
-              Learn
+              Coach review
             </Button>
           </Stack>
         )}

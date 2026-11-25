@@ -1,25 +1,43 @@
-import { Stack } from "@mui/material";
-import TopMovesButton from "./topMovesButton";
-import ClearMovesButton from "./clearMovesButton";
-import SaveButton from "./saveButton";
+import { Button, Stack } from "@mui/material";
+import { Icon } from "@iconify/react";
+import { useAtomValue, useSetAtom } from "jotai";
+import {
+  analysisSaveRequestAtom,
+  analysisSaveStateAtom,
+} from "../sessionAtoms";
 import MoreMenu from "./moreMenu";
 import { CopyPgnButton } from "./copyPgnButton";
 
-/** The game-level tools. Moving through the game is on the board's own row. */
+/** Compact bottom game-level tools. Navigation stays attached to the board. */
 export default function PanelToolBar() {
+  const saveState = useAtomValue(analysisSaveStateAtom);
+  const retrySave = useSetAtom(analysisSaveRequestAtom);
+
   return (
     <Stack
       direction="row"
-      justifyContent="center"
+      justifyContent="space-between"
       alignItems="center"
-      gap={{ xs: 0, sm: 1.5 }}
+      gap={1}
       width="100%"
     >
-      <TopMovesButton />
-      <ClearMovesButton />
-      <CopyPgnButton />
-      <SaveButton />
-      <MoreMenu />
+      <Stack direction="row" alignItems="center" gap={0.5}>
+        {saveState.status === "error" && (
+          <Button
+            size="small"
+            color="error"
+            variant="text"
+            startIcon={<Icon icon="mdi:cloud-alert" height={16} />}
+            onClick={() => retrySave((value) => value + 1)}
+          >
+            Retry save
+          </Button>
+        )}
+      </Stack>
+      <Stack direction="row" alignItems="center" gap={0.5}>
+        <CopyPgnButton />
+        <MoreMenu />
+      </Stack>
     </Stack>
   );
 }

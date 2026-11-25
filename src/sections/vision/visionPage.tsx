@@ -41,30 +41,36 @@ const WRONG = "rgba(223, 83, 83, 0.8)";
 const TARGET = "rgba(255, 170, 0, 0.55)";
 const VISITED = "rgba(59, 154, 198, 0.4)";
 
+const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  short: "Short",
+  medium: "Medium",
+  long: "Long",
+};
+
 const MODES: { id: VisionMode; label: string; icon: string; text: string }[] = [
   {
     id: "find",
     label: "Find",
     icon: "mdi:cursor-default-click-outline",
-    text: "A square name appears. Click it on the board.",
+    text: "A square name appears on the board. Click that square as fast as you can.",
   },
   {
     id: "name",
     label: "Name",
     icon: "mdi:keyboard-outline",
-    text: "A square lights up. Name it with its file and rank.",
+    text: "A square highlights on the board. Name it with its file and rank.",
   },
   {
     id: "colour",
-    label: "Colour",
+    label: "Color",
     icon: "mdi:checkerboard",
-    text: "A square name appears. Is it light or dark?",
+    text: "Visualize the board in your head. Is the target square light or dark?",
   },
   {
     id: "knight",
     label: "Knight",
     icon: "mdi:chess-knight",
-    text: "Hop the knight to the ringed square in as few moves as you can.",
+    text: "Click or drag the knight to the ringed square in the fewest possible hops.",
   },
 ];
 
@@ -136,7 +142,10 @@ export default function VisionPage() {
   );
 
   const labelsAllowed = trainer.mode === "find" || trainer.mode === "knight";
-  const nameKeys = [...FILES, ...RANKS];
+  const nameKeys = useMemo(
+    () => [...FILES, ...FILES.map((f) => f.toUpperCase()), ...RANKS],
+    []
+  );
 
   useKeyboardShortcut(
     nameKeys,
@@ -144,8 +153,8 @@ export default function VisionPage() {
     trainer.mode === "name" && trainer.phase === "running"
   );
   useKeyboardShortcut(
-    ["l", "d"],
-    (event) => trainer.answerColour(event.key === "l"),
+    ["l", "L", "d", "D"],
+    (event) => trainer.answerColour(event.key.toLowerCase() === "l"),
     trainer.mode === "colour" && trainer.phase === "running"
   );
   useKeyboardShortcut(
@@ -153,6 +162,21 @@ export default function VisionPage() {
     trainer.undoKnight,
     trainer.mode === "knight" && trainer.phase === "running"
   );
+  useKeyboardShortcut(
+    ["Enter", " "],
+    (event) => {
+      event.preventDefault();
+      trainer.start();
+    },
+    trainer.phase !== "running" ||
+      (trainer.mode === "knight" && !!trainer.knightResult)
+  );
+
+  const isBlindfoldColor =
+    trainer.mode === "colour" && trainer.phase === "running";
+  const showFindOverlay =
+    trainer.mode === "find" && trainer.phase === "running" && !!trainer.target;
+  const latestFlash = trainer.flashes[0];
 
   return (
     <BoardWorkspace
@@ -161,16 +185,25 @@ export default function VisionPage() {
       board={
         <SquareBoardStage>
           {(boardSize) => (
-            <>
+            <Box
+              sx={{ position: "relative", width: boardSize, height: boardSize }}
+            >
               <Chessboard
                 id="VisionBoard"
                 boardWidth={boardSize}
                 position={position}
                 boardOrientation={trainer.orientation}
-                arePiecesDraggable={false}
+                arePiecesDraggable={
+                  trainer.mode === "knight" &&
+                  trainer.phase === "running" &&
+                  !trainer.knightResult
+                }
                 areArrowsAllowed={false}
                 animationDuration={PIECE_SLIDE_MS}
                 onSquareClick={(square) => trainer.clickSquare(square)}
+                onPieceDrop={(source, targetSquare) =>
+                  trainer.dropKnight(source, targetSquare)
+                }
                 customSquareStyles={styles}
                 customBoardStyle={appearance.customBoardStyle}
                 customDarkSquareStyle={appearance.customDarkSquareStyle}
@@ -184,13 +217,113 @@ export default function VisionPage() {
                 turn="w"
                 size={boardSize}
               />
-            </>
+
+              {showFindOverlay && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                    zIndex: 10,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      px: 3,
+                      py: 1,
+                      borderRadius: 2,
+                      bgcolor: "rgba(15, 17, 22, 0.72)",
+                      backdropFilter: "blur(4px)",
+                      boxShadow: "0 8px 28px rgba(0,0,0,0.4)",
+                      border: "1px solid rgba(255,255,255,0.16)",
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: `${Math.max(40, Math.round(boardSize * 0.14))}px`,
+                        lineHeight: 1.05,
+                        fontWeight: 800,
+                        color: "#fff",
+                        letterSpacing: "0.04em",
+                        userSelect: "none",
+                      }}
+                    >
+                      {trainer.target}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+
+              {isBlindfoldColor && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 1.5,
+                    bgcolor: "rgba(16, 18, 24, 0.94)",
+                    backdropFilter: "blur(8px)",
+                    borderRadius: 1,
+                    zIndex: 10,
+                    p: 3,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "rgba(255,255,255,0.65)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Blindfold square color
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: `${Math.max(56, Math.round(boardSize * 0.2))}px`,
+                      lineHeight: 1,
+                      fontWeight: 800,
+                      color: "#fff",
+                      letterSpacing: "0.04em",
+                      userSelect: "none",
+                    }}
+                  >
+                    {trainer.target}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      minHeight: 22,
+                      color: latestFlash
+                        ? latestFlash.correct
+                          ? "success.light"
+                          : "error.light"
+                        : "rgba(255,255,255,0.6)",
+                      fontWeight: latestFlash ? 600 : 400,
+                    }}
+                  >
+                    {latestFlash
+                      ? latestFlash.correct
+                        ? `${latestFlash.square} — Correct`
+                        : `${latestFlash.square} — Missed`
+                      : "Press L for Light or D for Dark"}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
           )}
         </SquareBoardStage>
       }
       inspector={
         <Stack
-          spacing={2}
+          spacing={0}
           data-inspector-scroller
           sx={{
             minHeight: 0,
@@ -199,8 +332,6 @@ export default function VisionPage() {
             scrollbarGutter: "stable",
           }}
         >
-          {/* The round comes first: its answer buttons are tapped every second,
-              the settings above them would push them off a tall screen. */}
           <Panel>
             {trainer.mode === "knight" ? (
               <KnightPanel trainer={trainer} />
@@ -224,7 +355,13 @@ export default function VisionPage() {
                   <ToggleButton
                     key={id}
                     value={id}
-                    sx={{ gap: 0.75, py: 0.75 }}
+                    sx={{
+                      gap: { xs: 0.4, sm: 0.75 },
+                      px: { xs: 0.75, sm: 1.25 },
+                      py: 0.75,
+                      fontSize: { xs: "0.75rem", sm: "0.8125rem" },
+                      whiteSpace: "nowrap",
+                    }}
                   >
                     <Icon icon={icon} height={16} />
                     {label}
@@ -232,7 +369,7 @@ export default function VisionPage() {
                 ))}
               </ToggleButtonGroup>
 
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+              <Typography variant="body2" color="text.secondary">
                 {MODES.find(({ id }) => id === trainer.mode)?.text}
               </Typography>
 
@@ -284,7 +421,8 @@ export default function VisionPage() {
                   {(Object.keys(DIFFICULTY_RANGE) as Difficulty[]).map(
                     (level) => (
                       <ToggleButton key={level} value={level}>
-                        {level} ({DIFFICULTY_RANGE[level].join("–")})
+                        {DIFFICULTY_LABELS[level]} (
+                        {DIFFICULTY_RANGE[level].join("–")})
                       </ToggleButton>
                     )
                   )}
@@ -293,25 +431,66 @@ export default function VisionPage() {
             </Stack>
           </Panel>
 
-          <Panel>
-            <Stack
-              direction="row"
-              justifyContent="space-around"
-              textAlign="center"
-            >
-              <Box>
-                <Typography fontWeight={700}>{trainer.bestScore}</Typography>
-                <Typography variant="caption" sx={{ opacity: 0.65 }}>
-                  Best round
-                </Typography>
-              </Box>
-              <Box>
-                <Typography fontWeight={700}>{trainer.sessions}</Typography>
-                <Typography variant="caption" sx={{ opacity: 0.65 }}>
-                  Rounds played
-                </Typography>
-              </Box>
-            </Stack>
+          <Panel sx={{ borderBottom: 0 }}>
+            {trainer.mode === "knight" ? (
+              <Stack
+                direction="row"
+                justifyContent="space-around"
+                textAlign="center"
+              >
+                <Box>
+                  <Typography
+                    fontWeight={700}
+                    sx={{ fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {trainer.knightSolved}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Routes solved
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography
+                    fontWeight={700}
+                    sx={{ fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {trainer.knightPerfect}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Perfect routes
+                  </Typography>
+                </Box>
+              </Stack>
+            ) : (
+              <Stack
+                direction="row"
+                justifyContent="space-around"
+                textAlign="center"
+              >
+                <Box>
+                  <Typography
+                    fontWeight={700}
+                    sx={{ fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {trainer.bestScore}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Best timed round
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography
+                    fontWeight={700}
+                    sx={{ fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {trainer.sessions}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Timed rounds
+                  </Typography>
+                </Box>
+              </Stack>
+            )}
           </Panel>
         </Stack>
       }
@@ -328,10 +507,10 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
   if (phase === "idle") {
     return (
       <Stack spacing={1.5} alignItems="flex-start" sx={{ minHeight: 248 }}>
-        <Typography fontWeight={600}>30 seconds on the clock</Typography>
-        <Typography variant="body2" sx={{ opacity: 0.8 }}>
-          Answer as many as you can. Misses cost time, not points, so keep
-          moving.
+        <Typography fontWeight={600}>30-second sprint</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Answer as many squares as you can before time runs out. Both speed and
+          accuracy are tracked. Press Enter or Space to begin.
         </Typography>
         <Button
           variant="contained"
@@ -348,15 +527,23 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
     return (
       <Stack spacing={1.25} alignItems="flex-start" sx={{ minHeight: 248 }}>
         <Stack direction="row" alignItems="center" gap={1}>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography
+            variant="h4"
+            fontWeight={700}
+            sx={{ fontVariantNumeric: "tabular-nums" }}
+          >
             {score}
           </Typography>
           <Typography>correct</Typography>
           {isNewBest && <Chip size="small" color="success" label="New best" />}
         </Stack>
-        <Typography variant="body2" sx={{ opacity: 0.8 }}>
-          {accuracy}% accuracy, {misses} miss{misses === 1 ? "" : "es"}. Your
-          best round is {Math.max(trainer.bestScore, score)}.
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {accuracy}% accuracy · {misses} miss{misses === 1 ? "" : "es"} · Best{" "}
+          {Math.max(trainer.bestScore, score)}
         </Typography>
         <Button
           variant="contained"
@@ -378,37 +565,56 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
       />
 
       <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          sx={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {(msLeft / 1000).toFixed(1)}s left
         </Typography>
-        <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          Score <b>{score}</b>
-        </Typography>
-      </Stack>
-
-      <Typography
-        sx={{
-          fontSize: "4rem",
-          lineHeight: 1,
-          fontWeight: 700,
-          textAlign: "center",
-          py: 1,
-          letterSpacing: "0.02em",
-        }}
-      >
-        {trainer.target}
-      </Typography>
-
-      {mode === "name" && (
-        <Stack spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1.5} alignItems="center">
           <Typography
             variant="body2"
-            noWrap
-            sx={{ opacity: 0.8, minHeight: 22 }}
+            color="success.main"
+            sx={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            Hits <b>{score}</b>
+          </Typography>
+          <Typography
+            variant="body2"
+            color={misses > 0 ? "error.main" : "text.secondary"}
+            sx={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            Misses <b>{misses}</b>
+          </Typography>
+        </Stack>
+      </Stack>
+
+      {mode === "name" ? (
+        <Stack spacing={1} alignItems="center">
+          <Typography variant="subtitle1" fontWeight={700}>
+            Which square is highlighted?
+          </Typography>
+          <Typography
+            variant="h4"
+            fontWeight={800}
+            sx={{
+              fontVariantNumeric: "tabular-nums",
+              letterSpacing: "0.08em",
+              minHeight: 42,
+              color: trainer.typed ? "primary.main" : "text.disabled",
+            }}
+          >
+            {trainer.typed ? `${trainer.typed}–` : "—"}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ minHeight: 18 }}
           >
             {trainer.typed
-              ? `${trainer.typed}… now the rank`
-              : "Pick the file, then the rank (or type it)"}
+              ? `File "${trainer.typed}" selected — now pick or type the rank (1–8)`
+              : "Pick or type the file (a–h), then the rank (1–8)"}
           </Typography>
           <Stack
             direction="row"
@@ -448,6 +654,19 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
             ))}
           </Stack>
         </Stack>
+      ) : (
+        <Typography
+          sx={{
+            fontSize: "3.5rem",
+            lineHeight: 1,
+            fontWeight: 800,
+            textAlign: "center",
+            py: 0.75,
+            letterSpacing: "0.03em",
+          }}
+        >
+          {trainer.target}
+        </Typography>
       )}
 
       {mode === "colour" && (
@@ -457,8 +676,9 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
             sx={{
               minWidth: 120,
               backgroundColor: "#f0d9b5",
-              color: "#222",
-              "&:hover": { backgroundColor: "#e8cd9f" },
+              color: "#1a1a1a",
+              fontWeight: 700,
+              "&:hover": { backgroundColor: "#e6c999" },
             }}
             onClick={() => trainer.answerColour(true)}
           >
@@ -468,8 +688,10 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
             variant="contained"
             sx={{
               minWidth: 120,
-              backgroundColor: "#946f51",
-              "&:hover": { backgroundColor: "#7f5e44" },
+              backgroundColor: "#7c583c",
+              color: "#fff",
+              fontWeight: 700,
+              "&:hover": { backgroundColor: "#65462f" },
             }}
             onClick={() => trainer.answerColour(false)}
           >
@@ -479,10 +701,31 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
       )}
 
       {mode === "find" && (
-        <Typography variant="body2" textAlign="center" sx={{ opacity: 0.8 }}>
-          Click that square on the board.
+        <Typography variant="body2" textAlign="center" color="text.secondary">
+          Click the target square shown on the board.
         </Typography>
       )}
+
+      <Stack direction="row" gap={1} justifyContent="flex-end" pt={0.5}>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<Icon icon="mdi:refresh" height={16} />}
+          onClick={trainer.start}
+        >
+          Restart
+        </Button>
+        <Button
+          size="small"
+          variant="text"
+          color="inherit"
+          startIcon={<Icon icon="mdi:stop" height={16} />}
+          onClick={trainer.stop}
+          sx={{ color: "text.secondary" }}
+        >
+          Stop
+        </Button>
+      </Stack>
     </Stack>
   );
 }
@@ -492,12 +735,11 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
 
   if (phase === "idle") {
     return (
-      <Stack spacing={1.5} alignItems="flex-start">
+      <Stack spacing={1.5} alignItems="flex-start" sx={{ minHeight: 204 }}>
         <Typography fontWeight={600}>Knight routes</Typography>
-        <Typography variant="body2" sx={{ opacity: 0.8 }}>
-          Click a square a knight can reach to hop there. Click your last square
-          again to take a hop back. The shortest route has a fixed length, so
-          try to match it.
+        <Typography variant="body2" color="text.secondary">
+          Click a reachable square or drag the knight to hop there. Click the
+          knight again (or press Backspace) to undo a hop.
         </Typography>
         <Button
           variant="contained"
@@ -511,21 +753,29 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
   }
 
   const used = path.length - 1;
+  const isPerfect =
+    knightResult &&
+    knightResult.used === knightResult.best &&
+    !knightResult.usedHint;
+  const isOptimalWithHint =
+    knightResult &&
+    knightResult.used === knightResult.best &&
+    knightResult.usedHint;
 
   return (
-    <Stack spacing={1.25}>
-      <Typography fontWeight={600}>
+    <Stack spacing={1.25} sx={{ minHeight: 204 }}>
+      <Typography fontWeight={700} variant="subtitle1">
         {route.from} → {route.to}
       </Typography>
       <Typography
         variant="body2"
-        sx={{ opacity: 0.85, fontVariantNumeric: "tabular-nums" }}
+        color="text.secondary"
+        sx={{ fontVariantNumeric: "tabular-nums" }}
       >
-        The shortest route takes <b>{route.moves}</b> hops. You have used{" "}
-        <b>{used}</b>.
+        Shortest route: <b>{route.moves}</b> hop{route.moves === 1 ? "" : "s"} ·
+        Used: <b>{used}</b>
       </Typography>
 
-      {/* Keep action buttons above the result line so finishing a route never shifts them. */}
       <Stack direction="row" gap={1} flexWrap="wrap">
         <Button
           size="small"
@@ -545,6 +795,16 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
         >
           {trainer.showSolution ? "Hide route" : "Show route"}
         </Button>
+        {knightResult && !isPerfect && (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<Icon icon="mdi:refresh" height={18} />}
+            onClick={trainer.retryKnightRoute}
+          >
+            Retry
+          </Button>
+        )}
         <Button
           size="small"
           variant={knightResult ? "contained" : "text"}
@@ -556,19 +816,24 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
         </Button>
       </Stack>
 
-      <Box sx={{ minHeight: 40 }}>
+      <Box sx={{ minHeight: 44 }}>
         {knightResult && (
           <Typography
             variant="body2"
+            fontWeight={500}
             color={
-              knightResult.used === knightResult.best
+              isPerfect
                 ? "success.main"
-                : "warning.main"
+                : isOptimalWithHint
+                  ? "info.main"
+                  : "warning.main"
             }
           >
-            {knightResult.used === knightResult.best
-              ? "Perfect, that is as short as it gets."
-              : `Arrived in ${knightResult.used}. The shortest was ${knightResult.best}. Show the route to see it.`}
+            {isPerfect
+              ? "Perfect! Shortest possible route."
+              : isOptimalWithHint
+                ? `Arrived in ${knightResult.used} hops (optimal length, route shown).`
+                : `Arrived in ${knightResult.used} hops. Shortest is ${knightResult.best} — retry or show route.`}
           </Typography>
         )}
       </Box>

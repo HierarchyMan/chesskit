@@ -85,13 +85,20 @@ function LayoutBody({ children }: PropsWithChildren) {
             switchDarkMode={switchDarkMode}
             onMenuClick={() => setMobileMenuOpen(true)}
           />
-          <main
-            style={
-              workspace ? { padding: 12, minWidth: 0 } : { margin: "2vh 1vw" }
+          <Box
+            component="main"
+            sx={
+              workspace
+                ? { p: 1.5, minWidth: 0 }
+                : {
+                    px: { xs: 1.5, sm: 3 },
+                    py: { xs: 1.5, sm: 2.5 },
+                    minWidth: 0,
+                  }
             }
           >
             {children}
-          </main>
+          </Box>
         </Box>
       </Box>
 

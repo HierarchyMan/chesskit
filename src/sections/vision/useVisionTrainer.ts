@@ -1,3 +1,4 @@
+import { playIllegalMoveSound, playMoveSound } from "@/lib/sounds";
 import { recordVision, statsAtom } from "@/lib/stats";
 import {
   isKnightMove,
@@ -16,7 +17,7 @@ export type Difficulty = "short" | "medium" | "long";
 
 export const ROUND_MS = 30000;
 const TICK_MS = 100;
-const FLASH_MS = 700;
+const FLASH_MS = 650;
 
 export const DIFFICULTY_RANGE: Record<Difficulty, [number, number]> = {
   short: [2, 3],
@@ -32,6 +33,7 @@ export interface Flash {
 export interface KnightResult {
   used: number;
   best: number;
+  usedHint: boolean;
 }
 
 export const useVisionTrainer = () => {
@@ -56,7 +58,10 @@ export const useVisionTrainer = () => {
   const [route, setRoute] = useState({ from: "b1", to: "c3", moves: 1 });
   const [path, setPath] = useState<string[]>([]);
   const [knightResult, setKnightResult] = useState<KnightResult | null>(null);
-  const [showSolution, setShowSolution] = useState(false);
+  const [showSolution, setShowSolutionState] = useState(false);
+  const [usedRouteHint, setUsedRouteHint] = useState(false);
+  const [knightSolved, setKnightSolved] = useState(0);
+  const [knightPerfect, setKnightPerfect] = useState(0);
 
   const endsAt = useRef(0);
   const scoreRef = useRef(0);
@@ -84,6 +89,15 @@ export const useVisionTrainer = () => {
     setStats((previous) => recordVision(previous, scoreRef.current));
   }, [setStats, stats.vision.bestScore]);
 
+  const stop = useCallback(() => {
+    clearFlashTimers();
+    setFlashes([]);
+    setTyped("");
+    setTarget(null);
+    setMsLeft(ROUND_MS);
+    setPhase("idle");
+  }, [clearFlashTimers]);
+
   useEffect(() => {
     if (phase !== "running" || !timed) return;
 
@@ -110,7 +124,8 @@ export const useVisionTrainer = () => {
       setRoute(next);
       setPath([next.from]);
       setKnightResult(null);
-      setShowSolution(false);
+      setShowSolutionState(false);
+      setUsedRouteHint(false);
       setPhase("running");
       setOrientation(
         orientationChoice === "random"
@@ -121,6 +136,26 @@ export const useVisionTrainer = () => {
       );
     },
     [orientationChoice]
+  );
+
+  const retryKnightRoute = useCallback(() => {
+    clearFlashTimers();
+    setFlashes([]);
+    setPath([route.from]);
+    setKnightResult(null);
+    setShowSolutionState(false);
+    setUsedRouteHint(false);
+    setPhase("running");
+  }, [clearFlashTimers, route.from]);
+
+  const setShowSolution = useCallback(
+    (next: boolean) => {
+      setShowSolutionState(next);
+      if (next && !knightResult) {
+        setUsedRouteHint(true);
+      }
+    },
+    [knightResult]
   );
 
   const start = useCallback(() => {
@@ -157,6 +192,8 @@ export const useVisionTrainer = () => {
       setPhase("idle");
       setTarget(null);
       setKnightResult(null);
+      setShowSolutionState(false);
+      setUsedRouteHint(false);
       setModeState(next);
     },
     [clearFlashTimers]
@@ -167,8 +204,10 @@ export const useVisionTrainer = () => {
       if (correct) {
         scoreRef.current += 1;
         setScore(scoreRef.current);
+        playMoveSound();
       } else {
         setMisses((count) => count + 1);
+        playIllegalMoveSound();
       }
 
       flash(
@@ -187,6 +226,41 @@ export const useVisionTrainer = () => {
     [flash]
   );
 
+  const advanceKnight = useCallback(
+    (square: string): boolean => {
+      const current = path.at(-1);
+      if (!current || knightResult) return false;
+
+      if (square === current && path.length > 1) {
+        setPath(path.slice(0, -1));
+        playMoveSound();
+        return true;
+      }
+
+      if (!isKnightMove(current, square)) {
+        if (square !== current) {
+          playIllegalMoveSound();
+          flash([{ square, correct: false }]);
+        }
+        return false;
+      }
+
+      const next = [...path, square];
+      setPath(next);
+      playMoveSound();
+
+      if (square === route.to) {
+        const used = next.length - 1;
+        const optimal = used === route.moves && !usedRouteHint;
+        setKnightResult({ used, best: route.moves, usedHint: usedRouteHint });
+        setKnightSolved((count) => count + 1);
+        if (optimal) setKnightPerfect((count) => count + 1);
+      }
+      return true;
+    },
+    [flash, knightResult, path, route, usedRouteHint]
+  );
+
   const clickSquare = useCallback(
     (square: string) => {
       if (phase !== "running") return;
@@ -197,30 +271,28 @@ export const useVisionTrainer = () => {
       }
 
       if (mode === "knight") {
-        const current = path.at(-1);
-        if (!current || knightResult) return;
-
-        if (square === current && path.length > 1) {
-          setPath(path.slice(0, -1));
-          return;
-        }
-
-        if (!isKnightMove(current, square)) return;
-
-        const next = [...path, square];
-        setPath(next);
-
-        if (square === route.to) {
-          setKnightResult({ used: next.length - 1, best: route.moves });
-        }
+        advanceKnight(square);
       }
     },
-    [answer, knightResult, mode, path, phase, route, target]
+    [advanceKnight, answer, mode, phase, target]
+  );
+
+  const dropKnight = useCallback(
+    (source: string, targetSquare: string): boolean => {
+      if (phase !== "running" || mode !== "knight" || knightResult) {
+        return false;
+      }
+      const current = path.at(-1);
+      if (source !== current) return false;
+      return advanceKnight(targetSquare);
+    },
+    [advanceKnight, knightResult, mode, path, phase]
   );
 
   const typeKey = useCallback(
-    (key: string) => {
+    (rawKey: string) => {
       if (phase !== "running" || mode !== "name" || !target) return;
+      const key = rawKey.toLowerCase();
 
       if (/^[a-h]$/.test(key)) {
         setTyped(key);
@@ -242,6 +314,7 @@ export const useVisionTrainer = () => {
   const undoKnight = useCallback(() => {
     if (mode !== "knight" || knightResult || path.length < 2) return;
     setPath(path.slice(0, -1));
+    playMoveSound();
   }, [knightResult, mode, path]);
 
   const solution = knightPath(route.from, route.to);
@@ -270,11 +343,16 @@ export const useVisionTrainer = () => {
     route,
     path,
     knightResult,
+    knightSolved,
+    knightPerfect,
     showSolution,
     setShowSolution,
     solution,
     start,
+    stop,
+    retryKnightRoute,
     clickSquare,
+    dropKnight,
     typeKey,
     answerColour,
     undoKnight,

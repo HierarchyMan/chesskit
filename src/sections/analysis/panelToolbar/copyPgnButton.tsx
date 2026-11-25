@@ -14,7 +14,7 @@ export const CopyPgnButton = () => {
         onClick={() => {
           void copy(pgn, "Line PGN");
         }}
-        icon="ri:clipboard-line"
+        icon="mdi:content-copy"
       />
       {feedback}
     </>

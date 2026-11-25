@@ -1,12 +1,15 @@
+import { LastMoveCue } from "@/components/board/cues";
 import { engineLabel } from "@/constants";
 import { useChessActions } from "@/hooks/useChessActions";
 import { EngineState, useEngineState } from "@/hooks/useEngine";
 import { setGameHeaders, uciMoveParams } from "@/lib/chess";
+import { replayChess } from "@/lib/chessHistory";
 import { BotChoice, getBotChoice } from "@/lib/engine/botChoice";
 import { effectiveStrength } from "@/lib/engine/botMove";
 import { BotStrength } from "@/lib/engine/strength";
 import { getGameResult } from "@/lib/gameResult";
-import { Chess } from "chess.js";
+import { playSoundFromMove } from "@/lib/sounds";
+import { Chess, Square } from "chess.js";
 import { setupPosition } from "@/lib/setupPosition";
 import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
 import { fullStrengthMsAtom } from "@/lib/engine/engineSettings";
@@ -63,10 +66,14 @@ export const useArena = () => {
   const whiteEngine = useEngineState(white.engine, "Arena: White");
   const blackEngine = useEngineState(black.engine, "Arena: Black");
   const [proposal, setProposal] = useState<Proposal>({ status: "idle" });
+  const [matchId, setMatchId] = useState(1);
+  const [reviewPly, setReviewPly] = useState<number | null>(null);
 
   const fen = game.fen();
   const turn = game.turn();
   const isOver = game.isGameOver();
+  const history = game.history({ verbose: true });
+  const totalPlies = history.length;
   const mover = turn === "w" ? white : black;
   const moverState: EngineState = turn === "w" ? whiteEngine : blackEngine;
   const moverEngine = moverState.engine;
@@ -77,6 +84,36 @@ export const useArena = () => {
     varietyRef.current = variety;
     strengthRef.current = mover.strength;
   });
+
+  // Clamp reviewPly if moves were undone or reset.
+  const clampedReviewPly =
+    reviewPly !== null && reviewPly < totalPlies
+      ? Math.max(0, reviewPly)
+      : null;
+  const isReviewing = clampedReviewPly !== null;
+  const displayPly = clampedReviewPly ?? totalPlies;
+
+  const reviewState = useMemo(() => {
+    if (clampedReviewPly === null) return null;
+    const snapshot = replayChess(game, clampedReviewPly);
+    const last = snapshot.history({ verbose: true }).at(-1);
+    const lastMove: LastMoveCue | undefined = last
+      ? { from: last.from as Square, to: last.to as Square }
+      : undefined;
+    const evalForPly =
+      clampedReviewPly === 0
+        ? analysis.moves[0]?.before
+        : analysis.moves[clampedReviewPly - 1]?.after;
+    return {
+      fen: snapshot.fen(),
+      lastMove,
+      position: {
+        eval: evalForPly,
+        lastMove: last,
+        currentMoveIdx: clampedReviewPly,
+      },
+    };
+  }, [clampedReviewPly, game, analysis.moves]);
 
   const strengthKey = JSON.stringify(mover.strength);
 
@@ -137,17 +174,51 @@ export const useArena = () => {
   ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    setData(analysis.position);
-  }, [analysis.position, setData]);
+    setData(reviewState ? reviewState.position : analysis.position);
+  }, [analysis.position, reviewState, setData]);
+
+  const goToPly = useCallback(
+    (ply: number | null) => {
+      if (ply === null || ply >= totalPlies) {
+        setReviewPly(null);
+        return;
+      }
+      const target = Math.max(0, ply);
+      setRunning(false);
+      setReviewPly(target);
+      if (target > 0) {
+        const move = history[target - 1];
+        if (move) playSoundFromMove(move);
+      }
+    },
+    [history, setRunning, totalPlies]
+  );
+
+  const stepReview = useCallback(
+    (delta: number) => {
+      const target = displayPly + delta;
+      if (target >= totalPlies) {
+        setReviewPly(null);
+        return;
+      }
+      goToPly(Math.max(0, target));
+    },
+    [displayPly, goToPly, totalPlies]
+  );
 
   const acceptProposal = useCallback(() => {
     if (proposal.status !== "ready" || proposal.fen !== fen) return;
+    setReviewPly(null);
     playMove(uciMoveParams(proposal.choice.uci), game);
   }, [proposal, fen, playMove, game]);
 
   const playCandidate = useCallback(
-    (uci: string) => playMove(uciMoveParams(uci), game),
-    [playMove, game]
+    (uci: string) => {
+      setRunning(false);
+      setReviewPly(null);
+      return playMove(uciMoveParams(uci), game);
+    },
+    [playMove, game, setRunning]
   );
 
   const acceptRef = useRef(acceptProposal);
@@ -169,9 +240,6 @@ export const useArena = () => {
     return () => clearTimeout(timer);
   }, [running, isOver, proposal, fen, speed, setRunning]);
 
-  // A player change must never restart the match. Before the first move the
-  // game is rebuilt so its headers name the new players; after it, the change
-  // is noted on the current position. See playerChangeEffect.
   const notePlayerChange = (nextWhite: ArenaSide, nextBlack: ArenaSide) => {
     const effect = playerChangeEffect({
       started,
@@ -179,8 +247,6 @@ export const useArena = () => {
       moveCount: game.history().length,
     });
 
-    // With no moves, the current position is the match's own start. The
-    // startFen atom may already point elsewhere, for example after a handoff.
     if (effect === "rebuild-start") {
       reset({
         fen: game.fen(),
@@ -210,6 +276,8 @@ export const useArena = () => {
         black: { name: sideLabel(matchBlack) },
       });
       setStartFen(fen);
+      setReviewPly(null);
+      setMatchId((id) => id + 1);
       setRunning(false);
       setStarted(true);
     },
@@ -228,12 +296,15 @@ export const useArena = () => {
   const stop = useCallback(() => {
     setRunning(false);
     setStarted(false);
+    setReviewPly(null);
     setEditingPlayers(false);
+    setMatchId((id) => id + 1);
     reset({ fen: setupPosition(startFen).fen, noHeaders: true });
   }, [startFen, reset, setRunning, setStarted, setEditingPlayers]);
 
   const takeBack = useCallback(() => {
     setRunning(false);
+    setReviewPly(null);
     undoMove();
   }, [setRunning, undoMove]);
 
@@ -243,8 +314,6 @@ export const useArena = () => {
     notePlayerChange(black, white);
   };
 
-  // Passes the swapped players directly. Calling swapSides then start would
-  // name the players from this render's closure, before the swap.
   const rematch = useCallback(() => {
     setWhiteSide(black);
     setBlackSide(white);
@@ -253,8 +322,6 @@ export const useArena = () => {
 
   const result = useMemo(() => getGameResult(game, null), [game]);
 
-  // The game already carries the headers written when its match began, so a
-  // later player change does not rename the saved game.
   const finishedGame = useCallback((): Chess => {
     const copy = new Chess();
     copy.loadPgn(game.pgn());
@@ -268,6 +335,7 @@ export const useArena = () => {
 
   return {
     game,
+    matchId,
     analysis,
     white,
     black,
@@ -284,6 +352,13 @@ export const useArena = () => {
     turn,
     isOver,
     result,
+    isReviewing,
+    displayPly,
+    totalPlies,
+    reviewFen: reviewState?.fen,
+    reviewLastMove: reviewState?.lastMove,
+    goToPly,
+    stepReview,
     acceptProposal,
     playCandidate,
     start,

@@ -2,24 +2,25 @@ import { useGameDatabase } from "@/hooks/useGameDatabase";
 import { getGameFromPgn } from "@/lib/chess";
 import { useParsedInput } from "@/hooks/useParsedInput";
 import { GameOrigin } from "@/types/enums";
+import { Icon } from "@iconify/react";
 import {
-  MenuItem,
-  Select,
+  Alert,
+  Box,
   Button,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  FormControl,
-  InputLabel,
-  OutlinedInput,
   DialogActions,
-  Grid2 as Grid,
-  Snackbar,
-  Alert,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { setContext as setSentryContext } from "@sentry/react";
 import { Chess } from "chess.js";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import GamePgnInput from "./gamePgnInput";
 import ChessComInput from "./chessComInput";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -33,14 +34,21 @@ interface Props {
   setGame?: (game: Chess, pgn?: string) => Promise<void>;
 }
 
+const ORIGIN_OPTIONS: { value: GameOrigin; label: string }[] = [
+  { value: GameOrigin.ChessCom, label: "Chess.com" },
+  { value: GameOrigin.Lichess, label: "Lichess" },
+  { value: GameOrigin.Pgn, label: "PGN" },
+];
+
 export default function NewGameDialog({ open, onClose, setGame }: Props) {
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const [pgn, setPgn] = useState("");
   const [gameOrigin, setGameOrigin] = useLocalStorage(
     "preferred-game-origin",
     GameOrigin.ChessCom
   );
   const [parsingError, setParsingError] = useState("");
-  const parsingErrorTimeout = useRef<NodeJS.Timeout | null>(null);
   const setBoardOrientation = useSetAtom(boardOrientationAtom);
   const { addGame, addGames } = useGameDatabase();
 
@@ -48,37 +56,26 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
   const parsedGames = detected.kind === "pgn" ? detected.games : [];
   const readableGames = parsedGames.filter((game) => !game.error);
 
-  const handleAddGame = async (pgn: string, boardOrientation?: boolean) => {
-    if (!pgn) return;
+  const handleAddGame = async (rawPgn: string, boardOrientation?: boolean) => {
+    if (!rawPgn) return;
 
     try {
-      const gameToAdd = getGameFromPgn(pgn);
-      setSentryContext("loadedGame", { pgn });
+      const gameToAdd = getGameFromPgn(rawPgn);
+      setSentryContext("loadedGame", { pgn: rawPgn });
 
       if (setGame) {
-        await setGame(gameToAdd, pgn);
+        await setGame(gameToAdd, rawPgn);
       } else {
-        await addGame(gameToAdd, pgn);
+        await addGame(gameToAdd, rawPgn);
       }
 
       setBoardOrientation(boardOrientation ?? true);
       handleClose();
     } catch (error) {
       console.error(error);
-
-      if (parsingErrorTimeout.current) {
-        clearTimeout(parsingErrorTimeout.current);
-      }
-
       setParsingError(
-        error instanceof Error
-          ? `${error.message} !`
-          : "Invalid PGN: unknown error !"
+        error instanceof Error ? error.message : "Invalid PGN: unknown error."
       );
-
-      parsingErrorTimeout.current = setTimeout(() => {
-        setParsingError("");
-      }, 3000);
     }
   };
 
@@ -98,9 +95,6 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
   const handleClose = () => {
     setPgn("");
     setParsingError("");
-    if (parsingErrorTimeout.current) {
-      clearTimeout(parsingErrorTimeout.current);
-    }
     onClose();
   };
 
@@ -108,51 +102,55 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
     <Dialog
       open={open}
       onClose={handleClose}
-      maxWidth="md"
-      slotProps={{
-        paper: {
-          sx: {
-            position: "fixed",
-            top: 0,
-            width: "calc(100% - 10px)",
-            marginY: { xs: "3vh", sm: 5 },
-            maxHeight: { xs: "calc(100% - 5vh)", sm: "calc(100% - 64px)" },
-          },
-        },
-      }}
+      fullScreen={isSmall}
+      fullWidth
+      maxWidth="sm"
+      scroll="paper"
     >
-      {inputError && <Alert severity="error">{inputError}</Alert>}
-      <DialogTitle marginY={1} variant="h5">
-        {setGame ? "Load a game" : "Add a game to your database"}
-      </DialogTitle>
-      <DialogContent sx={{ padding: { xs: 2, md: 3 } }}>
-        <Grid
-          container
-          marginTop={1}
-          alignItems="center"
-          justifyContent="start"
-          rowGap={2}
+      <DialogTitle
+        sx={{ display: "flex", alignItems: "center", gap: 1, pr: 2 }}
+      >
+        <Icon icon="mdi:folder-open-outline" height={22} />
+        <Box sx={{ flexGrow: 1 }}>
+          {setGame ? "Load a game" : "Add a game to your database"}
+        </Box>
+        <IconButton
+          onClick={handleClose}
+          aria-label="Close"
+          edge="end"
+          size="small"
         >
-          <FormControl sx={{ my: 1, mr: 2, width: 150 }}>
-            <InputLabel id="dialog-select-label">Game origin</InputLabel>
-            <Select
-              labelId="dialog-select-label"
-              id="dialog-select"
-              displayEmpty
-              input={<OutlinedInput label="Game origin" />}
-              value={gameOrigin ?? ""}
-              onChange={(e) => {
-                setGameOrigin(e.target.value as GameOrigin);
-                setParsingError("");
-              }}
-            >
-              {Object.entries(gameOriginLabel).map(([origin, label]) => (
-                <MenuItem key={origin} value={origin}>
-                  {label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Icon icon="mdi:close" height={20} />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
+            size="small"
+            value={gameOrigin ?? GameOrigin.ChessCom}
+            aria-label="Game source"
+            onChange={(_, next: GameOrigin | null) => {
+              if (!next) return;
+              setGameOrigin(next);
+              setParsingError("");
+            }}
+          >
+            {ORIGIN_OPTIONS.map((option) => (
+              <ToggleButton key={option.value} value={option.value}>
+                {option.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+
+          {inputError && <Alert severity="error">{inputError}</Alert>}
+          {parsingError && (
+            <Alert severity="error" onClose={() => setParsingError("")}>
+              {parsingError}
+            </Alert>
+          )}
 
           {gameOrigin === GameOrigin.Pgn && (
             <GamePgnInput
@@ -171,27 +169,14 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
           {gameOrigin === GameOrigin.Lichess && (
             <LichessInput onSelect={handleAddGame} />
           )}
-
-          <Snackbar open={!!parsingError}>
-            <Alert
-              onClose={() => setParsingError("")}
-              severity="error"
-              variant="filled"
-              sx={{ width: "100%" }}
-            >
-              {parsingError}
-            </Alert>
-          </Snackbar>
-        </Grid>
+        </Stack>
       </DialogContent>
-      <DialogActions sx={{ m: 2 }}>
-        <Button variant="outlined" onClick={handleClose}>
-          Cancel
-        </Button>
+
+      <DialogActions sx={{ px: 2.5, py: 1.5 }}>
+        <Button onClick={handleClose}>Cancel</Button>
         {gameOrigin === GameOrigin.Pgn && readableGames.length <= 1 && (
           <Button
             variant="contained"
-            sx={{ marginLeft: 2 }}
             disabled={readableGames.length === 0}
             onClick={() => {
               handleAddGame(readableGames[0]?.pgn ?? pgn);
@@ -203,11 +188,7 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
         {gameOrigin === GameOrigin.Pgn &&
           !setGame &&
           readableGames.length > 1 && (
-            <Button
-              variant="contained"
-              sx={{ marginLeft: 2 }}
-              onClick={handleAddAll}
-            >
+            <Button variant="contained" onClick={handleAddAll}>
               Add all {readableGames.length} games
             </Button>
           )}
@@ -215,9 +196,3 @@ export default function NewGameDialog({ open, onClose, setGame }: Props) {
     </Dialog>
   );
 }
-
-const gameOriginLabel: Record<GameOrigin, string> = {
-  [GameOrigin.ChessCom]: "Chess.com",
-  [GameOrigin.Lichess]: "Lichess.org",
-  [GameOrigin.Pgn]: "PGN",
-};

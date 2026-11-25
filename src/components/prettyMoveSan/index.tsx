@@ -43,12 +43,31 @@ export default function PrettyMoveSan({
   }, [san, color, isDarkMode]);
 
   return (
-    <Box component="span" {...boxProps}>
+    <Box
+      component="span"
+      {...boxProps}
+      sx={[
+        { display: "inline-flex", alignItems: "baseline" },
+        ...(Array.isArray(boxProps?.sx)
+          ? boxProps.sx
+          : boxProps?.sx
+            ? [boxProps.sx]
+            : []),
+      ]}
+    >
       {icon && (
         <Typography
           component="span"
           fontFamily={chessFont.style.fontFamily}
           {...typographyProps}
+          sx={[
+            { lineHeight: 1, mr: "0.06em" },
+            ...(Array.isArray(typographyProps?.sx)
+              ? typographyProps.sx
+              : typographyProps?.sx
+                ? [typographyProps.sx]
+                : []),
+          ]}
         >
           {icon}
         </Typography>

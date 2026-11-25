@@ -14,11 +14,11 @@ import {
   Chip,
   Collapse,
   FormControl,
+  FormControlLabel,
   MenuItem,
   Select,
   Stack,
   Switch,
-  FormControlLabel,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -34,9 +34,9 @@ import {
   coachAtom,
   colorChoiceAtom,
   enginePlayNameAtom,
-  playEvalBarAtom,
   gameModeAtom,
   oddsAtom,
+  playEvalBarAtom,
   playerColorAtom,
   startingPositionAtom,
   timeControlAtom,
@@ -56,6 +56,16 @@ const TIME_PRESETS: { label: string; minutes: number; increment: number }[] = [
   { label: "15+10", minutes: 15, increment: 10 },
   { label: "30+0", minutes: 30, increment: 0 },
 ];
+
+const TOGGLE_GROUP_SX = {
+  "& .MuiToggleButton-root": {
+    py: 0.5,
+    minHeight: 34,
+    textTransform: "none",
+    fontWeight: 600,
+    fontSize: "0.82rem",
+  },
+} as const;
 
 interface Props {
   botEngine: EngineState;
@@ -104,8 +114,8 @@ export default function NewGamePanel({ botEngine }: Props) {
   };
 
   return (
-    <Panel title="New game" sx={{ maxHeight: "none" }}>
-      <Stack spacing={2.5}>
+    <Panel title="New game" sx={{ maxHeight: "none", borderBottom: 0 }}>
+      <Stack spacing={2.25}>
         {/* Settings are remembered, so Start leads: on a tall screen it sits
             right under the board instead of after a form that can expand. */}
         <Stack spacing={1}>
@@ -115,6 +125,7 @@ export default function NewGamePanel({ botEngine }: Props) {
             disabled={!ready || !!setup.error}
             onClick={handleStart}
             startIcon={<Icon icon="mdi:play" height={22} />}
+            sx={{ borderRadius: 1, fontWeight: 700 }}
           >
             {ready
               ? "Start game"
@@ -131,7 +142,7 @@ export default function NewGamePanel({ botEngine }: Props) {
         </Stack>
 
         <Section title="Opponent">
-          <Stack spacing={1.5}>
+          <Stack spacing={1.25}>
             <EngineField
               label="Opponent engine"
               role="play"
@@ -164,6 +175,7 @@ export default function NewGamePanel({ botEngine }: Props) {
             onChange={(_, value: ColorChoice | null) =>
               value && setColorChoice(value)
             }
+            sx={TOGGLE_GROUP_SX}
           >
             <ToggleButton value={Color.White}>White</ToggleButton>
             <ToggleButton value="random">Random</ToggleButton>
@@ -178,52 +190,87 @@ export default function NewGamePanel({ botEngine }: Props) {
             size="small"
             value={mode}
             onChange={(_, value: GameMode | null) => value && setMode(value)}
+            sx={TOGGLE_GROUP_SX}
           >
             <ToggleButton value="casual">Casual</ToggleButton>
             <ToggleButton value="formal">Formal</ToggleButton>
           </ToggleButtonGroup>
-          <Typography variant="body2" sx={{ opacity: 0.75, mt: 0.75 }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 0.75, fontSize: "0.8rem", lineHeight: 1.45 }}
+          >
             {mode === "casual"
-              ? "Hints, top moves for either side and takebacks are available. Great for learning."
-              : "No hints and no takebacks, like a real game. Every move counts."}
+              ? "Hints, top moves, live coach, and takebacks are available."
+              : "No hints, coach, or takebacks — every move counts."}
           </Typography>
           {mode === "casual" && (
-            <FormControlLabel
-              sx={{ mt: 0.5 }}
-              control={
-                <Switch
-                  size="small"
-                  checked={coach}
-                  onChange={(_, checked) => setCoach(checked)}
-                />
-              }
-              label={
-                <Typography variant="body2">
-                  Coach: rate each of my moves and show what weak ones lead to
-                </Typography>
-              }
-            />
-          )}
-          {mode === "casual" && coach && (
-            <FormControlLabel
-              sx={{ ml: 2 }}
-              control={
-                <Switch
-                  size="small"
-                  checked={evalBar}
-                  onChange={(_, checked) => setEvalBar(checked)}
-                />
-              }
-              label={
-                <Typography variant="body2">
-                  Evaluation bar beside the board
-                </Typography>
-              }
-            />
+            <Stack
+              spacing={0.25}
+              sx={{
+                mt: 1,
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                bgcolor: "action.hover",
+              }}
+            >
+              <FormControlLabel
+                labelPlacement="start"
+                sx={{
+                  m: 0,
+                  minHeight: 34,
+                  justifyContent: "space-between",
+                  gap: 1.5,
+                }}
+                control={
+                  <Switch
+                    size="small"
+                    checked={coach}
+                    onChange={(_, checked) => setCoach(checked)}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      Live coach
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", lineHeight: 1.3 }}
+                    >
+                      Rate moves and explain mistakes on the board
+                    </Typography>
+                  </Box>
+                }
+              />
+              <FormControlLabel
+                labelPlacement="start"
+                sx={{
+                  m: 0,
+                  minHeight: 32,
+                  justifyContent: "space-between",
+                  gap: 1.5,
+                }}
+                control={
+                  <Switch
+                    size="small"
+                    checked={evalBar}
+                    onChange={(_, checked) => setEvalBar(checked)}
+                  />
+                }
+                label={
+                  <Typography variant="body2" color="text.secondary">
+                    Evaluation bar beside the board
+                  </Typography>
+                }
+              />
+            </Stack>
           )}
         </Section>
 
-        <Section title="Time">
+        <Section title="Time control">
           <Stack direction="row" flexWrap="wrap" gap={0.75}>
             {TIME_PRESETS.map((preset) => {
               const selected =
@@ -243,6 +290,10 @@ export default function NewGamePanel({ botEngine }: Props) {
                       increment: preset.increment,
                     })
                   }
+                  sx={{
+                    fontVariantNumeric: "tabular-nums",
+                    fontWeight: selected ? 700 : 500,
+                  }}
                 />
               );
             })}
@@ -263,7 +314,8 @@ export default function NewGamePanel({ botEngine }: Props) {
                     <Typography
                       component="span"
                       variant="caption"
-                      sx={{ ml: 1, opacity: 0.65 }}
+                      color="text.secondary"
+                      sx={{ ml: 1 }}
                     >
                       {option.hint}
                     </Typography>
@@ -282,9 +334,17 @@ export default function NewGamePanel({ botEngine }: Props) {
             startIcon={
               <Icon
                 icon={showPosition ? "mdi:chevron-up" : "mdi:chevron-down"}
+                height={18}
               />
             }
             disabled={odds !== "none"}
+            sx={{
+              px: 0.75,
+              ml: -0.75,
+              borderRadius: 1,
+              color: "text.secondary",
+              textTransform: "none",
+            }}
           >
             Start from a position
           </Button>
@@ -313,6 +373,7 @@ export default function NewGamePanel({ botEngine }: Props) {
                   setHandoff({ kind: "fen", fen: setup.fen }, "/editor");
                   void router.push("/editor");
                 }}
+                sx={{ alignSelf: "flex-start", borderRadius: 1 }}
               >
                 Build one in the board editor
               </Button>
@@ -335,7 +396,13 @@ function Section({
     <Box>
       <Typography
         variant="overline"
-        sx={{ opacity: 0.7, letterSpacing: "0.08em" }}
+        color="text.secondary"
+        sx={{
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          lineHeight: 1.4,
+          display: "block",
+        }}
       >
         {title}
       </Typography>
@@ -355,9 +422,21 @@ function EngineStatusLine({
 }) {
   if (engine.status === "ready") {
     return (
-      <Typography variant="body2" color="success.main">
-        {engineLabel(engineName).small} is ready.
-      </Typography>
+      <Stack direction="row" alignItems="center" gap={0.6}>
+        <Box
+          aria-hidden
+          sx={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            bgcolor: "success.main",
+            flexShrink: 0,
+          }}
+        />
+        <Typography variant="caption" color="success.main" fontWeight={600}>
+          {engineLabel(engineName).small} is ready
+        </Typography>
+      </Stack>
     );
   }
 
@@ -366,7 +445,7 @@ function EngineStatusLine({
   }
 
   return (
-    <Typography variant="body2" sx={{ opacity: 0.75 }}>
+    <Typography variant="caption" color="text.secondary">
       Loading {engineLabel(engineName).small}…
     </Typography>
   );

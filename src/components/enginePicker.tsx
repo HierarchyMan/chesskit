@@ -11,9 +11,11 @@ import { EngineId } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
   Box,
+  Button,
   ButtonBase,
   Chip,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   IconButton,
@@ -114,7 +116,14 @@ function RatingBadge({ model }: { model: EngineModel }) {
           flexShrink: 0,
         }}
       >
-        <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 600,
+            lineHeight: 1.2,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
           {text}
         </Typography>
         <Typography variant="caption" sx={{ opacity: 0.7, lineHeight: 1 }}>
@@ -338,11 +347,16 @@ function PickerContent({
   return (
     <>
       <DialogTitle
-        sx={{ pb: 1, display: "flex", alignItems: "center", gap: 1 }}
+        sx={{ pb: 1, pr: 2, display: "flex", alignItems: "center", gap: 1 }}
       >
         <Icon icon="mdi:chip" height={22} />
         <Box sx={{ flexGrow: 1 }}>{title}</Box>
-        <IconButton onClick={onClose} aria-label="Close" edge="end">
+        <IconButton
+          onClick={onClose}
+          aria-label="Close"
+          edge="end"
+          size="small"
+        >
           <Icon icon="mdi:close" height={20} />
         </IconButton>
       </DialogTitle>
@@ -450,7 +464,22 @@ function PickerContent({
           )}
         </List>
       </DialogContent>
-      {footer && <Box sx={{ px: 3, py: 1.5 }}>{footer}</Box>}
+      {footer ? (
+        <DialogActions
+          sx={{
+            px: 2.5,
+            py: 1.5,
+            flexDirection: "column",
+            alignItems: "stretch",
+          }}
+        >
+          {footer}
+        </DialogActions>
+      ) : (
+        <DialogActions sx={{ px: 2.5, py: 1.5 }}>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+      )}
     </>
   );
 }

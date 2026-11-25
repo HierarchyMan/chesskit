@@ -54,6 +54,27 @@ import {
   playerColorAtom,
 } from "./states";
 
+export interface CoachFeedMessage extends CoachMessage {
+  /** True when this message begins a new coach reply group in the live feed. */
+  startsGroup?: boolean;
+  /** Compact move label (e.g. "3. Nf3" or "Hint") captured when the reply began. */
+  moveTag?: string;
+}
+
+const currentMoveTag = (game: Chess): string | undefined => {
+  const history = game.history({ verbose: true });
+  if (!history.length) return undefined;
+  const firstMove = history[0];
+  const firstMoveNumber = Number(firstMove.before.split(" ")[5]) || 1;
+  const offset = firstMove.color === "b" ? 1 : 0;
+  const lastIndex = history.length - 1;
+  const moveNumber = firstMoveNumber + Math.floor((lastIndex + offset) / 2);
+  const lastMove = history[lastIndex];
+  return lastMove.color === "w"
+    ? `${moveNumber}. ${lastMove.san}`
+    : `${moveNumber}... ${lastMove.san}`;
+};
+
 const MISTAKE_CLASSES: readonly MoveClassification[] = [
   MoveClassification.Inaccuracy,
   MoveClassification.Mistake,
@@ -226,26 +247,38 @@ export function useInteractiveCoach(
 
   const [workerReady, setWorkerReady] = useState(false);
   const [transcript, setTranscript] = useState<{
-    messages: CoachMessage[];
+    messages: CoachFeedMessage[];
     replyStart: number;
     nextStartsReply: boolean;
   }>({ messages: [], replyStart: 0, nextStartsReply: true });
-  const { messages } = transcript;
+  const { messages, replyStart } = transcript;
   const replyMessages = useMemo(
-    () => messages.slice(transcript.replyStart),
-    [messages, transcript.replyStart]
+    () => messages.slice(replyStart),
+    [messages, replyStart]
   );
 
   const updateTranscript = useCallback(
-    (incoming: CoachMessage[], startReply = false, wiggle = false) => {
+    (
+      incoming: CoachMessage[],
+      startReply = false,
+      wiggle = false,
+      explicitTag?: string
+    ) => {
+      const moveTag = explicitTag ?? currentMoveTag(store.get(gameAtom));
       setTranscript((previous) => {
         const startsReply = startReply || previous.nextStartsReply;
         const known = new Set(previous.messages.map((message) => message.id));
-        const added = incoming.filter((message) => {
-          if (known.has(message.id)) return false;
-          known.add(message.id);
-          return true;
-        });
+        const added: CoachFeedMessage[] = incoming
+          .filter((message) => {
+            if (known.has(message.id)) return false;
+            known.add(message.id);
+            return true;
+          })
+          .map((message, idx) =>
+            idx === 0 && startsReply
+              ? { ...message, startsGroup: true, moveTag }
+              : { ...message }
+          );
         if (added.length) {
           return {
             messages: [...previous.messages, ...added],
@@ -271,7 +304,7 @@ export function useInteractiveCoach(
           : { ...previous, nextStartsReply: startsReply };
       });
     },
-    []
+    [store]
   );
   const [workerArrows, setWorkerArrows] = useState<BoardArrow[]>([]);
   const [workerHighlights, setWorkerHighlights] = useState<SquareHighlight[]>(
@@ -649,32 +682,43 @@ export function useInteractiveCoach(
     store,
   ]);
 
-  // Boot / reset the Dr. Wolf JS Worker on each new coached game.
+  // Reset coaching transcript only when a brand-new game starts (never when toggling Coach off/on mid-game).
+  const transcriptGameIdRef = useRef<number>(gameId);
+  useEffect(() => {
+    if (transcriptGameIdRef.current === gameId) return;
+    transcriptGameIdRef.current = gameId;
+    evalCacheRef.current.clear();
+    spokenIdsRef.current.clear();
+    lastPositionFeedback.current = undefined;
+    syncedPliesRef.current = 0;
+    setPositionCoachGame(null);
+    setWorkerFailed(false);
+    setTranscript({ messages: [], replyStart: 0, nextStartsReply: true });
+  }, [gameId]);
+
+  // Boot / pause the Dr. Wolf JS Worker when Coach is toggled or a new game starts,
+  // preserving existing transcript messages across same-game Coach off/on toggles.
   useEffect(() => {
     const token = ++sessionTokenRef.current;
     pendingRequestsRef.current = [];
-    evalCacheRef.current.clear();
     setWorkerReady(false);
-    setWorkerFailed(false);
     setCoachBusy(false);
-    spokenIdsRef.current.clear();
-    lastPositionFeedback.current = undefined;
     sessionPlyAtBoot.current = store.get(gameAtom).history().length;
 
     if (!enabled) {
       clientRef.current?.dispose();
       clientRef.current = null;
-      setTranscript({ messages: [], replyStart: 0, nextStartsReply: true });
       setWorkerArrows([]);
       setWorkerHighlights([]);
       setWorkerChoices([]);
       setWorkerEffect(undefined);
       setMentionedSquare(null);
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
       return;
     }
 
-    syncedPliesRef.current = 0;
-    setTranscript({ messages: [], replyStart: 0, nextStartsReply: true });
     setWorkerArrows([]);
     setWorkerHighlights([]);
     setWorkerChoices([]);
@@ -686,6 +730,7 @@ export function useInteractiveCoach(
       return;
     }
 
+    syncedPliesRef.current = 0;
     setPositionCoachGame(null);
     let client: CoachWorkerClient;
     try {
@@ -916,7 +961,9 @@ export function useInteractiveCoach(
       const text = `Consider ${move.san}. Look at what it changes before you commit.`;
       updateTranscript(
         [{ id: --positionMessageId.current, html: text, plain: text }],
-        true
+        true,
+        false,
+        "Hint"
       );
       setWorkerArrows([
         {
@@ -1033,6 +1080,7 @@ export function useInteractiveCoach(
 
   return {
     messages,
+    replyStart,
     replyMessages,
     arrows,
     highlights,

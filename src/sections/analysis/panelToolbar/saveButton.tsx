@@ -7,7 +7,7 @@ export default function SaveButton() {
   return (
     <ToolbarButton
       tooltip="Save analysis session now"
-      icon="ri:save-3-line"
+      icon="mdi:content-save-outline"
       onClick={() => request((value) => value + 1)}
     />
   );

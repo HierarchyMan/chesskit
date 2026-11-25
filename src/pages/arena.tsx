@@ -9,6 +9,7 @@ import { ARROW_CAPABILITIES } from "@/lib/arrows/prefs";
 import { PageTitle } from "@/components/pageTitle";
 import BoardWorkspace from "@/components/boardWorkspace";
 import { useHandoff } from "@/hooks/useHandoff";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import ArenaSidePanel from "@/sections/arena/sidePanel";
 import {
   arenaAnalysisOptionAtoms,
@@ -22,7 +23,7 @@ import { sideLabel, useArena } from "@/sections/arena/useArena";
 import { BoardArrow } from "@/lib/arrows/types";
 import { Color } from "@/types/enums";
 import { Box } from "@mui/material";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { setupPosition } from "@/lib/setupPosition";
 import { useMemo } from "react";
 
@@ -30,7 +31,7 @@ const NO_ARROWS: BoardArrow[] = [];
 
 export default function Arena() {
   const arena = useArena();
-  const flipped = useAtomValue(arenaFlippedAtom);
+  const [flipped, setFlipped] = useAtom(arenaFlippedAtom);
   const arrows = useAtomValue(arenaProposalArrowsAtom);
   const setArrows = useSetAtom(arenaProposalArrowsAtom);
   const game = useAtomValue(arenaGameAtom);
@@ -41,10 +42,12 @@ export default function Arena() {
     [arena.startFen]
   );
   const orientation = flipped ? Color.Black : Color.White;
-  const proposals = arena.started && !arena.isOver ? arrows : NO_ARROWS;
+  const proposals =
+    arena.started && !arena.isOver && !arena.isReviewing ? arrows : NO_ARROWS;
+  const displayedFen = arena.reviewFen ?? game.fen();
   const engine = useEngineArrows({
     position,
-    fen: game.fen(),
+    fen: displayedFen,
     prefsAtom: arenaArrowPrefsAtom,
     capabilities: ARROW_CAPABILITIES.arena,
     extra: proposals,
@@ -53,6 +56,40 @@ export default function Arena() {
   useHandoff(["fen"], ({ fen }) => {
     arena.setStartFen(fen);
   });
+
+  useKeyboardShortcut(
+    " ",
+    (event) => {
+      event.preventDefault();
+      arena.setRunning(!arena.running);
+    },
+    arena.started && !arena.isOver && !story.projection.active
+  );
+  useKeyboardShortcut(
+    "ArrowLeft",
+    () => arena.stepReview(-1),
+    arena.started && arena.totalPlies > 0 && !story.projection.active
+  );
+  useKeyboardShortcut(
+    "ArrowRight",
+    () => arena.stepReview(1),
+    arena.started && arena.isReviewing && !story.projection.active
+  );
+  useKeyboardShortcut(
+    "Home",
+    () => arena.goToPly(0),
+    arena.started && arena.totalPlies > 0 && !story.projection.active
+  );
+  useKeyboardShortcut(
+    "End",
+    () => arena.goToPly(null),
+    arena.started && arena.isReviewing && !story.projection.active
+  );
+  useKeyboardShortcut(
+    ["f", "F"],
+    () => setFlipped((value) => !value),
+    arena.started
+  );
 
   return (
     <>
@@ -63,13 +100,23 @@ export default function Arena() {
         board={
           <Board
             id="ArenaBoard"
-            canPlay={arena.started && !arena.isOver && !story.projection.active}
+            gameIdentity={arena.matchId}
+            canPlay={
+              arena.started &&
+              !arena.isOver &&
+              !arena.isReviewing &&
+              !story.projection.active
+            }
             gameAtom={arenaGameAtom}
             previewFen={
               story.projection.previewFen ??
-              (!arena.started ? preview.fen : undefined)
+              (!arena.started ? preview.fen : arena.reviewFen)
             }
-            lastMove={story.projection.lastMove}
+            lastMove={
+              story.projection.active
+                ? story.projection.lastMove
+                : arena.reviewLastMove
+            }
             highlights={story.projection.highlights}
             demonstrationFrame={story.projection.active}
             whitePlayer={{ name: sideLabel(arena.white) }}
@@ -77,7 +124,13 @@ export default function Arena() {
             boardOrientation={orientation}
             currentPositionAtom={arenaDataAtom}
             showEvaluationBar={arena.started && arena.analysis.showEvaluation}
+            reserveEvaluationBar
             showPlayerMoveIconAtom={arenaAnalysisOptionAtoms.annotations}
+            onWheelStep={
+              arena.started && arena.totalPlies > 0 && !story.projection.active
+                ? (dir) => arena.stepReview(dir)
+                : undefined
+            }
             arrows={
               story.projection.active
                 ? story.projection.arrows
@@ -104,7 +157,13 @@ export default function Arena() {
               onArrows={setArrows}
               overlays={
                 arena.started ? (
-                  <Box sx={{ px: 1.5 }}>
+                  <Box
+                    sx={{
+                      px: 1.5,
+                      borderBottom: 1,
+                      borderColor: "divider",
+                    }}
+                  >
                     <ArrowOverlay
                       view="inspector"
                       prefs={engine.prefs}
@@ -112,7 +171,7 @@ export default function Arena() {
                       onChange={engine.update}
                       arrows={engine.arrows}
                       nameOf={colorNamer}
-                      turn={game.turn()}
+                      turn={displayedFen.split(" ")[1] === "b" ? "b" : "w"}
                       onFocus={engine.setFocus}
                     />
                   </Box>

@@ -1,6 +1,5 @@
 import { PageTitle } from "@/components/pageTitle";
 import BoardWorkspace from "@/components/boardWorkspace";
-import ArrowOverlay from "@/components/board/arrowOverlay";
 import { usePlayOverlay } from "@/sections/play/usePlayOverlay";
 import { useEngineState } from "@/hooks/useEngine";
 import { useHandoff } from "@/hooks/useHandoff";
@@ -57,41 +56,37 @@ export default function Play() {
           />
         }
         inspector={
-          <Box
-            data-inspector-scroller
-            sx={{
-              minHeight: 0,
-              overflowY: "auto",
-              overscrollBehavior: "contain",
-              scrollbarGutter: "stable",
-            }}
-          >
-            {!recoveryReady ? null : hasGame ? (
-              <>
-                {/* Opening the overlays panel must not push the game controls down. */}
-                <GamePanel
-                  botEngine={botEngine}
-                  coach={overlay.coach}
-                  interactive={overlay.interactiveCoach}
-                  coachSlotRef={setCoachSlot}
-                />
-                <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
-                  <ArrowOverlay
-                    view="inspector"
-                    prefs={overlay.engine.prefs}
-                    capabilities={overlay.capabilities}
-                    onChange={overlay.engine.update}
-                    arrows={overlay.engine.arrows}
-                    nameOf={overlay.nameOf}
-                    turn={overlay.turn}
-                    onFocus={overlay.engine.setFocus}
-                  />
-                </Box>
-              </>
-            ) : (
+          !recoveryReady ? null : hasGame ? (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              <GamePanel
+                botEngine={botEngine}
+                overlay={overlay}
+                coach={overlay.coach}
+                interactive={overlay.interactiveCoach}
+                coachSlotRef={setCoachSlot}
+              />
+            </Box>
+          ) : (
+            <Box
+              data-inspector-scroller
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                overscrollBehavior: "contain",
+                scrollbarGutter: "stable",
+              }}
+            >
               <NewGamePanel botEngine={botEngine} />
-            )}
-          </Box>
+            </Box>
+          )
         }
       />
     </>

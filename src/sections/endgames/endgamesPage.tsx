@@ -45,7 +45,7 @@ export default function EndgamesPage() {
     router.push("/play");
   };
 
-  const practise = (endgame: Endgame) => {
+  const practice = (endgame: Endgame) => {
     if (gameInProgress) setPending(endgame);
     else launch(endgame);
   };
@@ -56,16 +56,18 @@ export default function EndgamesPage() {
         <Typography variant="h4" fontWeight={700}>
           Endgames
         </Typography>
-        <Typography sx={{ opacity: 0.75 }}>
-          Each lesson starts from a position that has been checked with an
-          engine. You play it out against the engine at full strength, with
-          hints and takebacks available.
+        <Typography color="text.secondary">
+          Practice essential winning and drawing techniques against a
+          full-strength opponent, with hints and takebacks available.
         </Typography>
       </Box>
 
       <Stack spacing={0.75}>
         <Stack direction="row" justifyContent="space-between">
-          <Typography variant="body2">
+          <Typography
+            variant="body2"
+            sx={{ fontVariantNumeric: "tabular-nums" }}
+          >
             {done} of {ENDGAMES.length} completed
           </Typography>
         </Stack>
@@ -84,17 +86,18 @@ export default function EndgamesPage() {
           <Box key={level}>
             <Typography
               variant="overline"
-              sx={{ opacity: 0.7, letterSpacing: "0.1em" }}
+              color="text.secondary"
+              sx={{ letterSpacing: "0.1em" }}
             >
               {level}
             </Typography>
-            <Grid container spacing={2} mt={0}>
+            <Grid container spacing={2} mt={0} alignItems="flex-start">
               {items.map((endgame) => (
                 <Grid key={endgame.id} size={{ xs: 12, md: 6 }}>
                   <EndgameCard
                     endgame={endgame}
                     completed={completed.includes(endgame.id)}
-                    onPractise={() => practise(endgame)}
+                    onPractice={() => practice(endgame)}
                   />
                 </Grid>
               ))}
@@ -115,12 +118,13 @@ export default function EndgamesPage() {
           <Button onClick={() => setPending(null)}>Keep my game</Button>
           <Button
             variant="contained"
+            color="warning"
             onClick={() => {
               if (pending) launch(pending);
               setPending(null);
             }}
           >
-            Start the endgame
+            Leave current game
           </Button>
         </DialogActions>
       </Dialog>
@@ -131,44 +135,58 @@ export default function EndgamesPage() {
 function EndgameCard({
   endgame,
   completed,
-  onPractise,
+  onPractice,
 }: {
   endgame: Endgame;
   completed: boolean;
-  onPractise: () => void;
+  onPractice: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const turn = endgame.fen.split(" ")[1] === "b" ? "b" : "w";
 
   return (
     <Card
       variant="outlined"
       sx={{
         p: 2,
-        height: "100%",
+        borderRadius: 1.5,
         borderColor: completed ? "success.main" : "divider",
       }}
     >
-      <Stack direction="row" gap={2}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        gap={2}
+        alignItems={{ xs: "center", sm: "stretch" }}
+      >
         <MiniBoard
           fen={endgame.fen}
           size={BOARD_SIZE}
           orientation={endgame.player === "w" ? Color.White : Color.Black}
-          showCoordinates={false}
+          showCoordinates={true}
         />
 
-        <Stack spacing={1} minWidth={0} flexGrow={1}>
+        <Stack spacing={1} minWidth={0} flexGrow={1} width="100%">
           <Stack direction="row" alignItems="center" gap={0.75}>
             <Typography fontWeight={600}>{endgame.title}</Typography>
             {completed && (
-              <Icon icon="mdi:check-circle" height={20} color="#22ac38" />
+              <Box
+                component="span"
+                sx={{
+                  color: "success.main",
+                  display: "inline-flex",
+                  flexShrink: 0,
+                }}
+              >
+                <Icon icon="mdi:check-circle" height={20} />
+              </Box>
             )}
           </Stack>
 
-          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+          <Typography variant="body2" color="text.secondary">
             {endgame.summary}
           </Typography>
 
-          <Stack direction="row" gap={0.75} flexWrap="wrap">
+          <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center">
             <Chip
               size="small"
               color={endgame.goal === "win" ? "primary" : "default"}
@@ -179,16 +197,41 @@ function EndgameCard({
               variant="outlined"
               label={`You play ${endgame.player === "w" ? "White" : "Black"}`}
             />
+            <Chip
+              size="small"
+              variant="outlined"
+              icon={
+                <Box
+                  component="span"
+                  sx={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    border: 1,
+                    borderColor: "divider",
+                    bgcolor: turn === "w" ? "#f2f2f2" : "#1d1d1d",
+                    ml: "6px !important",
+                  }}
+                />
+              }
+              label={`${turn === "w" ? "White" : "Black"} to move`}
+            />
           </Stack>
 
-          <Stack direction="row" gap={1} mt="auto !important">
+          <Stack
+            direction="row"
+            gap={1}
+            flexWrap="wrap"
+            mt="auto !important"
+            pt={0.5}
+          >
             <Button
               size="small"
               variant="contained"
               startIcon={<Icon icon="mdi:play" height={18} />}
-              onClick={onPractise}
+              onClick={onPractice}
             >
-              {completed ? "Play again" : "Practise"}
+              {completed ? "Play again" : "Practice"}
             </Button>
             <Button
               size="small"
@@ -201,7 +244,7 @@ function EndgameCard({
               }
               onClick={() => setOpen(!open)}
             >
-              Idea
+              {open ? "Hide idea" : "Idea"}
             </Button>
           </Stack>
         </Stack>
@@ -212,7 +255,7 @@ function EndgameCard({
           <Typography variant="body2">
             <b>Goal.</b> {challengeGoalText(endgame)}
           </Typography>
-          <Typography variant="body2" sx={{ opacity: 0.85 }}>
+          <Typography variant="body2" color="text.secondary">
             {endgame.idea}
           </Typography>
           <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>

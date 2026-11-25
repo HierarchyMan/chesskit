@@ -32,7 +32,7 @@ export default function PuzzlesPage() {
     return list;
   }, [arrowMove, arrowSide]);
 
-  useKeyboardShortcut("h", trainer.askHint, phase === "solving");
+  useKeyboardShortcut(["h", "H"], trainer.askHint, phase === "solving");
   useKeyboardShortcut(
     [" ", "ArrowRight"],
     (event) => {
@@ -41,7 +41,16 @@ export default function PuzzlesPage() {
     },
     trainer.waiting
   );
-  useKeyboardShortcut("n", trainer.next, solved);
+  useKeyboardShortcut(
+    ["n", "N", " ", "Enter"],
+    (event) => {
+      event.preventDefault();
+      trainer.next();
+    },
+    solved &&
+      !story.projection.active &&
+      !(trainer.source === "mistakes" && trainer.mistakeCount < 2)
+  );
   useKeyboardShortcut("ArrowLeft", () => trainer.review("previous"), solved);
   useKeyboardShortcut("ArrowRight", () => trainer.review("next"), solved);
   useKeyboardShortcut("Home", () => trainer.review("start"), solved);

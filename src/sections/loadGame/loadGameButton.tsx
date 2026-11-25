@@ -1,5 +1,6 @@
+import { Icon } from "@iconify/react";
 import { Button } from "@mui/material";
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import NewGameDialog from "./loadGameDialog";
 import { Chess } from "chess.js";
 
@@ -8,6 +9,7 @@ interface Props {
   label?: string;
   size?: "small" | "medium" | "large";
   variant?: "text" | "outlined" | "contained";
+  startIcon?: ReactNode;
 }
 
 export default function LoadGameButton({
@@ -15,6 +17,7 @@ export default function LoadGameButton({
   label,
   size,
   variant = "contained",
+  startIcon,
 }: Props) {
   const [openDialog, setOpenDialog] = useState(false);
 
@@ -24,7 +27,18 @@ export default function LoadGameButton({
         variant={variant}
         onClick={() => setOpenDialog(true)}
         size={size}
-        sx={{ minHeight: 36, borderRadius: "6px", whiteSpace: "nowrap" }}
+        startIcon={
+          startIcon === undefined ? (
+            <Icon icon="mdi:folder-open-outline" height={18} />
+          ) : (
+            startIcon
+          )
+        }
+        sx={{
+          minHeight: size === "small" ? 34 : 36,
+          borderRadius: 1,
+          whiteSpace: "nowrap",
+        }}
       >
         {label || "Add game"}
       </Button>

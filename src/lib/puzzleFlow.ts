@@ -7,13 +7,13 @@ import { Chess } from "chess.js";
  */
 export const PUZZLE_PACE = {
   /** The starting position stays on screen before the opponent's last move is played. */
-  setup: 1200,
+  setup: 550,
   /** After the solver's move, before the opponent answers. */
-  reply: 1500,
+  reply: 550,
   /** A wrong move stays on the board, with its cross, before it slides back. */
-  wrong: 1800,
+  wrong: 700,
   /** Between the moves of a solution that is being shown. */
-  solution: 1800,
+  solution: 750,
 } as const;
 
 /** How long the user wants each puzzle pause to last. */

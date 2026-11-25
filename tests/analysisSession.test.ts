@@ -30,11 +30,12 @@ const game = (...moves: string[]) => {
 };
 
 describe("analysis branch persistence option", () => {
-  it("defaults fully off: legal alternatives remain interactive but never enter saved data", () => {
+  it("defaults on, and when off legal alternatives remain interactive without entering saved data", () => {
     const store = createStore();
     const original = game("e4", "e5", "Nf3", "Nc6");
     store.set(loadAnalysisGameAtom, { game: original });
-    assert.equal(store.get(storeAnalysisBranchesAtom), false);
+    assert.equal(store.get(storeAnalysisBranchesAtom), true);
+    store.set(storeAnalysisBranchesAtom, false);
     store.set(boardAtom, game("e4"));
     const before = store.get(analysisSessionAtom)!;
     store.set(boardAtom, game("e4", "c5"));
@@ -132,6 +133,7 @@ describe("analysis branch persistence option", () => {
   it("off stops appending to both the main game and a saved branch, then on resumes", () => {
     const store = createStore();
     store.set(loadAnalysisGameAtom, { game: game() });
+    store.set(storeAnalysisBranchesAtom, false);
     store.set(boardAtom, game("e4"));
     assert.equal(store.get(gameAtom).history().length, 0);
     assert.deepEqual(store.get(displayedAnalysisGameAtom).history(), ["e4"]);

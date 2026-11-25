@@ -1,8 +1,9 @@
 import {
-  FormControl,
-  TextField,
-  Button,
   Alert,
+  Button,
+  FormControl,
+  Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
@@ -43,61 +44,76 @@ export default function GamePgnInput({
 
   return (
     <FormControl fullWidth>
-      <TextField
-        label="Paste your PGN here (one game or many)"
-        variant="outlined"
-        multiline
-        value={pgn}
-        onChange={(e) => setPgn(e.target.value)}
-        rows={8}
-        sx={{ mb: 2 }}
-      />
-      <Button
-        variant="contained"
-        component="label"
-        startIcon={<Icon icon="material-symbols:upload" />}
-      >
-        Upload PGN File
-        <input
-          type="file"
-          hidden
-          accept=".pgn,.txt"
-          onChange={handleFileChange}
+      <Stack spacing={1.5}>
+        <TextField
+          label="Paste your PGN here (one game or many)"
+          variant="outlined"
+          multiline
+          value={pgn}
+          onChange={(e) => setPgn(e.target.value)}
+          minRows={6}
+          maxRows={10}
         />
-      </Button>
+        <BoxRow>
+          <Button
+            size="small"
+            variant="outlined"
+            component="label"
+            startIcon={<Icon icon="mdi:upload" height={18} />}
+          >
+            Upload PGN file
+            <input
+              type="file"
+              hidden
+              accept=".pgn,.txt"
+              onChange={handleFileChange}
+            />
+          </Button>
+        </BoxRow>
 
-      {games.length === 1 && single.error && (
-        <Alert severity="error" sx={{ mt: 2 }}>
-          {single.error}
-        </Alert>
-      )}
+        {games.length === 1 && single.error && (
+          <Alert severity="error">{single.error}</Alert>
+        )}
 
-      {games.length === 1 && !single.error && (
-        <Typography variant="body2" sx={{ mt: 2, opacity: 0.8 }}>
-          {single.white} vs {single.black} · {single.result} ·{" "}
-          {Math.ceil(single.movesNb / 2)} moves
-        </Typography>
-      )}
-
-      {games.length > 1 && (
-        <>
-          <Typography variant="body2" sx={{ mt: 2, mb: 1, opacity: 0.8 }}>
-            Found {games.length} games. Pick the one you want.
+        {games.length === 1 && !single.error && (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {single.white} vs {single.black} · {single.result} ·{" "}
+            {Math.ceil(single.movesNb / 2)} moves
           </Typography>
-          <PgnGameList
-            games={games}
-            renderActions={(game) => (
-              <Button
-                size="small"
-                variant="contained"
-                onClick={() => onSelectGame(game.pgn)}
-              >
-                {actionLabel}
-              </Button>
-            )}
-          />
-        </>
-      )}
+        )}
+
+        {games.length > 1 && (
+          <Stack spacing={1}>
+            <Typography variant="body2" color="text.secondary">
+              Found {games.length} games. Pick one below.
+            </Typography>
+            <PgnGameList
+              games={games}
+              renderActions={(game) => (
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => onSelectGame(game.pgn)}
+                >
+                  {actionLabel}
+                </Button>
+              )}
+            />
+          </Stack>
+        )}
+      </Stack>
     </FormControl>
+  );
+}
+
+function BoxRow({ children }: { children: React.ReactNode }) {
+  return (
+    <Stack direction="row" alignItems="center" gap={1}>
+      {children}
+    </Stack>
   );
 }

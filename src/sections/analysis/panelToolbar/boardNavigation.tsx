@@ -48,16 +48,16 @@ export default function BoardNavigation() {
       <ToolbarButton
         tooltip="Back to start (↑ / Home)"
         onClick={() => resetBoard()}
-        icon="ri:skip-back-line"
+        icon="mdi:skip-previous"
         disabled={boardHistory.length === 0}
       />
 
       <ToolbarButton
         tooltip="Previous move (←)"
         onClick={() => undoBoardMove()}
-        icon="ri:arrow-left-s-line"
+        icon="mdi:chevron-left"
         disabled={boardHistory.length === 0}
-        iconHeight={30}
+        iconHeight={28}
       />
 
       <AutoPlayButton />

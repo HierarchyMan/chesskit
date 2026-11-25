@@ -4,18 +4,20 @@ import { engineNameAtom } from "@/sections/analysis/states";
 import { describeModel } from "@/lib/engine/modelStatus";
 import { Icon } from "@iconify/react";
 import {
+  Box,
   Dialog,
-  InputAdornment,
+  InputBase,
   List,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  TextField,
+  ListSubheader,
   Typography,
+  alpha,
 } from "@mui/material";
 import { useAtom, useSetAtom } from "jotai";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { HOME_ITEM, NAV_ITEMS } from "./navItems";
 import {
   commandPaletteOpenAtom,
@@ -24,11 +26,21 @@ import {
   settingsTabAtom,
 } from "./states";
 
+type CommandGroup = "Pages" | "Actions" | "Analysis Engines";
+
+const GROUP_ORDER: readonly CommandGroup[] = [
+  "Pages",
+  "Actions",
+  "Analysis Engines",
+];
+
 interface Command {
   id: string;
+  group: CommandGroup;
   label: string;
   hint?: string;
   icon: string;
+  active?: boolean;
   run: () => void;
 }
 
@@ -38,7 +50,7 @@ interface Props {
 
 export default function CommandPalette({ switchDarkMode }: Props) {
   const [open, setOpen] = useAtom(commandPaletteOpenAtom);
-  const setEngineName = useSetAtom(engineNameAtom);
+  const [activeEngine, setEngineName] = useAtom(engineNameAtom);
   const setSettingsOpen = useSetAtom(settingsOpenAtom);
   const setSettingsTab = useSetAtom(settingsTabAtom);
   const setImportDialog = useSetAtom(importDialogAtom);
@@ -46,6 +58,9 @@ export default function CommandPalette({ switchDarkMode }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const lastMousePos = useRef<{ x: number; y: number } | null>(null);
+  const navViaKeyboard = useRef(false);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -63,50 +78,46 @@ export default function CommandPalette({ switchDarkMode }: Props) {
     if (!open) return;
     setQuery("");
     setIndex(0);
+    lastMousePos.current = null;
+    navViaKeyboard.current = false;
     void refresh();
   }, [open, refresh]);
 
   const commands = useMemo<Command[]>(() => {
     const pages: Command[] = [HOME_ITEM, ...NAV_ITEMS].map((item) => ({
       id: `go-${item.id}`,
+      group: "Pages",
       label: `Go to ${item.label}`,
       hint: item.description,
       icon: item.icon,
       run: () => router.push(item.href),
     }));
 
-    const engines: Command[] = models
-      .filter((view) => view.supported && view.model.roles.analysis)
-      .map((view) => {
-        const name = view.model.name;
-        return {
-          id: `engine-${name}`,
-          label: `Use ${engineLabel(name).small} for analysis`,
-          hint: describeModel(view).text,
-          icon: "mdi:chip",
-          run: () => setEngineName(name),
-        };
-      });
-
-    return [
-      ...pages,
+    const actions: Command[] = [
       {
         id: "import",
-        label: "Import a PGN, FEN or image",
-        hint: "Or just press Ctrl+V on any page",
+        group: "Actions",
+        label: "Import a PGN, FEN, link, or image",
+        hint: "Paste from clipboard, upload a file, or load from Chess.com / Lichess",
         icon: "mdi:clipboard-plus-outline",
         run: () => setImportDialog({ open: true }),
       },
       {
         id: "settings",
+        group: "Actions",
         label: "Open settings",
+        hint: "Board theme, piece set, arrows, engine options",
         icon: "mdi:cog-outline",
-        run: () => setSettingsOpen(true),
+        run: () => {
+          setSettingsTab("board");
+          setSettingsOpen(true);
+        },
       },
       {
         id: "models",
+        group: "Actions",
         label: "Manage engines and models",
-        hint: "Download or remove engine files, check Reckless",
+        hint: "Download or remove browser engines, check local bridge",
         icon: "mdi:database-outline",
         run: () => {
           setSettingsTab("models");
@@ -115,15 +126,34 @@ export default function CommandPalette({ switchDarkMode }: Props) {
       },
       {
         id: "theme",
+        group: "Actions",
         label: "Switch light or dark theme",
+        hint: "Toggle between dark mode and light mode",
         icon: "mdi:brightness-6",
         run: switchDarkMode,
       },
-      ...engines,
     ];
+
+    const engines: Command[] = models
+      .filter((view) => view.supported && view.model.roles.analysis)
+      .map((view) => {
+        const name = view.model.name;
+        return {
+          id: `engine-${name}`,
+          group: "Analysis Engines",
+          label: `Use ${engineLabel(name).small} for analysis`,
+          hint: describeModel(view).text,
+          icon: "mdi:chip",
+          active: activeEngine === name,
+          run: () => setEngineName(name),
+        };
+      });
+
+    return [...pages, ...actions, ...engines];
   }, [
     router,
     models,
+    activeEngine,
     setEngineName,
     setImportDialog,
     setSettingsOpen,
@@ -133,10 +163,30 @@ export default function CommandPalette({ switchDarkMode }: Props) {
 
   const filtered = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-    return commands.filter((command) =>
-      words.every((word) => command.label.toLowerCase().includes(word))
-    );
+    if (!words.length) return commands;
+    return commands.filter((command) => {
+      const haystack =
+        `${command.label} ${command.hint ?? ""} ${command.group}`.toLowerCase();
+      return words.every((word) => haystack.includes(word));
+    });
   }, [commands, query]);
+
+  const grouped = useMemo(() => {
+    const indexMap = new Map<string, number>();
+    filtered.forEach((cmd, i) => indexMap.set(cmd.id, i));
+    return GROUP_ORDER.map((group) => ({
+      group,
+      items: filtered
+        .filter((cmd) => cmd.group === group)
+        .map((cmd) => ({ command: cmd, flatIndex: indexMap.get(cmd.id) ?? 0 })),
+    })).filter((section) => section.items.length > 0);
+  }, [filtered]);
+
+  useEffect(() => {
+    if (!navViaKeyboard.current) return;
+    navViaKeyboard.current = false;
+    itemRefs.current[index]?.scrollIntoView({ block: "nearest" });
+  }, [index]);
 
   const execute = (command: Command | undefined) => {
     if (!command) return;
@@ -158,59 +208,186 @@ export default function CommandPalette({ switchDarkMode }: Props) {
             m: 0,
             width: "calc(100% - 32px)",
             maxWidth: 560,
+            overflow: "hidden",
           },
         },
       }}
     >
-      <TextField
-        autoFocus
-        fullWidth
-        value={query}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setIndex(0);
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.25,
+          px: 2,
+          py: 1.25,
+          borderBottom: 1,
+          borderColor: "divider",
         }}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown") {
-            event.preventDefault();
-            setIndex((value) => Math.min(filtered.length - 1, value + 1));
-          } else if (event.key === "ArrowUp") {
-            event.preventDefault();
-            setIndex((value) => Math.max(0, value - 1));
-          } else if (event.key === "Enter") {
-            event.preventDefault();
-            execute(filtered[index]);
-          }
-        }}
-        placeholder="Where to? Try “puzzles”, “reckless” or “theme”"
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <Icon icon="mdi:magnify" height={22} />
-              </InputAdornment>
-            ),
-          },
-          htmlInput: { "aria-label": "Quick actions" },
-        }}
-      />
-      <List sx={{ maxHeight: 360, overflowY: "auto" }}>
-        {filtered.map((command, i) => (
-          <ListItemButton
-            key={command.id}
-            selected={i === index}
-            onMouseMove={() => setIndex(i)}
-            onClick={() => execute(command)}
-          >
-            <ListItemIcon sx={{ minWidth: 40 }}>
-              <Icon icon={command.icon} height={22} />
-            </ListItemIcon>
-            <ListItemText primary={command.label} secondary={command.hint} />
-          </ListItemButton>
+      >
+        <Box sx={{ display: "flex", color: "text.secondary", flexShrink: 0 }}>
+          <Icon icon="mdi:magnify" height={22} />
+        </Box>
+        <InputBase
+          autoFocus
+          fullWidth
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setIndex(0);
+          }}
+          onKeyDown={(event) => {
+            if (!filtered.length) return;
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              navViaKeyboard.current = true;
+              setIndex((value) => (value + 1) % filtered.length);
+            } else if (event.key === "ArrowUp") {
+              event.preventDefault();
+              navViaKeyboard.current = true;
+              setIndex(
+                (value) => (value - 1 + filtered.length) % filtered.length
+              );
+            } else if (event.key === "Enter") {
+              event.preventDefault();
+              execute(filtered[index]);
+            }
+          }}
+          placeholder="Search pages, actions, or engines…"
+          inputProps={{ "aria-label": "Quick actions" }}
+          sx={{ fontSize: "0.95rem" }}
+        />
+        <Box
+          component="kbd"
+          sx={{
+            fontFamily: "inherit",
+            fontSize: "0.7rem",
+            fontWeight: 600,
+            px: 0.75,
+            py: 0.25,
+            borderRadius: 0.75,
+            border: 1,
+            borderColor: "divider",
+            bgcolor: "action.hover",
+            color: "text.secondary",
+            flexShrink: 0,
+          }}
+        >
+          Esc
+        </Box>
+      </Box>
+
+      <List
+        dense
+        disablePadding
+        sx={{ maxHeight: 380, overflowY: "auto", py: 0.75 }}
+      >
+        {grouped.map(({ group, items }) => (
+          <Fragment key={group}>
+            <ListSubheader
+              disableSticky
+              sx={{
+                bgcolor: "transparent",
+                lineHeight: "28px",
+                px: 2,
+                pt: 0.5,
+                textTransform: "uppercase",
+                fontSize: "0.68rem",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                color: "text.secondary",
+              }}
+            >
+              {group}
+            </ListSubheader>
+            {items.map(({ command, flatIndex }) => {
+              const selected = flatIndex === index;
+              return (
+                <ListItemButton
+                  key={command.id}
+                  ref={(el) => {
+                    itemRefs.current[flatIndex] = el;
+                  }}
+                  selected={selected}
+                  onMouseMove={(event) => {
+                    const prev = lastMousePos.current;
+                    if (
+                      prev &&
+                      prev.x === event.clientX &&
+                      prev.y === event.clientY
+                    ) {
+                      return;
+                    }
+                    lastMousePos.current = {
+                      x: event.clientX,
+                      y: event.clientY,
+                    };
+                    if (index !== flatIndex) setIndex(flatIndex);
+                  }}
+                  onClick={() => execute(command)}
+                  sx={{
+                    mx: 1,
+                    my: 0.2,
+                    borderRadius: 1,
+                    px: 1.5,
+                    py: 0.75,
+                    "&.Mui-selected": {
+                      bgcolor: (t) => alpha(t.palette.primary.main, 0.14),
+                      "&:hover": {
+                        bgcolor: (t) => alpha(t.palette.primary.main, 0.2),
+                      },
+                    },
+                  }}
+                >
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 36,
+                      color: selected ? "primary.main" : "text.secondary",
+                    }}
+                  >
+                    <Icon icon={command.icon} height={20} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={command.label}
+                    secondary={command.hint}
+                    slotProps={{
+                      primary: {
+                        variant: "body2",
+                        fontWeight: selected ? 600 : 500,
+                        noWrap: true,
+                      },
+                      secondary: {
+                        variant: "caption",
+                        noWrap: true,
+                      },
+                    }}
+                  />
+                  {command.active && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        color: "primary.main",
+                        ml: 1,
+                        flexShrink: 0,
+                      }}
+                      title="Active engine"
+                    >
+                      <Icon icon="mdi:check" height={18} />
+                    </Box>
+                  )}
+                </ListItemButton>
+              );
+            })}
+          </Fragment>
         ))}
+
         {!filtered.length && (
-          <Typography sx={{ p: 2, opacity: 0.7 }}>
-            Nothing matches “{query}”.
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ px: 2.5, py: 3, textAlign: "center" }}
+          >
+            Nothing matches &ldquo;{query}&rdquo;.
           </Typography>
         )}
       </List>

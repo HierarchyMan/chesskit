@@ -34,6 +34,7 @@ import {
   SEEN_LIMIT,
   preferredSourceAtom,
   puzzleGameAtom,
+  puzzleAutoJumpAtom,
   puzzleAutoNextAtom,
   puzzleMoveTimeAtom,
   puzzleShowSetupAtom,
@@ -81,6 +82,7 @@ export const usePuzzleTrainer = () => {
   const showSetup = useAtomValue(puzzleShowSetupAtom);
   const [moveTime, setMoveTime] = useAtom(puzzleMoveTimeAtom);
   const [autoNext, setAutoNext] = useAtom(puzzleAutoNextAtom);
+  const [autoJump, setAutoJump] = useAtom(puzzleAutoJumpAtom);
   const motion = useMotionScale();
   const [source, setSourceState] = useState<PuzzleSource | null>(null);
   const { games, isReady, gamesLoaded } = useGameDatabase(
@@ -112,10 +114,12 @@ export const usePuzzleTrainer = () => {
   const focusApplied = useRef(false);
   const pending = useRef<(() => void) | null>(null);
   const autoNextRef = useRef(autoNext);
+  const autoJumpRef = useRef(autoJump);
 
   useEffect(() => {
     actionsRef.current = actions;
     autoNextRef.current = autoNext;
+    autoJumpRef.current = autoJump;
   });
 
   const later = useCallback((action: () => void, delay: number) => {
@@ -389,6 +393,12 @@ export const usePuzzleTrainer = () => {
     if (!cleanly) return;
     score(true);
     if (!alreadyScored) setSolvedInSession((count) => count + 1);
+    if (
+      autoJumpRef.current &&
+      !(source === "mistakes" && mistakePuzzles.length < 2)
+    ) {
+      later(() => nextRef.current(), 1000);
+    }
   };
 
   useEffect(() => {
@@ -568,6 +578,11 @@ export const usePuzzleTrainer = () => {
     }
   };
 
+  const nextRef = useRef(next);
+  useEffect(() => {
+    nextRef.current = next;
+  });
+
   const previous = () => {
     if (source !== "mistakes" || mistakePuzzles.length < 2) return;
     setMistakeIndex(
@@ -588,6 +603,7 @@ export const usePuzzleTrainer = () => {
   /** Steps through the finished line, move by move. */
   const review = (action: ReplayAction) => {
     if (phase !== "solved" || !solvedGame) return;
+    clearTimers();
 
     const target = navigateChess(game, solvedGame, action);
     if (target !== game) showPosition(target);
@@ -595,6 +611,7 @@ export const usePuzzleTrainer = () => {
 
   const goToPly = (ply: number) => {
     if (phase !== "solved" || !solvedGame) return;
+    clearTimers();
     if (ply < 0 || ply > solvedGame.history().length) return;
     if (ply === game.history().length) return;
 
@@ -700,6 +717,8 @@ export const usePuzzleTrainer = () => {
     setMoveTime,
     autoNext,
     setAutoNext,
+    autoJump,
+    setAutoJump,
     review,
     goToPly,
     next,

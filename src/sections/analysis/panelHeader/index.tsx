@@ -1,54 +1,38 @@
-import { Box, Stack, Typography } from "@mui/material";
-import LoadGame from "./loadGame";
-import AnalyzeButton from "./analyzeButton";
+import { Box } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { evaluationProgressAtom } from "../states";
 
+/** Slim 3px progress bar rendered ONLY while a full-game evaluation is in progress. */
 export default function PanelHeader() {
   const evaluationProgress = useAtomValue(evaluationProgressAtom);
 
+  if (!(evaluationProgress > 0 && evaluationProgress < 100)) {
+    return null;
+  }
+
   return (
-    <Box sx={{ minWidth: 0 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        gap={1}
-        flexWrap="wrap"
-      >
-        <Typography
-          variant="body2"
-          fontWeight={600}
-          sx={{ flex: 1, minWidth: 90 }}
-        >
-          Game analysis
-        </Typography>
-        <LoadGame />
-        <AnalyzeButton />
-      </Stack>
+    <Box
+      role="progressbar"
+      aria-valuenow={Math.round(evaluationProgress)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`Analyzing ${Math.round(evaluationProgress)} percent`}
+      sx={{
+        height: 3,
+        width: "100%",
+        bgcolor: "action.hover",
+        flexShrink: 0,
+        overflow: "hidden",
+      }}
+    >
       <Box
-        role="status"
         sx={{
-          height: 3,
-          bgcolor: "action.hover",
-          mt: 0.75,
-          borderRadius: 1,
-          overflow: "hidden",
+          height: "100%",
+          width: `${evaluationProgress}%`,
+          bgcolor: "primary.main",
+          transition: "width 120ms linear",
         }}
-        aria-label={
-          evaluationProgress
-            ? `Analyzing ${Math.round(evaluationProgress)} percent`
-            : "Analysis ready"
-        }
-      >
-        <Box
-          sx={{
-            height: "100%",
-            width: `${evaluationProgress}%`,
-            bgcolor: "primary.main",
-          }}
-        />
-      </Box>
+      />
     </Box>
   );
 }

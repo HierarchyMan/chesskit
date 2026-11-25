@@ -1,5 +1,6 @@
 import PrettyMoveSan from "@/components/prettyMoveSan";
-import { Box, ButtonBase, Typography } from "@mui/material";
+import { Box, ButtonBase, Tooltip, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { useEffect, useRef } from "react";
 import { LineEval } from "@/types/eval";
 import { MoveClassification } from "@/types/enums";
@@ -25,6 +26,18 @@ interface Props {
   emptyText?: string;
   annotations?: MoveAnnotation[];
 }
+
+const formatCompactEval = (line: Pick<LineEval, "cp" | "mate">): string => {
+  if (line.mate) {
+    return `${line.mate > 0 ? "+" : "-"}M${Math.abs(line.mate)}`;
+  }
+  if (line.cp !== undefined) {
+    const pawns = line.cp / 100;
+    const sign = line.cp > 0 ? "+" : "";
+    return `${sign}${Math.abs(pawns) >= 10 ? pawns.toFixed(0) : pawns.toFixed(1)}`;
+  }
+  return "";
+};
 
 export default function MovesList({
   moves,
@@ -75,10 +88,10 @@ export default function MovesList({
       <Box
         sx={{
           height: boundedHeight ? maxHeight : undefined,
-          minHeight: boundedHeight ? maxHeight : undefined,
+          minHeight: boundedHeight ? maxHeight : 0,
         }}
       >
-        <Typography variant="body2" sx={{ opacity: 0.6, py: 1 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
           {emptyText}
         </Typography>
       </Box>
@@ -94,78 +107,121 @@ export default function MovesList({
     const color = (ply + offset) % 2 === 0 ? "w" : "b";
     const active = currentPly !== undefined && currentPly - 1 === ply;
     const annotation = annotations?.[ply];
-    const annotationLabel = annotation
-      ? `${
-          annotation.classification
-            ? classificationName(annotation.classification)
-            : annotation.status === "error"
-              ? "Unavailable"
-              : "Pending"
-        }${annotation.evaluation ? ` · ${getLineEvalLabel(annotation.evaluation)}` : ""}`
-      : undefined;
+    const hasClassification = Boolean(annotation?.classification);
+    const hasEval = Boolean(
+      annotation?.evaluation &&
+        (annotation.evaluation.cp !== undefined ||
+          annotation.evaluation.mate !== undefined)
+    );
+    const hasError = annotation?.status === "error";
 
-    return (
+    const tooltipParts: string[] = [];
+    if (annotation?.classification) {
+      tooltipParts.push(classificationName(annotation.classification));
+    } else if (hasError) {
+      tooltipParts.push("Evaluation unavailable");
+    }
+    if (hasEval && annotation?.evaluation) {
+      tooltipParts.push(getLineEvalLabel(annotation.evaluation));
+    }
+    const tooltipTitle = tooltipParts.length
+      ? `${san} — ${tooltipParts.join(" · ")}`
+      : "";
+
+    const compactEval =
+      hasEval && annotation?.evaluation
+        ? formatCompactEval(annotation.evaluation)
+        : "";
+
+    const cell = (
       <ButtonBase
         data-active={active}
         disabled={!onSelect}
         onClick={() => onSelect?.(ply + 1)}
-        title={annotationLabel ? `${san} — ${annotationLabel}` : undefined}
         aria-label={
-          annotation
-            ? `${san}: ${annotation.classification ? classificationName(annotation.classification) : annotation.status === "error" ? "evaluation unavailable" : "analysis pending"}`
-            : undefined
+          tooltipParts.length ? `${san}: ${tooltipParts.join(", ")}` : san
         }
-        sx={{
-          justifyContent: "flex-start",
-          px: 0.75,
-          py: 0.25,
-          minHeight: 28,
-          borderRadius: 1,
-          fontSize: "0.95rem",
-          backgroundColor: active ? "primary.main" : undefined,
-          color: active ? "primary.contrastText" : undefined,
-          gap: 0.5,
-          flexWrap: "nowrap",
-          minWidth: 0,
-          overflow: "hidden",
-          "&:hover": {
-            backgroundColor: active ? "primary.main" : "action.hover",
-          },
+        sx={(theme) => {
+          const activeBg = alpha(
+            theme.palette.primary.main,
+            theme.palette.mode === "dark" ? 0.24 : 0.18
+          );
+          const activeHoverBg = alpha(
+            theme.palette.primary.main,
+            theme.palette.mode === "dark" ? 0.3 : 0.24
+          );
+          return {
+            justifyContent: "flex-start",
+            px: 0.75,
+            py: 0.25,
+            minHeight: 28,
+            borderRadius: 0.75,
+            color: "text.primary",
+            backgroundColor: active ? activeBg : "transparent",
+            boxShadow: active
+              ? `inset 2px 0 0 ${theme.palette.primary.main}`
+              : "none",
+            gap: 0.5,
+            flexWrap: "nowrap",
+            minWidth: 0,
+            overflow: "hidden",
+            transition: "background-color 120ms ease",
+            "&:hover": {
+              backgroundColor: active ? activeHoverBg : "action.hover",
+            },
+          };
         }}
       >
-        <Box component="span" sx={{ flexShrink: 0 }}>
+        <Box component="span" sx={{ flexShrink: 0, lineHeight: 1.2 }}>
           <PrettyMoveSan
             san={san}
-            color={active ? (color === "w" ? "b" : "w") : color}
+            color={color}
+            typographyProps={{
+              fontSize: "0.875rem",
+              fontWeight: active ? 700 : 500,
+              lineHeight: 1.2,
+            }}
           />
         </Box>
-        {annotation && (
-          <>
-            {annotation.classification && (
-              <Image
-                src={`/icons/${annotation.classification}.png`}
-                alt=""
-                width={16}
-                height={16}
-                style={{ flexShrink: 0 }}
-              />
-            )}
-            <Typography
-              component="span"
-              variant="caption"
-              noWrap
-              sx={{
-                minWidth: 0,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {annotationLabel}
-            </Typography>
-          </>
+        {hasClassification && annotation?.classification && (
+          <Image
+            src={`/icons/${annotation.classification}.png`}
+            alt=""
+            width={15}
+            height={15}
+            style={{ flexShrink: 0 }}
+          />
+        )}
+        {compactEval && (
+          <Typography
+            component="span"
+            variant="caption"
+            noWrap
+            sx={{
+              ml: "auto",
+              pl: 0.25,
+              fontSize: "0.7rem",
+              lineHeight: 1,
+              color: "text.secondary",
+              opacity: active ? 0.9 : 0.65,
+              fontVariantNumeric: "tabular-nums",
+              flexShrink: 0,
+            }}
+          >
+            {compactEval}
+          </Typography>
         )}
       </ButtonBase>
+    );
+
+    if (!tooltipTitle) return cell;
+
+    return (
+      <Tooltip title={tooltipTitle} disableInteractive placement="top">
+        <Box component="span" sx={{ display: "grid", minWidth: 0 }}>
+          {cell}
+        </Box>
+      </Tooltip>
     );
   };
 
@@ -174,8 +230,9 @@ export default function MovesList({
       ref={containerRef}
       sx={{
         height: boundedHeight ? maxHeight : undefined,
-        minHeight: boundedHeight ? maxHeight : undefined,
+        minHeight: boundedHeight ? maxHeight : 0,
         maxHeight: pageFlow ? "none" : maxHeight,
+        flex: !boundedHeight && maxHeight === "none" ? "1 1 auto" : undefined,
         overflowY: pageFlow || maxHeight === "none" ? "visible" : "auto",
         scrollbarGutter: boundedHeight ? "stable" : undefined,
         position: "relative",
@@ -188,15 +245,38 @@ export default function MovesList({
         return (
           <Box
             key={row}
-            sx={{
+            sx={(theme) => ({
               display: "grid",
-              gridTemplateColumns: "2.4rem 1fr 1fr",
+              gridTemplateColumns: "2.35rem minmax(0, 1fr) minmax(0, 1fr)",
               alignItems: "center",
-              backgroundColor: row % 2 ? "action.hover" : undefined,
-              borderRadius: 1,
-            }}
+              columnGap: 0.25,
+              backgroundColor:
+                row % 2
+                  ? alpha(
+                      theme.palette.text.primary,
+                      theme.palette.mode === "dark" ? 0.035 : 0.03
+                    )
+                  : "transparent",
+              borderRadius: 0.75,
+              "&:hover": {
+                backgroundColor: alpha(
+                  theme.palette.text.primary,
+                  theme.palette.mode === "dark" ? 0.06 : 0.05
+                ),
+              },
+            })}
           >
-            <Typography variant="body2" sx={{ opacity: 0.55, pl: 0.75 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                fontSize: "0.78rem",
+                opacity: 0.65,
+                pl: 0.75,
+                fontVariantNumeric: "tabular-nums",
+                userSelect: "none",
+              }}
+            >
               {firstMoveNumber + row}.
             </Typography>
             {renderCell(whitePly < 0 ? -1 : whitePly)}

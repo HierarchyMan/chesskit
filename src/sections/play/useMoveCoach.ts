@@ -41,7 +41,14 @@ export const useMoveCoach = (enabled: boolean, visible = true) => {
           multiPv,
           useCloudEval: false,
         }),
-      (value) => setUpdate({ ...value, source: engine, gameId })
+      (value) =>
+        setUpdate((prev) => {
+          const sameContext = prev.source === engine && prev.gameId === gameId;
+          const merged = sameContext
+            ? new Map([...prev.evaluations, ...value.evaluations])
+            : value.evaluations;
+          return { ...value, evaluations: merged, source: engine, gameId };
+        })
     );
     session.current = current;
     return () => {

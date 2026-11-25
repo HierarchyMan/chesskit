@@ -86,7 +86,7 @@ export default function BoardWorkspace({
           Math.floor(
             Math.min(
               element.clientWidth,
-              window.innerWidth - Math.max(0, rect.left) * 2
+              window.innerWidth - Math.max(0, rect.left) - 12
             )
           )
         ),

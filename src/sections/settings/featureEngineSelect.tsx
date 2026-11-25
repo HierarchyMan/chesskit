@@ -124,7 +124,6 @@ export default function FeatureEngineSelect({
             setChoice(next);
           }
         }}
-        inherit={resolveEngineChoice("analysis", analysisEngine)}
         helper={helperText}
       />
     </Stack>

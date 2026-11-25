@@ -1,4 +1,4 @@
-import { Stack, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 
 interface Props {
   title: string;
@@ -12,23 +12,29 @@ export default function PlayersMetric({
   blackValue,
 }: Props) {
   return (
-    <Stack
-      alignItems="center"
+    <Box
       sx={{
         display: "grid",
         gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
+        alignItems: "center",
         columnGap: 2,
         width: "100%",
       }}
     >
       <ValueBlock value={whiteValue} color="white" />
 
-      <Typography align="center" fontSize="0.875rem" noWrap>
+      <Typography
+        align="center"
+        variant="body2"
+        color="text.secondary"
+        fontWeight={500}
+        noWrap
+      >
         {title}
       </Typography>
 
       <ValueBlock value={blackValue} color="black" />
-    </Stack>
+    </Box>
   );
 }
 
@@ -43,16 +49,20 @@ const ValueBlock = ({
     <Typography
       align="center"
       sx={{
-        backgroundColor: color,
-        color: color === "white" ? "black" : "white",
+        bgcolor: color === "white" ? "#f4f5f7" : "#1e2026",
+        color: color === "white" ? "#141519" : "#f4f5f7",
         justifySelf: "center",
+        minWidth: 68,
+        borderRadius: 1,
+        border: 1,
+        borderColor: "divider",
+        px: 1.25,
+        py: 0.55,
+        fontSize: "0.875rem",
+        fontWeight: 600,
+        lineHeight: 1.2,
+        fontVariantNumeric: "tabular-nums",
       }}
-      borderRadius="5px"
-      lineHeight="1em"
-      fontSize="0.9rem"
-      padding={0.8}
-      fontWeight="500"
-      border="1px solid #424242"
       noWrap
     >
       {value}

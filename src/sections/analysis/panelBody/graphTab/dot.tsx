@@ -5,20 +5,21 @@ import { CLASSIFICATION_COLORS } from "@/constants";
 export default function CustomDot({
   cx,
   cy,
-  r,
   payload,
 }: DotProps & { payload?: ChartItemData }) {
+  if (typeof cx !== "number" || typeof cy !== "number") return null;
+
   const moveColor = payload?.moveClassification
     ? CLASSIFICATION_COLORS[payload.moveClassification]
-    : "grey";
+    : "#8b949e";
 
   return (
     <circle
       cx={cx}
       cy={cy}
-      r={r}
-      stroke={moveColor}
-      strokeWidth={5}
+      r={3.75}
+      stroke="#ffffff"
+      strokeWidth={1.25}
       fill={moveColor}
       fillOpacity={1}
     />

@@ -41,7 +41,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: "learn",
-    label: "Learn",
+    label: "Training Hub",
     href: "/learn",
     icon: "mdi:school-outline",
     group: "Learn",
@@ -72,7 +72,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/endgames",
     icon: "mdi:chess-king",
     group: "Learn",
-    description: "Practise the key endgames against the engine",
+    description: "Practice the key endgames against the engine",
     accent: "#19d4af",
   },
   {

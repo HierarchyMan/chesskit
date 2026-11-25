@@ -12,14 +12,15 @@ import {
 } from "@mui/material";
 import { useSetAtom } from "jotai";
 import Image from "next/image";
-import { useRouter } from "next/router";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import EngineChip from "./engineChip";
 import { findNavItem } from "./navItems";
 import {
   commandPaletteOpenAtom,
   importDialogAtom,
   settingsOpenAtom,
+  settingsTabAtom,
 } from "./states";
 
 interface Props {
@@ -27,6 +28,17 @@ interface Props {
   switchDarkMode: () => void;
   onMenuClick: () => void;
 }
+
+const iconBtnSx = {
+  width: 34,
+  height: 34,
+  borderRadius: 1,
+  color: "text.secondary",
+  "&:hover": {
+    color: "text.primary",
+    bgcolor: "action.hover",
+  },
+} as const;
 
 export default function NavBar({
   darkMode,
@@ -39,6 +51,7 @@ export default function NavBar({
   const isSmOrGreater = useMediaQuery(theme.breakpoints.up("sm"));
   const setImportDialog = useSetAtom(importDialogAtom);
   const setSettingsOpen = useSetAtom(settingsOpenAtom);
+  const setSettingsTab = useSetAtom(settingsTabAtom);
   const setPaletteOpen = useSetAtom(commandPaletteOpenAtom);
 
   const current = findNavItem(router.pathname);
@@ -57,7 +70,7 @@ export default function NavBar({
         userSelect: "none",
       }}
     >
-      <Toolbar variant="dense" sx={{ minHeight: 56, gap: 0.5 }}>
+      <Toolbar variant="dense" sx={{ minHeight: 56, height: 56, gap: 0.75 }}>
         {!isDesktop && (
           <>
             <IconButton
@@ -65,8 +78,9 @@ export default function NavBar({
               color="inherit"
               aria-label="Open menu"
               onClick={onMenuClick}
+              sx={{ width: 34, height: 34, borderRadius: 1 }}
             >
-              <Icon icon="mdi:menu" />
+              <Icon icon="mdi:menu" height={22} />
             </IconButton>
             <Link
               href="/"
@@ -77,8 +91,8 @@ export default function NavBar({
               <Image
                 src="/favicon-32x32.png"
                 alt="Chesskit logo"
-                width={28}
-                height={28}
+                width={26}
+                height={26}
               />
             </Link>
           </>
@@ -89,21 +103,24 @@ export default function NavBar({
             display: "flex",
             alignItems: "center",
             gap: 1,
-            ml: 1,
+            ml: isDesktop ? 0.5 : 0.75,
             minWidth: 0,
           }}
         >
           {current && (
-            <Icon
-              icon={current.icon}
-              height={22}
-              color={current.accent}
-              style={{ flexShrink: 0 }}
-            />
+            <Box
+              sx={{
+                display: "flex",
+                color: "primary.main",
+                flexShrink: 0,
+              }}
+            >
+              <Icon icon={current.icon} height={20} />
+            </Box>
           )}
           <Typography
             variant="h6"
-            fontSize="1.05rem"
+            fontSize="1rem"
             fontWeight={600}
             noWrap
             sx={{ minWidth: 0 }}
@@ -115,41 +132,122 @@ export default function NavBar({
 
         <Box sx={{ flexGrow: 1 }} />
 
-        <Tooltip title="Paste a PGN, FEN, link or image (or just press Ctrl+V)">
-          <Button
-            color="inherit"
-            onClick={() => setImportDialog({ open: true })}
-            startIcon={<Icon icon="mdi:clipboard-plus-outline" height={20} />}
-            sx={{
-              borderRadius: 5,
-              minWidth: 0,
-              px: isSmOrGreater ? 1.5 : 1,
-              "& .MuiButton-startIcon": { mr: isSmOrGreater ? 0.75 : 0 },
-            }}
-          >
-            {isSmOrGreater ? "Import" : ""}
-          </Button>
+        <Tooltip title="Import PGN, FEN, Lichess/Chess.com game, or board image (Ctrl/⌘+V)">
+          {isSmOrGreater ? (
+            <Button
+              size="small"
+              color="inherit"
+              onClick={() => setImportDialog({ open: true })}
+              startIcon={<Icon icon="mdi:clipboard-plus-outline" height={18} />}
+              sx={{
+                height: 34,
+                borderRadius: 1,
+                px: 1.5,
+                minWidth: 0,
+                border: 1,
+                borderColor: "divider",
+                bgcolor: "action.hover",
+                "&:hover": {
+                  bgcolor: "action.selected",
+                  borderColor: "text.secondary",
+                },
+              }}
+            >
+              Import
+            </Button>
+          ) : (
+            <IconButton
+              size="small"
+              aria-label="Import"
+              onClick={() => setImportDialog({ open: true })}
+              sx={{
+                ...iconBtnSx,
+                color: "text.primary",
+                border: 1,
+                borderColor: "divider",
+              }}
+            >
+              <Icon icon="mdi:clipboard-plus-outline" height={20} />
+            </IconButton>
+          )}
         </Tooltip>
 
         <EngineChip />
 
-        <Tooltip title="Quick actions (Ctrl+K)">
-          <IconButton
-            color="inherit"
-            aria-label="Quick actions"
-            onClick={() => setPaletteOpen(true)}
-          >
-            <Icon icon="mdi:magnify" />
-          </IconButton>
+        <Tooltip title="Quick actions (Ctrl/⌘+K)">
+          {isDesktop ? (
+            <Button
+              size="small"
+              color="inherit"
+              aria-label="Quick actions"
+              onClick={() => setPaletteOpen(true)}
+              startIcon={<Icon icon="mdi:magnify" height={18} />}
+              sx={{
+                height: 34,
+                borderRadius: 1,
+                px: 1.25,
+                minWidth: 0,
+                border: 1,
+                borderColor: "divider",
+                color: "text.secondary",
+                fontWeight: 500,
+                gap: 1,
+                "&:hover": {
+                  color: "text.primary",
+                  bgcolor: "action.hover",
+                  borderColor: "text.secondary",
+                },
+              }}
+            >
+              <Typography
+                variant="body2"
+                color="inherit"
+                sx={{ fontSize: "0.82rem" }}
+              >
+                Search
+              </Typography>
+              <Box
+                component="kbd"
+                sx={{
+                  fontFamily: "inherit",
+                  fontSize: "0.7rem",
+                  fontWeight: 600,
+                  px: 0.6,
+                  py: 0.15,
+                  borderRadius: 0.75,
+                  border: 1,
+                  borderColor: "divider",
+                  bgcolor: "action.hover",
+                  color: "text.secondary",
+                  lineHeight: 1.2,
+                }}
+              >
+                Ctrl/⌘K
+              </Box>
+            </Button>
+          ) : (
+            <IconButton
+              size="small"
+              aria-label="Quick actions"
+              onClick={() => setPaletteOpen(true)}
+              sx={iconBtnSx}
+            >
+              <Icon icon="mdi:magnify" height={20} />
+            </IconButton>
+          )}
         </Tooltip>
 
         <Tooltip title="Settings">
           <IconButton
-            color="inherit"
+            size="small"
             aria-label="Settings"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => {
+              setSettingsTab("board");
+              setSettingsOpen(true);
+            }}
+            sx={iconBtnSx}
           >
-            <Icon icon="mdi:cog-outline" />
+            <Icon icon="mdi:cog-outline" height={20} />
           </IconButton>
         </Tooltip>
 
@@ -157,29 +255,17 @@ export default function NavBar({
           title={darkMode ? "Switch to light theme" : "Switch to dark theme"}
         >
           <IconButton
-            color="inherit"
+            size="small"
             aria-label="Switch theme"
             onClick={switchDarkMode}
+            sx={iconBtnSx}
           >
-            <Icon icon={darkMode ? "mdi:brightness-7" : "mdi:brightness-4"} />
+            <Icon
+              icon={darkMode ? "mdi:weather-sunny" : "mdi:weather-night"}
+              height={20}
+            />
           </IconButton>
         </Tooltip>
-
-        {isSmOrGreater && (
-          <Tooltip title="Source on GitHub">
-            <IconButton
-              color="inherit"
-              aria-label="GitHub"
-              component="a"
-              href="https://github.com/GuillaumeSD/Chesskit"
-              target="_blank"
-              rel="noopener noreferrer"
-              edge="end"
-            >
-              <Icon icon="mdi:github" />
-            </IconButton>
-          </Tooltip>
-        )}
       </Toolbar>
     </AppBar>
   );

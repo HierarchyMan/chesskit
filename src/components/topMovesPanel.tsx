@@ -92,7 +92,7 @@ export default function TopMovesPanel({
   useEffect(() => () => onArrows?.([]), [onArrows]);
 
   // Whose moves these are, and whose move it is on the board: the same rule as
-  // the arrows, so a row's mark is the colour its arrow is drawn in.
+  // the arrows, so a row's mark is the color its arrow is drawn in.
   const turnColor = queryFen?.split(" ")[1] === "b" ? "b" : "w";
   const displayedTurn = fen.split(" ")[1] === "b" ? "b" : "w";
   const rowMark = (rank: number) => {
@@ -102,7 +102,7 @@ export default function TopMovesPanel({
     );
     return {
       color: colorWithOpacity(style.color, Math.min(1, style.opacity + 0.2)),
-      width: Math.max(2, Math.round(style.width * 20)),
+      width: Math.max(3, Math.round(style.width * 20)),
     };
   };
   const isLoading = status === "loading";
@@ -116,7 +116,7 @@ export default function TopMovesPanel({
   }, [fen, side]);
 
   return (
-    <Stack spacing={1.25}>
+    <Stack spacing={1}>
       <Stack
         direction="row"
         alignItems="center"
@@ -134,11 +134,17 @@ export default function TopMovesPanel({
               value && onSideChange(value)
             }
             aria-label="Which side to show"
+            sx={{
+              "& .MuiToggleButton-root": {
+                py: 0.25,
+                px: 1.25,
+                minHeight: 30,
+                textTransform: "none",
+              },
+            }}
           >
-            <ToggleButton value="mover" sx={{ py: 0.25, px: 1.25 }}>
-              {sideName(fen, "mover")}
-            </ToggleButton>
-            <ToggleButton value="opponent" sx={{ py: 0.25, px: 1.25 }}>
+            <ToggleButton value="mover">{sideName(fen, "mover")}</ToggleButton>
+            <ToggleButton value="opponent">
               {sideName(fen, "opponent")}
             </ToggleButton>
           </ToggleButtonGroup>
@@ -146,18 +152,13 @@ export default function TopMovesPanel({
       </Stack>
 
       {side === "opponent" && (
-        <Typography variant="caption" sx={{ opacity: 0.7 }}>
+        <Typography variant="caption" color="text.secondary">
           A what-if, not a real move: it shows what that side would do if it
-          could move right now, which reveals its threats.
+          could move right now, revealing its threats.
         </Typography>
       )}
 
-      <LinearProgress
-        sx={{
-          borderRadius: 1,
-          visibility: isLoading ? "visible" : "hidden",
-        }}
-      />
+      {isLoading && <LinearProgress sx={{ borderRadius: 1 }} />}
 
       {engineFailed && engineState && (
         <EngineFailureAlert state={engineState} />
@@ -170,87 +171,124 @@ export default function TopMovesPanel({
       {!engineFailed && status !== "error" && moves.length === 0 && (
         <Stack spacing={0.75}>
           {Array.from({ length: count }).map((_, index) => (
-            <Skeleton key={index} variant="rounded" height={72} />
+            <Skeleton key={index} variant="rounded" height={64} />
           ))}
         </Stack>
       )}
 
-      {moves.map((move) => (
-        <Stack
-          key={`${move.rank}-${move.uci}`}
-          direction="row"
-          alignItems="center"
-          gap={1}
-          tabIndex={0}
-          onMouseEnter={() =>
-            setHoverChoice({ key: hoverKey, rank: move.rank - 1 })
-          }
-          onMouseLeave={() => setHoverChoice(null)}
-          onFocus={() => setHoverChoice({ key: hoverKey, rank: move.rank - 1 })}
-          onBlur={() => setHoverChoice(null)}
-          sx={{
-            p: 0.75,
-            borderRadius: 2,
-            border: 1,
-            borderColor: "divider",
-            borderLeft: `${rowMark(move.rank).width}px solid`,
-            borderLeftColor: rowMark(move.rank).color,
-          }}
-        >
-          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-            <Stack direction="row" alignItems="center" gap={1}>
-              <Typography fontWeight={700} component="span">
-                <PrettyMoveSan san={move.san} color={turnColor} />
-              </Typography>
-              <Box
-                component="span"
-                sx={{
-                  px: 0.75,
-                  borderRadius: 1,
-                  fontSize: "0.78rem",
-                  fontWeight: 600,
-                  border: "1px solid #424242",
-                  backgroundColor: isBlackAdvantage(move) ? "#000" : "#fff",
-                  color: isBlackAdvantage(move) ? "#fff" : "#000",
-                }}
-              >
-                {move.evalLabel}
-              </Box>
-            </Stack>
-            {move.pvSan.length > 1 && (
-              <>
-                <Typography variant="caption" display="block">
-                  Then {turnColor === "w" ? "Black" : "White"} answers{" "}
-                  <b>
-                    <PrettyMoveSan
-                      san={move.pvSan[1]}
-                      color={turnColor === "w" ? "b" : "w"}
-                    />
-                  </b>
+      {moves.map((move) => {
+        const mark = rowMark(move.rank);
+        const blackAdv = isBlackAdvantage(move);
+        return (
+          <Stack
+            key={`${move.rank}-${move.uci}`}
+            direction="row"
+            alignItems="center"
+            gap={1}
+            tabIndex={0}
+            role={onPlay ? "button" : undefined}
+            aria-label={
+              onPlay
+                ? `${move.san} (${move.evalLabel}). Press Enter to ${playLabel.toLowerCase()}.`
+                : `${move.san} (${move.evalLabel})`
+            }
+            onMouseEnter={() =>
+              setHoverChoice({ key: hoverKey, rank: move.rank - 1 })
+            }
+            onMouseLeave={() => setHoverChoice(null)}
+            onFocus={() =>
+              setHoverChoice({ key: hoverKey, rank: move.rank - 1 })
+            }
+            onBlur={() => setHoverChoice(null)}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                event.target === event.currentTarget
+              ) {
+                event.preventDefault();
+                if (onPlay) {
+                  onPlay(move);
+                } else {
+                  setHoverChoice({ key: hoverKey, rank: move.rank - 1 });
+                }
+              }
+            }}
+            sx={{
+              p: 0.85,
+              borderRadius: 1,
+              overflow: "hidden",
+              border: 1,
+              borderColor: "divider",
+              borderLeft: `${mark.width}px solid`,
+              borderLeftColor: mark.color,
+              transition: "background-color 120ms ease",
+              "&:hover": { bgcolor: "action.hover" },
+              "&:focus-visible": {
+                outline: "2px solid",
+                outlineColor: "primary.main",
+                outlineOffset: 1,
+              },
+            }}
+          >
+            <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+              <Stack direction="row" alignItems="center" gap={1}>
+                <Typography fontWeight={700} component="span">
+                  <PrettyMoveSan san={move.san} color={turnColor} />
                 </Typography>
-                <Typography
-                  variant="caption"
-                  noWrap
-                  display="block"
-                  sx={{ opacity: 0.6 }}
+                <Box
+                  component="span"
+                  sx={{
+                    px: 0.75,
+                    py: 0.1,
+                    borderRadius: 1,
+                    fontSize: "0.78rem",
+                    fontWeight: 600,
+                    fontVariantNumeric: "tabular-nums",
+                    border: 1,
+                    borderColor: "divider",
+                    backgroundColor: blackAdv ? "#1e2026" : "#f4f5f7",
+                    color: blackAdv ? "#f4f5f7" : "#141519",
+                  }}
                 >
-                  {formatLine(queryFen ?? fen, move.pvSan.slice(0, 7))}
-                </Typography>
-              </>
+                  {move.evalLabel}
+                </Box>
+              </Stack>
+              {move.pvSan.length > 1 && (
+                <>
+                  <Typography variant="caption" display="block">
+                    Then {turnColor === "w" ? "Black" : "White"} answers{" "}
+                    <b>
+                      <PrettyMoveSan
+                        san={move.pvSan[1]}
+                        color={turnColor === "w" ? "b" : "w"}
+                      />
+                    </b>
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    noWrap
+                    display="block"
+                  >
+                    {formatLine(queryFen ?? fen, move.pvSan.slice(0, 7))}
+                  </Typography>
+                </>
+              )}
+            </Box>
+            {onPlay && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Icon icon="mdi:play" height={16} />}
+                onClick={() => onPlay(move)}
+                sx={{ flexShrink: 0 }}
+              >
+                {playLabel}
+              </Button>
             )}
-          </Box>
-          {onPlay && (
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<Icon icon="mdi:play" height={16} />}
-              onClick={() => onPlay(move)}
-            >
-              {playLabel}
-            </Button>
-          )}
-        </Stack>
-      ))}
+          </Stack>
+        );
+      })}
     </Stack>
   );
 }

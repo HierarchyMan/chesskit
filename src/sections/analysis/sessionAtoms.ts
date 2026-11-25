@@ -48,7 +48,7 @@ export const analysisTargetKey = (
 ) => `${session?.id ?? ""}:${getGameSignature(game)}`;
 const branchPreferenceAtom = storedAtom(
   "analysis-store-branches",
-  false,
+  true,
   (value): value is boolean => typeof value === "boolean"
 );
 

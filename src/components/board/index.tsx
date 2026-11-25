@@ -61,6 +61,8 @@ export interface Props {
   currentPositionAtom?: PrimitiveAtom<CurrentPosition>;
   showPlayerMoveIconAtom?: PrimitiveAtom<boolean>;
   showEvaluationBar?: boolean;
+  /** Keep the eval bar gutter stably allocated even when toggled off, preventing board/panel layout jumps. */
+  reserveEvaluationBar?: boolean;
   /** Changes when the board is attached to a different game or session. */
   gameIdentity?: number | string;
   arrows?: readonly BoardArrow[];
@@ -131,6 +133,7 @@ export default function Board({
   currentPositionAtom = noPositionAtom,
   showPlayerMoveIconAtom,
   showEvaluationBar = false,
+  reserveEvaluationBar = false,
   gameIdentity,
   arrows,
   header,
@@ -157,6 +160,7 @@ export default function Board({
   const boardRef = useRef<HTMLDivElement>(null);
   const [barTop, setBarTop] = useState(0);
   const reportChrome = stage?.reportChrome;
+  const hasEvalGutter = showEvaluationBar || reserveEvaluationBar;
   useLayoutEffect(() => {
     if (!stackRef.current || !boardRef.current) return;
     const measure = () => {
@@ -164,7 +168,10 @@ export default function Board({
       const stack = stackRef.current?.getBoundingClientRect();
       const root = rootRef.current?.getBoundingClientRect();
       if (board && stack && root) {
-        reportChrome?.(stack.height - board.height, root.width - board.width);
+        reportChrome?.(
+          stack.height - board.height,
+          hasEvalGutter ? root.width - board.width : 0
+        );
         setBarTop(board.top - root.top);
       }
     };
@@ -172,8 +179,9 @@ export default function Board({
     const observer = new ResizeObserver(measure);
     observer.observe(stackRef.current);
     observer.observe(boardRef.current);
+    if (rootRef.current) observer.observe(rootRef.current);
     return () => observer.disconnect();
-  }, [reportChrome]);
+  }, [reportChrome, hasEvalGutter]);
   const pixels = useBoardPixels(boardRef);
   const game = useAtomValue(gameAtom);
   const qualityMark = useQualityMark(
@@ -627,7 +635,7 @@ export default function Board({
       width={boardSize}
       sx={{ "--board-size": `${boardSize || 400}px`, maxWidth: "100%" }}
     >
-      {(showEvaluationBar || stage) && (
+      {hasEvalGutter && (
         <Box
           sx={{
             width: { xs: "1.6rem", sm: "2rem" },
@@ -636,7 +644,17 @@ export default function Board({
             position: "relative",
           }}
         >
-          <Box sx={{ position: "absolute", top: barTop, left: 0 }}>
+          <Box
+            aria-hidden={!showEvaluationBar || undefined}
+            sx={{
+              position: "absolute",
+              top: barTop,
+              left: 0,
+              opacity: showEvaluationBar ? 1 : 0,
+              pointerEvents: showEvaluationBar ? "auto" : "none",
+              transition: "opacity 160ms ease",
+            }}
+          >
             {showEvaluationBar && (
               <EvaluationBar
                 height={pixels ?? boardSize ?? 400}
@@ -653,12 +671,12 @@ export default function Board({
       <Grid
         ref={stackRef}
         container
-        rowGap={1.5}
+        rowGap={0.75}
         justifyContent="center"
         alignItems="center"
         paddingLeft={{
-          xs: stage || showEvaluationBar ? 0.5 : 0,
-          sm: stage || showEvaluationBar ? 2 : 0,
+          xs: hasEvalGutter ? 0.75 : 0,
+          sm: hasEvalGutter ? 1.25 : 0,
         }}
         size="grow"
         sx={{ minWidth: 0, flexWrap: "nowrap", flexDirection: "column" }}
@@ -680,17 +698,17 @@ export default function Board({
           justifyContent="center"
           alignItems="center"
           ref={boardRef}
-          sx={{
+          sx={(theme) => ({
             aspectRatio: "1 / 1",
             width: "100%",
             minWidth: 0,
             position: "relative",
-            borderRadius: demonstrationFrame ? "10px" : 0,
+            borderRadius: "6px",
             boxShadow: demonstrationFrame
-              ? "0 0 0 3px rgba(245, 184, 46, 0.72), 0 10px 28px rgba(0, 0, 0, 0.28)"
+              ? `0 0 0 3px ${theme.palette.warning.main}, 0 8px 24px rgba(0, 0, 0, 0.28)`
               : "none",
             transition: "box-shadow 220ms ease",
-          }}
+          })}
           size={12}
           onMouseDownCapture={(event) => {
             if (event.button === 2 && isDragging.current) cancelBoardInput();
@@ -700,7 +718,12 @@ export default function Board({
           <Box sx={{ position: "absolute", inset: 0 }}>
             <Chessboard
               id={boardId}
-              boardWidth={pixels}
+              boardWidth={
+                pixels ??
+                (boardSize
+                  ? Math.max(160, boardSize - (hasEvalGutter ? 42 : 0))
+                  : undefined)
+              }
               position={gameFen}
               onPieceDrop={onPieceDrop}
               boardOrientation={

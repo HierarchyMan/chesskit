@@ -9,7 +9,9 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import type { CascadeBoardProjection, CascadeBranch } from "@/lib/coachCascade";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 interface Props {
   cascade: CascadeBoardProjection;
@@ -35,41 +37,76 @@ export default function CascadeBar({
   onTryAgain,
   showCaption = false,
 }: Props) {
+  useKeyboardShortcut(
+    "ArrowLeft",
+    (event) => {
+      event.preventDefault();
+      if (cascade.stepIndex > 0) onPrev();
+    },
+    cascade.active
+  );
+  useKeyboardShortcut(
+    "ArrowRight",
+    (event) => {
+      event.preventDefault();
+      if (cascade.stepIndex < cascade.maxStep) onNext();
+    },
+    cascade.active
+  );
+  useKeyboardShortcut(
+    " ",
+    (event) => {
+      event.preventDefault();
+      onTogglePlay();
+    },
+    cascade.active
+  );
+  useKeyboardShortcut(
+    "Escape",
+    (event) => {
+      event.preventDefault();
+      onExit();
+    },
+    cascade.active
+  );
+
   if (!cascade.active) return null;
+
+  const transportButtonSx = {
+    width: 28,
+    height: 28,
+    borderRadius: 1,
+    p: 0,
+  };
 
   return (
     <Box
       data-cascade-bar
-      sx={{
+      sx={(theme) => ({
         width: "100%",
-        height: showCaption ? undefined : 44,
         minHeight: 44,
-        maxHeight: showCaption ? undefined : 44,
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         px: 1.25,
-        py: showCaption ? 1 : 0,
-        borderRadius: 2,
+        py: showCaption ? 0.75 : 0.45,
+        borderRadius: 1,
         border: "1px solid",
-        borderColor: "rgba(245, 184, 46, 0.45)",
-        bgcolor: (theme) =>
-          theme.palette.mode === "dark"
-            ? "rgba(245, 184, 46, 0.09)"
-            : "rgba(245, 184, 46, 0.12)",
-        overflowX: showCaption ? undefined : "auto",
-        overflowY: "hidden",
-        scrollbarWidth: "none",
-        "&::-webkit-scrollbar": { display: "none" },
-      }}
+        borderColor: alpha(theme.palette.warning.main, 0.42),
+        bgcolor: alpha(
+          theme.palette.warning.main,
+          theme.palette.mode === "dark" ? 0.1 : 0.12
+        ),
+      })}
     >
       <Stack
         direction="row"
         alignItems="center"
         justifyContent="space-between"
-        gap={1}
-        flexWrap={showCaption ? "wrap" : "nowrap"}
+        rowGap={0.75}
+        columnGap={1}
+        flexWrap="wrap"
         sx={{ minWidth: 0 }}
       >
         <Stack
@@ -77,13 +114,19 @@ export default function CascadeBar({
           alignItems="center"
           gap={0.75}
           minWidth={0}
-          sx={{ flexShrink: 0 }}
+          flexWrap="wrap"
         >
-          <Icon
-            icon="mdi:movie-open-outline"
-            width={17}
-            style={{ color: "#f5b82e", flexShrink: 0 }}
-          />
+          <Box
+            component="span"
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              color: "warning.main",
+              flexShrink: 0,
+            }}
+          >
+            <Icon icon="mdi:movie-open-outline" width={17} />
+          </Box>
           <Typography
             variant="caption"
             fontWeight={700}
@@ -93,8 +136,8 @@ export default function CascadeBar({
           </Typography>
           <Typography
             variant="caption"
+            color="text.secondary"
             sx={{
-              opacity: 0.72,
               whiteSpace: "nowrap",
               fontVariantNumeric: "tabular-nums",
             }}
@@ -110,14 +153,13 @@ export default function CascadeBar({
                 if (val) onSwitchBranch(val);
               }}
               sx={{
-                ml: 0.5,
+                ml: 0.25,
                 flexShrink: 0,
                 "& .MuiToggleButton-root": {
-                  py: 0.15,
+                  py: 0.2,
                   px: 0.85,
-                  fontSize: "0.7rem",
-                  lineHeight: 1.4,
-                  textTransform: "none",
+                  fontSize: "0.72rem",
+                  lineHeight: 1.35,
                   whiteSpace: "nowrap",
                 },
               }}
@@ -132,25 +174,28 @@ export default function CascadeBar({
           direction="row"
           alignItems="center"
           gap={0.25}
-          sx={{ flexShrink: 0 }}
+          flexWrap="wrap"
+          sx={{ ml: "auto" }}
         >
-          <Tooltip title="Previous step">
+          <Tooltip title="Previous step (←)">
             <span>
               <IconButton
                 size="small"
                 onClick={onPrev}
                 disabled={cascade.stepIndex <= 0}
                 aria-label="Previous step"
+                sx={transportButtonSx}
               >
                 <Icon icon="mdi:chevron-left" width={18} />
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={cascade.playing ? "Pause" : "Play"}>
+          <Tooltip title={cascade.playing ? "Pause (Space)" : "Play (Space)"}>
             <IconButton
               size="small"
               onClick={onTogglePlay}
               aria-label={cascade.playing ? "Pause cascade" : "Play cascade"}
+              sx={transportButtonSx}
             >
               <Icon
                 icon={cascade.playing ? "mdi:pause" : "mdi:play"}
@@ -158,13 +203,14 @@ export default function CascadeBar({
               />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Next step">
+          <Tooltip title="Next step (→)">
             <span>
               <IconButton
                 size="small"
                 onClick={onNext}
                 disabled={cascade.stepIndex >= cascade.maxStep}
                 aria-label="Next step"
+                sx={transportButtonSx}
               >
                 <Icon icon="mdi:chevron-right" width={18} />
               </IconButton>
@@ -175,6 +221,7 @@ export default function CascadeBar({
               size="small"
               onClick={onReplay}
               aria-label="Replay cascade"
+              sx={transportButtonSx}
             >
               <Icon icon="mdi:replay" width={16} />
             </IconButton>
@@ -189,6 +236,7 @@ export default function CascadeBar({
                 ml: 0.5,
                 py: 0.25,
                 px: 1.1,
+                minHeight: 28,
                 fontSize: "0.75rem",
                 whiteSpace: "nowrap",
               }}
@@ -199,11 +247,13 @@ export default function CascadeBar({
           <Button
             size="small"
             variant="outlined"
+            color="inherit"
             onClick={onExit}
             sx={{
               ml: 0.5,
               py: 0.25,
               px: 1.1,
+              minHeight: 28,
               fontSize: "0.75rem",
               whiteSpace: "nowrap",
             }}
@@ -216,9 +266,13 @@ export default function CascadeBar({
       {showCaption && cascade.caption && (
         <Typography
           variant="caption"
+          aria-live="polite"
           sx={{
             display: "block",
             mt: 0.5,
+            maxHeight: 52,
+            overflowY: "auto",
+            overflowWrap: "anywhere",
             color: "text.secondary",
             lineHeight: 1.4,
           }}

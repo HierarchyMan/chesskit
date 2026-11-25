@@ -80,6 +80,7 @@ export default function BoardContainer({ overlay }: Props) {
       currentPositionAtom={currentPositionAtom}
       showPlayerMoveIconAtom={analysisOptionAtoms.annotations}
       showEvaluationBar={showEvaluationBar}
+      reserveEvaluationBar
       gameIdentity={sessionId}
       onWheelStep={active ? undefined : wheelStep}
       previewFen={active ? cascade.projection.previewFen : undefined}

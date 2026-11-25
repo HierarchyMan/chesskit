@@ -10,7 +10,7 @@ import {
 import { EngineState } from "@/hooks/useEngine";
 import { EngineId } from "@/types/enums";
 import { Icon } from "@iconify/react";
-import { Alert, Box, Button, Stack } from "@mui/material";
+import { Alert, Box, Button, LinearProgress, Stack } from "@mui/material";
 
 /**
  * An engine that did not start: the download prompt when it is not downloaded,
@@ -76,6 +76,14 @@ export default function EngineDownloadAlert({
   const progress = view?.progress;
   const failed = view?.error;
 
+  const pct =
+    progress && progress.totalBytes > 0
+      ? Math.min(
+          100,
+          Math.round((progress.receivedBytes / progress.totalBytes) * 100)
+        )
+      : undefined;
+
   const useDefault = onUseDefault && engineName !== DEFAULT_ENGINE && (
     <Button color="inherit" size="small" onClick={onUseDefault}>
       Use {engineLabel(DEFAULT_ENGINE).small}
@@ -106,9 +114,23 @@ export default function EngineDownloadAlert({
     <Alert
       severity={failed ? "error" : "info"}
       data-engine-download={engineName}
-      sx={{ width: "100%", "& .MuiAlert-message": { minWidth: 0 } }}
+      sx={{
+        width: "100%",
+        "& .MuiAlert-message": {
+          minWidth: 0,
+          width: "100%",
+          fontVariantNumeric: "tabular-nums",
+        },
+      }}
     >
       {text}
+      {progress && (
+        <LinearProgress
+          variant={pct !== undefined ? "determinate" : "indeterminate"}
+          value={pct}
+          sx={{ mt: 1, borderRadius: 1, height: 5 }}
+        />
+      )}
       <Stack direction="row" gap={1} mt={1} flexWrap="wrap">
         <Button
           variant="outlined"
@@ -117,12 +139,15 @@ export default function EngineDownloadAlert({
           disabled={!!progress}
           startIcon={<Icon icon="mdi:download" height={18} />}
           onClick={() => void download(engineName)}
+          sx={{ fontVariantNumeric: "tabular-nums" }}
         >
           {progress
-            ? "Downloading…"
+            ? pct !== undefined
+              ? `Downloading (${pct}%)`
+              : "Downloading…"
             : failed
               ? "Retry"
-              : `Download ${model.sizeMb} MB`}
+              : `Download (${model.sizeMb} MB)`}
         </Button>
         {!progress && useDefault}
       </Stack>
