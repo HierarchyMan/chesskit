@@ -1,4 +1,5 @@
-import { Chess, Square, validateFen } from "chess.js";
+import { Square } from "chess.js";
+import { createChess, validateFenPermissive } from "./chessInstance";
 
 export type PieceCode =
   | "wP"
@@ -261,10 +262,24 @@ export const validatePosition = (
   if (
     entries.some(
       ([square, piece]) =>
-        piece[1] === "P" && (square[1] === "1" || square[1] === "8")
+        (piece === "wP" && square[1] === "8") ||
+        (piece === "bP" && square[1] === "1")
     )
   ) {
-    problems.push("Pawns can't stand on the first or eighth rank.");
+    problems.push("Pawns can't stand on their promotion rank.");
+  }
+
+  if (
+    !options?.allowExtraPieces &&
+    entries.some(
+      ([square, piece]) =>
+        (piece === "wP" && square[1] === "1") ||
+        (piece === "bP" && square[1] === "8")
+    )
+  ) {
+    warnings.push(
+      "Pawns on their starting back rank (White on rank 1, Black on rank 8) are rejected by standard Stockfish and Reckless — switch to Fairy-Stockfish to run an engine."
+    );
   }
 
   if (!options?.allowExtraPieces) {
@@ -300,7 +315,7 @@ export const validatePosition = (
     const sanitized = sanitizePosition(position);
     const fen = positionToFen(sanitized);
 
-    const fenCheck = validateFen(fen);
+    const fenCheck = validateFenPermissive(fen);
     if (!fenCheck.ok) {
       problems.push(fenCheck.error ?? "This position isn't valid.");
     } else {
@@ -310,13 +325,13 @@ export const validatePosition = (
       fields[3] = "-";
 
       try {
-        if (new Chess(fields.join(" ")).inCheck()) {
+        if (createChess(fields.join(" ")).inCheck()) {
           problems.push(
             `${otherTurn === "w" ? "White" : "Black"} is in check, but it is ${position.turn === "w" ? "White" : "Black"}'s turn to move.`
           );
         }
 
-        const game = new Chess(fen);
+        const game = createChess(fen);
         if (game.isCheckmate())
           warnings.push("This position is already checkmate.");
         else if (game.isStalemate())

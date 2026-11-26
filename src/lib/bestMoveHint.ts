@@ -1,6 +1,6 @@
 import { CurrentPosition } from "@/types/eval";
 import { MoveClassification } from "@/types/enums";
-import { Chess } from "chess.js";
+import { createChess } from "./chessInstance";
 import { uciMoveParams } from "./chess";
 import { WORTH_VISUALIZING } from "./classificationLabels";
 
@@ -9,7 +9,7 @@ const legalMove = (fen: string | undefined, uci: string | undefined) => {
     return undefined;
   }
   try {
-    const game = new Chess(fen);
+    const game = createChess(fen);
     if (game.isGameOver()) return undefined;
     return game.move(uciMoveParams(uci));
   } catch {

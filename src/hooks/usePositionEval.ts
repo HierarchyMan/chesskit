@@ -2,7 +2,7 @@ import { useEffectiveAdvice } from "@/hooks/useEffectiveEngineSettings";
 import { engineDepthAtom } from "@/sections/analysis/states";
 import { EngineFeature, engineFeatureLabel } from "@/lib/engine/featureEngines";
 import { CurrentPosition } from "@/types/eval";
-import { Chess } from "chess.js";
+import { createChess } from "@/lib/chessInstance";
 import { useAtomValue } from "jotai";
 import { useEffect, useState } from "react";
 import { useEngineState } from "./useEngine";
@@ -10,7 +10,7 @@ import { useFeatureEngineName } from "./useFeatureEngineName";
 
 const isOver = (fen: string): boolean => {
   try {
-    return new Chess(fen).isGameOver();
+    return createChess(fen).isGameOver();
   } catch {
     return true;
   }

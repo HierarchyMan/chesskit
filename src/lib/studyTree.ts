@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { createChess } from "./chessInstance";
 
 export interface StudyNode {
   id: string;
@@ -80,7 +81,7 @@ export const studyNodePath = (
 };
 
 export const studyPathGame = (tree: StudyTree, path: StudyPath): Chess => {
-  const game = new Chess(tree.rootFen);
+  const game = createChess(tree.rootFen);
   for (const [key, value] of Object.entries(path.headers))
     game.setHeader(key, value);
   const comment = (id: string) => {
@@ -112,7 +113,7 @@ const parseUncachedStudyPgn = (
     headers[match[1]] = match[2].replace(/\\([\\"])/g, "$1");
     remaining = remaining.slice(match[0].length);
   }
-  const root = new Chess(headers.FEN);
+  const root = createChess(headers.FEN);
   const tree = emptyStudyTree(root.fen());
   const tokens =
     remaining.match(/\{[^}]*\}|;[^\r\n]*|\(|\)|\$\d+|[^\s(){};]+/g) ?? [];
@@ -123,7 +124,7 @@ const parseUncachedStudyPgn = (
     startFen: string,
     nested: boolean
   ): StudyPath => {
-    const game = new Chess(startFen);
+    const game = createChess(startFen);
     let current = start;
     let previous = start;
     let beforeMoveFen = startFen;
@@ -268,7 +269,7 @@ export const studyFromGame = (
 ): { tree: StudyTree; main: StudyPath } => {
   const history = game.history({ verbose: true });
   const tree = emptyStudyTree(history[0]?.before ?? game.fen());
-  const replay = new Chess(tree.rootFen);
+  const replay = createChess(tree.rootFen);
   const comments = new Map(
     game.getComments().map(({ fen, comment }) => [fen, comment])
   );
@@ -317,7 +318,7 @@ export const writeStudyPath = (tree: StudyTree, path: StudyPath): string => {
     const body = pgn.slice(pgn.lastIndexOf("]\n") + 2);
     return `${headerText(path.headers)}\n${body}`;
   }
-  const game = new Chess(tree.rootFen);
+  const game = createChess(tree.rootFen);
   const tokens = [...(path.annotations.root ?? [])];
   for (const node of studyNodePath(tree, path.endpoint)) {
     tokens.push(moveText(game, node), ...(path.annotations[node.id] ?? []));
@@ -344,10 +345,10 @@ export const writeStudyTree = (
     const before = game.fen();
     const tokens = [moveText(game, first), ...first.annotations];
     for (const child of children.slice(1))
-      tokens.push(`(${branch(child, new Chess(before))})`);
+      tokens.push(`(${branch(child, createChess(before))})`);
     const rest = emit(first.id, game);
     if (rest) tokens.push(rest);
     return tokens.join(" ");
   };
-  return `${headerText(headers)}\n\n${tree.nodes.root.annotations.join(" ")} ${emit("root", new Chess(tree.rootFen))} ${headers.Result ?? "*"}`.trim();
+  return `${headerText(headers)}\n\n${tree.nodes.root.annotations.join(" ")} ${emit("root", createChess(tree.rootFen))} ${headers.Result ?? "*"}`.trim();
 };

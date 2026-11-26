@@ -1,5 +1,5 @@
 import { EngineId } from "@/types/enums";
-import { Chess } from "chess.js";
+import { createChess } from "../chessInstance";
 import { engineMaxElo, getEngineModel } from "./models";
 import { DEFAULT_FULL_STRENGTH_MS } from "./engineSettings";
 import {
@@ -53,7 +53,7 @@ export const planBotMove = (
 };
 
 export const legalUciMoves = (fen: string): string[] =>
-  new Chess(fen)
+  createChess(fen)
     .moves({ verbose: true })
     .map((move) => move.from + move.to + (move.promotion ?? ""));
 
@@ -95,7 +95,7 @@ export const getBotMove = async (
     useCloudEval: false,
   });
 
-  const turn = new Chess(fen).turn();
+  const turn = createChess(fen).turn();
   const candidates = result.lines
     .filter((line) => line.pv.length > 0)
     .map((line) => ({ uci: line.pv[0], cp: scoreFromLine(line, turn) }));

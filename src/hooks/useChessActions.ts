@@ -1,4 +1,5 @@
 import { getGameFromPgn, setGameHeaders } from "@/lib/chess";
+import { createChess, loadFenPermissive } from "@/lib/chessInstance";
 import { loadGameFromText } from "@/lib/pgn";
 import { playIllegalMoveSound, playSoundFromMove } from "@/lib/sounds";
 import { Player } from "@/types/game";
@@ -27,7 +28,7 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
 
   const reset = useCallback(
     (params?: resetGameParams) => {
-      const newGame = new Chess(params?.fen);
+      const newGame = createChess(params?.fen);
       if (!params?.noHeaders) setGameHeaders(newGame, params);
       setGame(newGame);
     },
@@ -36,7 +37,6 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
 
   const copyGame = useCallback(() => {
     const game = store.get(chessAtom);
-    const newGame = new Chess();
 
     if (game.history().length === 0) {
       const pgnSplitted = game.pgn().split("]");
@@ -45,8 +45,7 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
           pgnSplitted.at(-1)?.trim() ?? ""
         )
       ) {
-        newGame.loadPgn(pgnSplitted.slice(0, -1).join("]") + "]");
-        return newGame;
+        return loadGameFromText(pgnSplitted.slice(0, -1).join("]") + "]");
       }
     }
 
@@ -56,7 +55,7 @@ export const useChessActions = (chessAtom: PrimitiveAtom<Chess>) => {
   const resetToStartingPosition = useCallback(
     (pgn?: string) => {
       const newGame = pgn ? getGameFromPgn(pgn) : copyGame();
-      newGame.load(newGame.getHeaders().FEN || DEFAULT_POSITION, {
+      loadFenPermissive(newGame, newGame.getHeaders().FEN || DEFAULT_POSITION, {
         preserveHeaders: true,
       });
       setGame(newGame);

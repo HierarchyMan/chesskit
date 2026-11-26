@@ -1,4 +1,5 @@
-import { Chess, Color, Move, PieceSymbol, Square } from "chess.js";
+import { type Chess, Color, Move, PieceSymbol, Square } from "chess.js";
+import { createChess } from "../chessInstance";
 
 export type MoveTag =
   | "capture"
@@ -373,8 +374,8 @@ export const describeMove = (
   fenBefore: string,
   uci: string
 ): MoveDescription => {
-  const before = new Chess(fenBefore);
-  const after = new Chess(fenBefore);
+  const before = createChess(fenBefore);
+  const after = createChess(fenBefore);
   const move: Move = after.move({
     from: uci.slice(0, 2),
     to: uci.slice(2, 4),

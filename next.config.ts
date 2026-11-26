@@ -59,6 +59,14 @@ const nextConfig = (phase: string): NextConfig => ({
                 key: "Age",
                 value: "181921",
               },
+              {
+                key: "Cross-Origin-Embedder-Policy",
+                value: "credentialless",
+              },
+              {
+                key: "Cross-Origin-Resource-Policy",
+                value: "same-origin",
+              },
             ],
           },
         ],

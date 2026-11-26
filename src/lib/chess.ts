@@ -1,6 +1,7 @@
 import { EvaluateGameParams, LineEval, PositionEval } from "@/types/eval";
 import { Game, Player } from "@/types/game";
 import { Chess, PieceSymbol, Square } from "chess.js";
+import { createChess } from "./chessInstance";
 import { getPositionWinPercentage } from "./engine/helpers/winPercentage";
 import { Color } from "@/types/enums";
 import { loadGameFromText, normalizePgn } from "./pgn";
@@ -151,7 +152,7 @@ export const setGameHeaders = (
 export const moveLineUciToSan = (
   fen: string
 ): ((moveUci: string) => string) => {
-  const game = new Chess(fen);
+  const game = createChess(fen);
 
   return (moveUci: string): string => {
     try {
@@ -187,12 +188,12 @@ export const getEvaluationBarValue = (
 };
 
 export const getIsStalemate = (fen: string): boolean => {
-  const game = new Chess(fen);
+  const game = createChess(fen);
   return game.isStalemate();
 };
 
 export const getWhoIsCheckmated = (fen: string): "w" | "b" | null => {
-  const game = new Chess(fen);
+  const game = createChess(fen);
   if (!game.isCheckmate()) return null;
   return game.turn();
 };
@@ -213,7 +214,7 @@ export const isSimplePieceRecapture = (
   fen: string,
   uciMoves: [string, string]
 ): boolean => {
-  const game = new Chess(fen);
+  const game = createChess(fen);
   const moves = uciMoves.map((uciMove) => uciMoveParams(uciMove));
 
   if (moves[0].to !== moves[1].to) return false;
@@ -231,7 +232,7 @@ export const getIsPieceSacrifice = (
 ): boolean => {
   if (!bestLinePvToPlay.length) return false;
 
-  const game = new Chess(fen);
+  const game = createChess(fen);
   const whiteToPlay = game.turn() === "w";
   const startingMaterialDifference = getMaterialDifference(fen);
 
@@ -284,7 +285,7 @@ export const getIsPieceSacrifice = (
 };
 
 export const getMaterialDifference = (fen: string): number => {
-  const game = new Chess(fen);
+  const game = createChess(fen);
   const board = game.board().flat();
 
   return board.reduce((acc, square) => {
@@ -317,7 +318,7 @@ const getPieceValue = (piece: PieceSymbol): number => {
 };
 
 export const isCheck = (fen: string): boolean => {
-  const game = new Chess(fen);
+  const game = createChess(fen);
   return game.inCheck();
 };
 

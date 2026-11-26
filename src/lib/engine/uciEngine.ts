@@ -20,6 +20,7 @@ import { getEngineWorker, sendCommandsToWorker } from "./worker";
 import { UciOption, parseUciOptions } from "./uciOptions";
 import { getEngineModel } from "./models";
 import { fenHasExtraPieces } from "../editorPosition";
+import { fenHasBackRankPawns } from "../chessInstance";
 import { logMessageIfLocalhost } from "../helpers";
 
 /** UCI commands for a new worker, built from the options the engine advertised. */
@@ -189,11 +190,18 @@ export class UciEngine {
   }
 
   private assertPositionSupported(fen: string) {
-    if (!fenHasExtraPieces(fen)) return;
+    const hasExtra = fenHasExtraPieces(fen);
+    const hasBackRankPawns = fenHasBackRankPawns(fen);
+    if (!hasExtra && !hasBackRankPawns) return;
     const model = getEngineModel(this.name);
     if (model.supportsExtraPieces) return;
+    if (hasExtra) {
+      throw new Error(
+        `${model.label.small} does not support positions with more than 8 pawns or 16 pieces per side. Switch to Fairy-Stockfish to analyze or play this position.`
+      );
+    }
     throw new Error(
-      `${model.label.small} does not support positions with more than 8 pawns or 16 pieces per side. Switch to Fairy-Stockfish to analyze or play this position.`
+      `${model.label.small} does not support pawns on the 1st or 8th rank. Switch to Fairy-Stockfish to analyze or play this position.`
     );
   }
 

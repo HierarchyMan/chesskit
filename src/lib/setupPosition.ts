@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { createChess } from "./chessInstance";
 import { loadGameFromText, normalizeFen } from "./pgn";
 import { getOddsFen, Odds } from "./odds";
 import { Color } from "@/types/enums";
@@ -7,7 +8,7 @@ export const setupPosition = (text = ""): { fen: string; error?: string } => {
   if (!text.trim()) return { fen: new Chess().fen() };
   try {
     const fen = normalizeFen(text) ?? loadGameFromText(text).fen();
-    if (new Chess(fen).isGameOver())
+    if (createChess(fen).isGameOver())
       return { fen, error: "That position is already finished." };
     return { fen };
   } catch {

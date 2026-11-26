@@ -9,7 +9,8 @@ import { effectiveStrength } from "@/lib/engine/botMove";
 import { BotStrength } from "@/lib/engine/strength";
 import { getGameResult } from "@/lib/gameResult";
 import { playSoundFromMove } from "@/lib/sounds";
-import { Chess, Square } from "chess.js";
+import { type Chess, Square } from "chess.js";
+import { loadPgnPermissive } from "@/lib/chessInstance";
 import { setupPosition } from "@/lib/setupPosition";
 import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
 import { fullStrengthMsAtom } from "@/lib/engine/engineSettings";
@@ -323,8 +324,7 @@ export const useArena = () => {
   const result = useMemo(() => getGameResult(game, null), [game]);
 
   const finishedGame = useCallback((): Chess => {
-    const copy = new Chess();
-    copy.loadPgn(game.pgn());
+    const copy = loadPgnPermissive(game.pgn());
     setGameHeaders(copy, {
       ended: result.over
         ? { result: result.result, termination: result.reason }

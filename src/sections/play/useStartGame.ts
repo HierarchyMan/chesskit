@@ -5,7 +5,7 @@ import { BotStrength, CHALLENGE_STRENGTH } from "@/lib/engine/strength";
 import { effectiveStrength } from "@/lib/engine/botMove";
 import { playSetupPosition } from "@/lib/setupPosition";
 import { Color, EngineId } from "@/types/enums";
-import { Chess } from "chess.js";
+import { createChess } from "@/lib/chessInstance";
 import { useStore } from "jotai";
 import { useCallback } from "react";
 import {
@@ -108,7 +108,7 @@ export const useStartGame = () => {
           if (setup.error) return setup.error;
           startFen = setup.fen;
         }
-        if (startFen && new Chess(startFen).isGameOver()) {
+        if (startFen && createChess(startFen).isGameOver()) {
           return "That position is already finished.";
         }
       } catch (error) {

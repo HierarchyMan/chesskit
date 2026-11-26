@@ -1,4 +1,5 @@
-import { Chess, Square } from "chess.js";
+import { Square } from "chess.js";
+import { createChess } from "./chessInstance";
 import { MoveClassification } from "@/types/enums";
 import { CurrentPosition } from "@/types/eval";
 import { SquareHighlight } from "@/components/board/cues";
@@ -207,7 +208,7 @@ const safeBestSan = (
 ): string | undefined => {
   if (!bestUci || bestUci.length < 4) return undefined;
   try {
-    const g = new Chess(fenBefore);
+    const g = createChess(fenBefore);
     const m = g.move({
       from: bestUci.slice(0, 2),
       to: bestUci.slice(2, 4),

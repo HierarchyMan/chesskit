@@ -1,4 +1,4 @@
-import { Chess } from "chess.js";
+import { createChess } from "../chessInstance";
 import { LineEval } from "@/types/eval";
 import {
   getLineEvalLabel,
@@ -91,7 +91,7 @@ const buildSteps = (
   moves: string[],
   mover: "w" | "b"
 ): StoryStep[] => {
-  const game = new Chess(fenBefore);
+  const game = createChess(fenBefore);
   const steps: StoryStep[] = [
     {
       index: 0,
@@ -209,7 +209,7 @@ export const buildMoveStory = ({
   beforeLines,
   afterLines,
 }: StoryInput): MoveStory => {
-  const mover = new Chess(fenBefore).turn();
+  const mover = createChess(fenBefore).turn();
   const bestBefore = beforeLines[0];
   const bestAfter = afterLines[0];
 
@@ -309,7 +309,7 @@ export const buildContinuationStory = (
   fenBefore: string,
   line: LineEval
 ): MoveStory => {
-  const mover = new Chess(fenBefore).turn();
+  const mover = createChess(fenBefore).turn();
   const steps = buildSteps(
     fenBefore,
     line.pv.slice(0, 1 + MAX_CASCADE_PLIES),

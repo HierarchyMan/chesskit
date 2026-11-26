@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Chess, DEFAULT_POSITION, Square } from "chess.js";
+import { type Chess, DEFAULT_POSITION, Square } from "chess.js";
+import { createChess } from "@/lib/chessInstance";
 import { buildAnalysisFeedback } from "@/lib/analysisFeedback";
 import { chessPathKey } from "@/lib/chessHistory";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
@@ -101,7 +102,7 @@ const attackerArrowsTo = (
   attackerColor: "w" | "b"
 ): BoardArrow[] => {
   try {
-    const g = new Chess(fen);
+    const g = createChess(fen);
     return g
       .attackers(target, attackerColor)
       .slice(0, 3)
@@ -118,7 +119,7 @@ const attackerArrowsTo = (
 
 const findKingSquare = (fen: string, color: "w" | "b"): Square | undefined => {
   try {
-    const g = new Chess(fen);
+    const g = createChess(fen);
     for (const row of g.board()) {
       for (const cell of row) {
         if (cell && cell.type === "k" && cell.color === color) {
@@ -134,7 +135,7 @@ const findKingSquare = (fen: string, color: "w" | "b"): Square | undefined => {
 
 const terminalEvalForFen = (fen: string) => {
   try {
-    return arenaTerminalEval(new Chess(fen));
+    return arenaTerminalEval(createChess(fen));
   } catch {
     return undefined;
   }

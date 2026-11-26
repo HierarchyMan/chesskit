@@ -109,11 +109,33 @@ describe("validation", () => {
     );
   });
 
-  it("rejects pawns on the back ranks", () => {
-    const result = validatePosition(
+  it("rejects pawns on their promotion rank but allows starting-rank pawns with a warning unless Fairy-Stockfish is active", () => {
+    const whitePromo = validatePosition(
       placePiece(positionFromFen("4k3/8/8/8/8/8/8/4K3 w - - 0 1"), "a8", "wP")
     );
-    assert.match(result.problems.join(" "), /first or eighth rank/);
+    assert.equal(whitePromo.ok, false);
+    assert.match(whitePromo.problems.join(" "), /promotion rank/);
+
+    const blackPromo = validatePosition(
+      placePiece(positionFromFen("4k3/8/8/8/8/8/8/4K3 w - - 0 1"), "a1", "bP")
+    );
+    assert.equal(blackPromo.ok, false);
+    assert.match(blackPromo.problems.join(" "), /promotion rank/);
+
+    const startingRankPos = placePiece(
+      positionFromFen("4k3/8/8/8/8/8/8/4K3 w - - 0 1"),
+      "a1",
+      "wP"
+    );
+    const standardResult = validatePosition(startingRankPos);
+    assert.equal(standardResult.ok, true);
+    assert.match(standardResult.warnings.join(" "), /Fairy-Stockfish/);
+
+    const fairyResult = validatePosition(startingRankPos, {
+      allowExtraPieces: true,
+    });
+    assert.equal(fairyResult.ok, true);
+    assert.equal(fairyResult.warnings.length, 0);
   });
 
   it("rejects touching kings", () => {

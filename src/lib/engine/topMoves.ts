@@ -1,4 +1,5 @@
-import { Chess } from "chess.js";
+import { type Chess } from "chess.js";
+import { createChess } from "../chessInstance";
 import { LineEval } from "@/types/eval";
 import { getLineEvalLabel, uciMoveParams } from "../chess";
 import { atom, Atom } from "jotai";
@@ -87,7 +88,7 @@ export type SideFen = { fen: string } | { error: string };
 export const getFenForSide = (fen: string, side: MoveSide): SideFen => {
   let game: Chess;
   try {
-    game = new Chess(fen);
+    game = createChess(fen);
   } catch {
     return { error: "This position is not valid." };
   }
@@ -108,7 +109,7 @@ export const getFenForSide = (fen: string, side: MoveSide): SideFen => {
   const flipped = fields.join(" ");
 
   try {
-    const flippedGame = new Chess(flipped);
+    const flippedGame = createChess(flipped);
     if (!flippedGame.moves().length) {
       return { error: "That side has no legal moves in this position." };
     }
@@ -131,7 +132,7 @@ export const linesToTopMoves = (
         all.findIndex((other) => other.pv[0] === line.pv[0]) === index
     )
     .map((line, index) => {
-      const game = new Chess(fen);
+      const game = createChess(fen);
       const pvSan: string[] = [];
       const pvUci: string[] = [];
 

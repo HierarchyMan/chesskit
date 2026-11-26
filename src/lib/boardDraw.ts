@@ -1,4 +1,5 @@
-import { Chess, Square } from "chess.js";
+import { type Chess, Square } from "chess.js";
+import { createChess } from "./chessInstance";
 import { GameEnd, getGameResult } from "./gameResult";
 import { chessPathKey } from "./chessHistory";
 
@@ -14,7 +15,7 @@ export function getBoardDraw(
 ): BoardDraw | null {
   let game: Chess;
   try {
-    game = typeof position === "string" ? new Chess(position) : position;
+    game = typeof position === "string" ? createChess(position) : position;
   } catch {
     // Incomplete scan previews do not establish a game result.
     return null;

@@ -4,7 +4,7 @@ import { setGameHeaders } from "@/lib/chess";
 import { evaluateChallenge, getEndgame } from "@/lib/endgames";
 import { getGameResult, getOutcomeFor } from "@/lib/gameResult";
 import { markEndgameCompleted, recordGame, statsAtom } from "@/lib/stats";
-import { Chess } from "chess.js";
+import { loadPgnPermissive } from "@/lib/chessInstance";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo, useRef } from "react";
 import {
@@ -68,8 +68,7 @@ export const useGameLifecycle = (
       setStats((stats) => recordGame(stats, getOutcomeFor(info, playerColor)));
     }
 
-    const finished = new Chess();
-    finished.loadPgn(game.pgn());
+    const finished = loadPgnPermissive(game.pgn());
     setGameHeaders(finished, {
       ended: { result: info.result, termination: info.reason },
     });

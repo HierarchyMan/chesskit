@@ -55,6 +55,8 @@ const storedResponse = (path: string, blob: Blob, sha256: string) =>
   new Response(blob, {
     headers: {
       "content-type": contentTypeFor(path),
+      "cross-origin-embedder-policy": "credentialless",
+      "cross-origin-resource-policy": "same-origin",
       [BYTES_HEADER]: String(blob.size),
       [SHA256_HEADER]: sha256,
     },

@@ -1,4 +1,9 @@
-import { Chess, validateFen } from "chess.js";
+import { Chess } from "chess.js";
+import {
+  createChess,
+  loadPgnPermissive,
+  validateFenPermissive,
+} from "./chessInstance";
 import { parseStudyPgn } from "@/lib/studyTree";
 
 export interface ParsedGame {
@@ -132,9 +137,7 @@ export const loadGameFromText = (text: string): Chess => {
 
   for (const attempt of attempts) {
     try {
-      const game = new Chess();
-      game.loadPgn(attempt);
-      return game;
+      return loadPgnPermissive(attempt);
     } catch (error) {
       firstError ??= error;
     }
@@ -197,7 +200,7 @@ export const normalizeFen = (text: string): string | undefined => {
     " "
   );
 
-  return validateFen(fen).ok ? fen : undefined;
+  return validateFenPermissive(fen).ok ? fen : undefined;
 };
 
 export const parseLichessUrl = (
@@ -243,4 +246,4 @@ export const detectInput = (text: string): DetectedInput => {
   return { kind: "pgn", games };
 };
 
-export const fenToPgn = (fen: string): string => new Chess(fen).pgn();
+export const fenToPgn = (fen: string): string => createChess(fen).pgn();

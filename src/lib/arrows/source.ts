@@ -1,4 +1,5 @@
-import { Chess, type Square } from "chess.js";
+import { type Chess, type Square } from "chess.js";
+import { createChess } from "../chessInstance";
 import type { BoardArrow } from "./types";
 
 /** Kinds whose origin is a piece that really moves from the displayed board. */
@@ -22,7 +23,7 @@ const touchedBy = (
   fen: string,
   history: readonly string[]
 ): Set<string> | undefined => {
-  const game = new Chess(fen);
+  const game = createChess(fen);
   const touched = new Set<string>();
 
   try {
@@ -66,7 +67,7 @@ const playedTouches = (fen: string, uci: string): Set<string> => {
   const from = uci.slice(0, 2);
   const to = uci.slice(2, 4);
   const touched = new Set([from, to]);
-  const moved = new Chess(fen).get(to as Square);
+  const moved = createChess(fen).get(to as Square);
 
   if (
     moved?.type === "k" &&
@@ -98,7 +99,7 @@ const playedTouches = (fen: string, uci: string): Set<string> => {
 export const sourcePieceFor = (
   fen: string,
   arrow: Pick<BoardArrow, "from" | "side" | "kind" | "history">,
-  game: Chess = new Chess(fen)
+  game: Chess = createChess(fen)
 ): string | undefined => {
   if (!HAS_ORIGIN.has(arrow.kind)) return undefined;
   if (arrow.kind === "missed" && !arrow.history) return undefined;
@@ -128,7 +129,7 @@ export const withSources = (
 ): BoardArrow[] => {
   if (!fen || arrows.length === 0) return [...arrows];
 
-  const game = new Chess(fen);
+  const game = createChess(fen);
   return arrows.map((arrow) => {
     const sourcePiece = sourcePieceFor(fen, arrow, game);
     return sourcePiece === arrow.sourcePiece

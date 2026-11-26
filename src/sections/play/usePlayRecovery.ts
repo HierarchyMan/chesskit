@@ -2,7 +2,8 @@ import { loadGameFromText } from "@/lib/pgn";
 import { isEngineId } from "@/lib/engine/models";
 import { isChessPrefix } from "@/lib/chessHistory";
 import { Color } from "@/types/enums";
-import { Chess } from "chess.js";
+import { type Chess } from "chess.js";
+import { createChess } from "@/lib/chessInstance";
 import { atom, useAtomValue, useStore } from "jotai";
 import { useEffect, useState } from "react";
 import {
@@ -121,7 +122,7 @@ export function usePlayRecovery() {
           const game = loadGameFromText(draft.pgn);
           if (
             !game.isGameOver() &&
-            isChessPrefix(new Chess(game.getHeaders().FEN), game)
+            isChessPrefix(createChess(game.getHeaders().FEN), game)
           ) {
             store.set(restoreAtom, draft, game);
           }

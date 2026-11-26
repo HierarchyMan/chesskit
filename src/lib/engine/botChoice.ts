@@ -1,4 +1,4 @@
-import { Chess } from "chess.js";
+import { createChess } from "../chessInstance";
 import { BotMoveOptions, planBotMove } from "./botMove";
 import { getEngineModel } from "./models";
 import { LineEval } from "@/types/eval";
@@ -87,7 +87,7 @@ export const getBotChoice = async (
     random?: () => number;
   } & BotMoveOptions = {}
 ): Promise<BotChoice | undefined> => {
-  const game = new Chess(fen);
+  const game = createChess(fen);
   const legalMoves = game
     .moves({ verbose: true })
     .map((move) => move.from + move.to + (move.promotion ?? ""));

@@ -35,6 +35,30 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "claim") event.waitUntil(self.clients.claim());
 });
 
+// Ensure worker scripts and WASM served from cache satisfy crossOriginIsolated
+// pages (COEP: credentialless) even if cached before COEP headers were added.
+const withIsolationHeaders = (response) => {
+  if (!response?.headers) return response;
+  if (
+    response.headers.get("cross-origin-embedder-policy") &&
+    response.headers.get("cross-origin-resource-policy")
+  ) {
+    return response;
+  }
+  const headers = new Headers(response.headers);
+  if (!headers.has("cross-origin-embedder-policy")) {
+    headers.set("cross-origin-embedder-policy", "credentialless");
+  }
+  if (!headers.has("cross-origin-resource-policy")) {
+    headers.set("cross-origin-resource-policy", "same-origin");
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+};
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -53,6 +77,10 @@ self.addEventListener("fetch", (event) => {
       .open(CACHE_NAME)
       .then((cache) => cache.match(request.url))
       .catch(() => undefined)
-      .then((cached) => cached ?? fetch(request))
+      .then((cached) =>
+        cached
+          ? withIsolationHeaders(cached)
+          : fetch(request).then(withIsolationHeaders)
+      )
   );
 });

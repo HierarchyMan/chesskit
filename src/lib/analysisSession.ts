@@ -12,6 +12,7 @@ import { MoveClassification } from "@/types/enums";
 import { isEngineId } from "./engine/models";
 import { GameEval } from "@/types/eval";
 import { Chess } from "chess.js";
+import { createChess } from "@/lib/chessInstance";
 import { chessPath, isChessPrefix } from "@/lib/chessHistory";
 import {
   addStudyPath,
@@ -342,7 +343,7 @@ export const captureAnalysisBoard = (
         )
       );
       const study = parseStudyPgn(prefix.pgn);
-      const replay = new Chess(study.tree.rootFen);
+      const replay = createChess(study.tree.rootFen);
       for (const node of [
         study.tree.nodes.root,
         ...studyNodePath(study.tree, study.main.endpoint),

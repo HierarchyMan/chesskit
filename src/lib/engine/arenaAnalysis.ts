@@ -2,7 +2,8 @@ import { openings } from "@/data/openings";
 import { computeAccuracy } from "@/lib/engine/helpers/accuracy";
 import { getMovesClassification } from "@/lib/engine/helpers/moveClassification";
 import { Accuracy, CurrentPosition, PositionEval } from "@/types/eval";
-import { Chess, Move } from "chess.js";
+import { type Chess, Move } from "chess.js";
+import { createChess } from "@/lib/chessInstance";
 import { chessPath } from "@/lib/chessHistory";
 import { terminalEvaluation } from "./terminalEvaluation";
 
@@ -178,7 +179,7 @@ export class ArenaAnalysisSession {
       let fen: string | undefined;
       while (!this.disposed && (fen = this.nextFen())) {
         const evaluation =
-          arenaTerminalEval(new Chess(fen)) ?? (await this.evaluate(fen));
+          arenaTerminalEval(createChess(fen)) ?? (await this.evaluate(fen));
         if (this.disposed) return;
         const best = evaluation.lines[0];
         if (
