@@ -1,4 +1,9 @@
 import { useBoardAppearance } from "@/components/board/appearance";
+import {
+  InspectorDeck,
+  InspectorPill,
+} from "@/components/inspector/inspectorShell";
+import { ToolbarButton } from "@/components/ToolbarButton";
 import { setHandoff } from "@/lib/handoff";
 import {
   EMPTY_FEN,
@@ -20,7 +25,6 @@ import {
   Box,
   Button,
   Checkbox,
-  Chip,
   FormControl,
   FormControlLabel,
   IconButton,
@@ -46,11 +50,13 @@ import {
   redoArrangeAtom,
 } from "../sessionAtoms";
 import { SparePiece } from "react-chessboard";
+import { getEngineModel } from "@/lib/engine/models";
 import {
   boardOrientationAtom,
   arrangeBrushAtom,
   editablePositionAtom,
   arrangeFenDraftAtom,
+  engineNameAtom,
 } from "../states";
 import { ARRANGE_BOARD_ID } from "./arrangeBoard";
 import { useArrangeMode } from "./useArrangeMode";
@@ -113,9 +119,12 @@ export default function ArrangePanel() {
     return () => window.removeEventListener("keydown", handle);
   }, [undo, redo, setBrush, setOrientation]);
 
+  const engineName = useAtomValue(engineNameAtom);
+  const allowExtraPieces = !!getEngineModel(engineName).supportsExtraPieces;
+
   const effective = draft === null ? position : parseFenLoose(draft);
   const validation = effective
-    ? validatePosition(sanitizePosition(effective))
+    ? validatePosition(sanitizePosition(effective), { allowExtraPieces })
     : {
         ok: false,
         problems: ["Enter a valid FEN before continuing."],
@@ -157,7 +166,7 @@ export default function ArrangePanel() {
   };
 
   const openElsewhere = (path: string) => {
-    setHandoff({ kind: "fen", fen }, path);
+    setHandoff({ kind: "fen", fen, source: "Board editor" }, path);
     void router.push(path);
   };
 
@@ -176,6 +185,86 @@ export default function ArrangePanel() {
         userSelect: "none",
       }}
     >
+      {/* Compact Status + Position Utility Strip (replaces duplicate header + 5-button pile) */}
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={0.5}
+        sx={{
+          px: 1.25,
+          py: 0.65,
+          minHeight: 40,
+          flexShrink: 0,
+          borderBottom: 1,
+          borderColor: "divider",
+        }}
+      >
+        <InspectorPill
+          tone={validation.ok ? "success" : "error"}
+          icon={
+            validation.ok
+              ? "mdi:check-circle-outline"
+              : "mdi:alert-circle-outline"
+          }
+          label={
+            validation.ok
+              ? "Valid position"
+              : `${validation.problems.length} to fix`
+          }
+        />
+
+        <Stack direction="row" alignItems="center" gap={0.2}>
+          <ToolbarButton
+            tooltip="Undo (Ctrl/⌘+Z)"
+            icon="mdi:undo"
+            iconHeight={18}
+            disabled={!history.past.length}
+            onClick={() => undo()}
+          />
+          <ToolbarButton
+            tooltip="Redo (Ctrl/⌘+Shift+Z)"
+            icon="mdi:redo"
+            iconHeight={18}
+            disabled={!history.future.length}
+            onClick={() => redo()}
+          />
+          <ToolbarButton
+            tooltip="Flip board (F)"
+            icon="mdi:swap-vertical"
+            iconHeight={18}
+            onClick={() => setOrientation((value) => !value)}
+          />
+          <ToolbarButton
+            tooltip="Swap colors"
+            icon="mdi:swap-vertical-bold"
+            iconHeight={18}
+            onClick={() => {
+              setSelectedPreset("");
+              setPosition((current) => sanitizePosition(mirrorColors(current)));
+            }}
+          />
+          <ToolbarButton
+            tooltip="Reset to starting position"
+            icon="mdi:restart"
+            iconHeight={18}
+            onClick={() => {
+              setSelectedPreset("");
+              setPosition(positionFromFen(START_FEN));
+            }}
+          />
+          <ToolbarButton
+            tooltip="Clear board"
+            icon="mdi:delete-outline"
+            iconHeight={18}
+            onClick={() => {
+              setSelectedPreset("");
+              setPosition(positionFromFen(EMPTY_FEN));
+            }}
+          />
+        </Stack>
+      </Stack>
+
       {/* Scrollable editor controls */}
       <Box
         data-inspector-scroller
@@ -189,37 +278,6 @@ export default function ArrangePanel() {
         }}
       >
         <Stack spacing={2} width="100%">
-          {/* Header + Status Chip */}
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            gap={1}
-          >
-            <Typography variant="subtitle1" fontWeight={700}>
-              Board editor
-            </Typography>
-            <Chip
-              size="small"
-              color={validation.ok ? "success" : "error"}
-              icon={
-                <Icon
-                  icon={
-                    validation.ok
-                      ? "mdi:check-circle-outline"
-                      : "mdi:alert-circle-outline"
-                  }
-                  height={16}
-                />
-              }
-              label={
-                validation.ok
-                  ? "Valid position"
-                  : `${validation.problems.length} to fix`
-              }
-            />
-          </Stack>
-
           {/* Validation errors & warnings surfaced right at the top */}
           {(validation.problems.length > 0 ||
             validation.warnings.length > 0) && (
@@ -333,78 +391,16 @@ export default function ArrangePanel() {
             </Stack>
           </Box>
 
-          {/* Position Actions */}
+          {/* Preset Picker */}
           <Box>
-            <Typography variant="overline" color="text.secondary">
-              Position
-            </Typography>
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              flexWrap="wrap"
-              gap={0.75}
-              mt={0.5}
+            <Typography
+              variant="overline"
+              color="text.secondary"
+              sx={{ fontWeight: 700, letterSpacing: "0.08em", lineHeight: 1.4 }}
             >
-              <Stack direction="row" flexWrap="wrap" gap={0.75}>
-                <UtilityButton
-                  icon="mdi:undo"
-                  label="Undo"
-                  disabled={!history.past.length}
-                  onClick={() => undo()}
-                />
-                <UtilityButton
-                  icon="mdi:redo"
-                  label="Redo"
-                  disabled={!history.future.length}
-                  onClick={() => redo()}
-                />
-                <UtilityButton
-                  icon="mdi:restart"
-                  label="Starting position"
-                  onClick={() => {
-                    setSelectedPreset("");
-                    setPosition(positionFromFen(START_FEN));
-                  }}
-                />
-                <UtilityButton
-                  icon="mdi:swap-vertical-bold"
-                  label="Swap colors"
-                  onClick={() => {
-                    setSelectedPreset("");
-                    setPosition((current) =>
-                      sanitizePosition(mirrorColors(current))
-                    );
-                  }}
-                />
-                <UtilityButton
-                  icon="mdi:swap-vertical"
-                  label="Flip board"
-                  onClick={() => setOrientation((value) => !value)}
-                />
-              </Stack>
-
-              <Button
-                size="small"
-                variant="text"
-                onClick={() => {
-                  setSelectedPreset("");
-                  setPosition(positionFromFen(EMPTY_FEN));
-                }}
-                startIcon={<Icon icon="mdi:delete-outline" height={17} />}
-                sx={{
-                  color: "text.secondary",
-                  "&:hover": {
-                    color: "error.main",
-                    bgcolor: "action.hover",
-                  },
-                }}
-              >
-                Clear board
-              </Button>
-            </Stack>
-
-            <FormControl size="small" fullWidth sx={{ mt: 1.25 }}>
+              Preset
+            </Typography>
+            <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
               <InputLabel id="arrange-preset-label">Load a preset</InputLabel>
               <Select
                 labelId="arrange-preset-label"
@@ -594,51 +590,44 @@ export default function ArrangePanel() {
       </Box>
 
       {/* Pinned Sticky Primary Action Footer */}
-      <Stack
-        spacing={1}
-        sx={{
-          p: 1.5,
-          flexShrink: 0,
-          borderTop: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-        }}
-      >
-        <Button
-          variant="contained"
-          size="medium"
-          fullWidth
-          disabled={!validation.ok}
-          onClick={() => {
-            if (effective && finishArrange(effective)) setDraft(null);
-          }}
-          startIcon={<Icon icon="mdi:chart-line" height={18} />}
-        >
-          Analyze from here
-        </Button>
-        <Stack direction="row" gap={1}>
+      <InspectorDeck sx={{ p: 1.25 }}>
+        <Stack spacing={0.85}>
           <Button
+            variant="contained"
+            size="medium"
             fullWidth
-            size="small"
-            variant="outlined"
             disabled={!validation.ok}
-            startIcon={<Icon icon="mdi:chess-pawn" height={16} />}
-            onClick={() => openElsewhere("/play")}
+            onClick={() => {
+              if (effective && finishArrange(effective)) setDraft(null);
+            }}
+            startIcon={<Icon icon="mdi:chart-line" height={18} />}
           >
-            Play vs bot
+            Analyze from here
           </Button>
-          <Button
-            fullWidth
-            size="small"
-            variant="outlined"
-            disabled={!validation.ok}
-            startIcon={<Icon icon="mdi:sword-cross" height={16} />}
-            onClick={() => openElsewhere("/arena")}
-          >
-            Arena
-          </Button>
+          <Stack direction="row" gap={0.85}>
+            <Button
+              fullWidth
+              size="small"
+              variant="outlined"
+              disabled={!validation.ok}
+              startIcon={<Icon icon="mdi:chess-pawn" height={16} />}
+              onClick={() => openElsewhere("/play")}
+            >
+              Play vs bot
+            </Button>
+            <Button
+              fullWidth
+              size="small"
+              variant="outlined"
+              disabled={!validation.ok}
+              startIcon={<Icon icon="mdi:sword-cross" height={16} />}
+              onClick={() => openElsewhere("/arena")}
+            >
+              Arena
+            </Button>
+          </Stack>
         </Stack>
-      </Stack>
+      </InspectorDeck>
 
       {feedback}
     </Box>
@@ -653,32 +642,3 @@ const PIECE_NAMES: Record<string, string> = {
   N: "knight",
   P: "pawn",
 };
-
-function UtilityButton({
-  icon,
-  label,
-  disabled = false,
-  onClick,
-}: {
-  icon: string;
-  label: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      size="small"
-      variant="outlined"
-      disabled={disabled}
-      onClick={onClick}
-      startIcon={<Icon icon={icon} height={17} />}
-      sx={{
-        color: "text.primary",
-        borderColor: "divider",
-        "&:hover": { borderColor: "text.secondary", bgcolor: "action.hover" },
-      }}
-    >
-      {label}
-    </Button>
-  );
-}

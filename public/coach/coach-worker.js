@@ -103,7 +103,16 @@ function initEngine(playerColor) {
     parameters: JSON.stringify({ analyticsId: "Beginner" }),
   });
 
-  // Start the game (if player chose Black, switch color via new-game event if available).
+  // When the user plays Black (bot is White), switch Dr. Wolf's game color before
+  // starting so Dr. Wolf owns White and immediately requests White's opening move.
+  if (playerColor === "b") {
+    sendRaw({
+      what: "choice_response",
+      action: "choice_black",
+      parameters: JSON.stringify({ analyticsId: "Black" }),
+    });
+  }
+
   const startRes = sendRaw({
     what: "user_interface_event",
     gameScreen: "PLAY",

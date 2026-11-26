@@ -11,6 +11,7 @@ import {
   Divider,
   ListItemIcon,
   ListItemText,
+  ListSubheader,
   Menu,
   MenuItem,
   Typography,
@@ -43,7 +44,7 @@ export default function MoreMenu() {
 
   const openWithFen = (path: string) => {
     close();
-    setHandoff({ kind: "fen", fen: board.fen() }, path);
+    setHandoff({ kind: "fen", fen: board.fen(), source: "Analysis" }, path);
     void router.push(path);
   };
 
@@ -60,7 +61,7 @@ export default function MoreMenu() {
     URL.revokeObjectURL(url);
   };
 
-  const items: { icon: string; label: string; onClick: () => void }[] = [
+  const exportItems: { icon: string; label: string; onClick: () => void }[] = [
     {
       icon: "mdi:content-copy",
       label: "Copy position (FEN)",
@@ -82,6 +83,9 @@ export default function MoreMenu() {
           },
         ]
       : []),
+  ];
+
+  const modeItems: { icon: string; label: string; onClick: () => void }[] = [
     {
       icon: "mdi:pencil-ruler",
       label: "Arrange this position",
@@ -102,6 +106,17 @@ export default function MoreMenu() {
     },
   ];
 
+  const subheaderSx = {
+    bgcolor: "transparent",
+    lineHeight: "24px",
+    pt: 0.5,
+    fontSize: "0.66rem",
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: "text.secondary",
+  } as const;
+
   return (
     <>
       <Box ref={anchorRef} component="span" sx={{ display: "inline-flex" }}>
@@ -117,17 +132,50 @@ export default function MoreMenu() {
         onClose={close}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
         transformOrigin={{ vertical: "bottom", horizontal: "right" }}
+        slotProps={{
+          paper: {
+            sx: {
+              minWidth: 236,
+              borderRadius: 1.5,
+              border: 1,
+              borderColor: "divider",
+              mb: 0.5,
+            },
+          },
+        }}
       >
-        {items.map((item) => (
-          <MenuItem key={item.label} onClick={item.onClick}>
-            <ListItemIcon>
-              <Icon icon={item.icon} height={20} />
+        <ListSubheader disableSticky sx={subheaderSx}>
+          Export
+        </ListSubheader>
+        {exportItems.map((item) => (
+          <MenuItem key={item.label} dense onClick={item.onClick}>
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              <Icon icon={item.icon} height={18} />
             </ListItemIcon>
-            <ListItemText primary={item.label} />
+            <ListItemText
+              primary={item.label}
+              slotProps={{ primary: { fontSize: "0.84rem" } }}
+            />
           </MenuItem>
         ))}
-        <Divider />
+        <Divider sx={{ my: 0.5 }} />
+        <ListSubheader disableSticky sx={subheaderSx}>
+          Open position in
+        </ListSubheader>
+        {modeItems.map((item) => (
+          <MenuItem key={item.label} dense onClick={item.onClick}>
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              <Icon icon={item.icon} height={18} />
+            </ListItemIcon>
+            <ListItemText
+              primary={item.label}
+              slotProps={{ primary: { fontSize: "0.84rem" } }}
+            />
+          </MenuItem>
+        ))}
+        <Divider sx={{ my: 0.5 }} />
         <MenuItem
+          dense
           disabled={!hasMoves}
           onClick={() => {
             close();
@@ -137,10 +185,13 @@ export default function MoreMenu() {
             color: hasMoves ? "error.main" : undefined,
           }}
         >
-          <ListItemIcon sx={{ color: "inherit" }}>
-            <Icon icon="mdi:eraser" height={20} />
+          <ListItemIcon sx={{ minWidth: 32, color: "inherit" }}>
+            <Icon icon="mdi:eraser" height={18} />
           </ListItemIcon>
-          <ListItemText primary="Reset from this position" />
+          <ListItemText
+            primary="Reset from this position"
+            slotProps={{ primary: { fontSize: "0.84rem" } }}
+          />
         </MenuItem>
       </Menu>
 

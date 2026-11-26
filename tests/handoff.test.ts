@@ -55,4 +55,30 @@ describe("destination-owned handoffs", () => {
     assert.equal(takeHandoff("fen"), undefined);
     assert.equal(takeHandoff("pgn")?.pgn, "1. e4 c5 *");
   });
+
+  it("preserves source metadata and initialTab through handoff delivery", () => {
+    mock.location.pathname = "/editor";
+    setHandoff(
+      { kind: "fen", fen: "8/8/8/8/8/8/4K3/4k3 w - - 0 1", source: "Board editor" },
+      "/play"
+    );
+    mock.location.pathname = "/play";
+    const takenFen = takeHandoff("fen");
+    assert.equal(takenFen?.source, "Board editor");
+
+    mock.location.pathname = "/";
+    setHandoff(
+      {
+        kind: "pgn",
+        pgn: "1. d4 d5 *",
+        source: "Import",
+        initialTab: "review",
+      },
+      "/analysis"
+    );
+    mock.location.pathname = "/analysis";
+    const takenPgn = takeHandoff("pgn");
+    assert.equal(takenPgn?.source, "Import");
+    assert.equal(takenPgn?.initialTab, "review");
+  });
 });

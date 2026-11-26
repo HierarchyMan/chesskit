@@ -24,6 +24,8 @@ import { usePlayOverlay } from "./usePlayOverlay";
 import {
   activeGameModeAtom,
   boardFlippedAtom,
+  botErrorAtom,
+  botRetryTickAtom,
   botStrengthAtom,
   botThinkingAtom,
   challengeIdAtom,
@@ -89,7 +91,9 @@ export default function BoardContainer({
   const activeMode = useAtomValue(activeGameModeAtom);
   const evalBarEnabled = useAtomValue(playEvalBarAtom);
   const arrowsWithCoach = useAtomValue(playArrowsWithCoachAtom);
+  const botRetryTick = useAtomValue(botRetryTickAtom);
   const setBotThinking = useSetAtom(botThinkingAtom);
+  const setBotError = useSetAtom(botErrorAtom);
   const setCascadeActive = useSetAtom(playCascadeActiveAtom);
   const { playMove, goToMove } = useChessActions(gameAtom);
 
@@ -141,6 +145,7 @@ export default function BoardContainer({
     let cancelled = false;
 
     const playBotMove = async () => {
+      setBotError(null);
       setBotThinking(true);
 
       const minimumThinkTime = sleep(
@@ -172,7 +177,14 @@ export default function BoardContainer({
           playMove(uciMoveParams(move), game);
         }
       } catch (error) {
-        if (!cancelled) console.error(error);
+        if (!cancelled) {
+          console.error(error);
+          setBotError(
+            error instanceof Error
+              ? error.message
+              : "The bot could not make a move."
+          );
+        }
       } finally {
         if (!cancelled) setBotThinking(false);
       }
@@ -197,6 +209,8 @@ export default function BoardContainer({
     playMove,
     playerColor,
     setBotThinking,
+    setBotError,
+    botRetryTick,
     store,
   ]);
 

@@ -113,7 +113,7 @@ export default function Hub() {
       <Card
         variant="outlined"
         sx={(theme) => ({
-          borderRadius: "12px",
+          borderRadius: 1.5,
           borderStyle: "dashed",
           borderColor: alpha(theme.palette.primary.main, 0.5),
           bgcolor: alpha(theme.palette.primary.main, 0.06),
@@ -172,7 +172,7 @@ export default function Hub() {
               variant="outlined"
               sx={{
                 height: "100%",
-                borderRadius: "12px",
+                borderRadius: 1.5,
                 borderColor: "divider",
                 transition: "transform 0.15s, border-color 0.15s",
                 "&:hover": {
@@ -235,7 +235,7 @@ function RecentGames() {
 
   return (
     <Panel
-      sx={{ height: "100%", borderRadius: "12px" }}
+      sx={{ height: "100%", borderRadius: 1.5 }}
       title={
         <Stack direction="row" alignItems="center" gap={1}>
           <Icon icon="mdi:history" height={20} />
@@ -430,7 +430,7 @@ function Progress() {
 
   return (
     <Panel
-      sx={{ height: "100%", borderRadius: "12px" }}
+      sx={{ height: "100%", borderRadius: 1.5 }}
       title={
         <Stack direction="row" alignItems="center" gap={1}>
           <Icon icon="mdi:trending-up" height={20} />

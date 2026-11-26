@@ -150,6 +150,22 @@ describe("validation", () => {
     );
     assert.match(finished.warnings.join(" "), /checkmate/);
   });
+
+  it("allows >8 pawns and >16 pieces with warnings by default, and clears warnings for Fairy-Stockfish", () => {
+    const horde = positionFromFen(
+      "rnbqkbnr/pppppppp/8/PPPPPPPP/PPPPPPPP/PPPPPPPP/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    );
+    const standard = validatePosition(horde);
+    assert.equal(standard.ok, true);
+    assert.equal(standard.problems.length, 0);
+    assert.match(standard.warnings.join(" "), /more than eight pawns/);
+    assert.match(standard.warnings.join(" "), /more than sixteen pieces/);
+
+    const fairy = validatePosition(horde, { allowExtraPieces: true });
+    assert.equal(fairy.ok, true);
+    assert.equal(fairy.problems.length, 0);
+    assert.equal(fairy.warnings.length, 0);
+  });
 });
 
 describe("editing helpers", () => {

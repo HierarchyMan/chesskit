@@ -10,12 +10,14 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useMemo } from "react";
 import { useLoadAnalysisGame } from "../hooks/useLoadAnalysisGame";
 import { resetArrangePositionAtom } from "../sessionAtoms";
+import { getEngineModel } from "@/lib/engine/models";
 import {
   arrangeModeAtom,
   arrangeStartFenAtom,
   boardAtom,
   editablePositionAtom,
   arrangeFenDraftAtom,
+  engineNameAtom,
 } from "../states";
 
 export const useArrangeMode = () => {
@@ -27,16 +29,19 @@ export const useArrangeMode = () => {
   const [, setStartFen] = useAtom(arrangeStartFenAtom);
   const { loadFen } = useLoadAnalysisGame();
 
+  const engineName = useAtomValue(engineNameAtom);
+  const allowExtraPieces = !!getEngineModel(engineName).supportsExtraPieces;
+
   const validation = useMemo(() => {
     const effective = fenDraft === null ? position : parseFenLoose(fenDraft);
     return effective
-      ? validatePosition(sanitizePosition(effective))
+      ? validatePosition(sanitizePosition(effective), { allowExtraPieces })
       : {
           ok: false,
           problems: ["Enter a valid FEN before continuing."],
           warnings: [],
         };
-  }, [position, fenDraft]);
+  }, [position, fenDraft, allowExtraPieces]);
 
   const enterArrange = useCallback(
     (fen?: string) => {

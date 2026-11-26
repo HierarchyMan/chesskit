@@ -123,7 +123,9 @@ export const describeModel = (
 
   if (!view.supported) {
     return {
-      text: "Needs WebAssembly, which this browser lacks",
+      text: view.model.needsSharedArrayBuffer
+        ? "Needs SharedArrayBuffer (cross-origin isolation); reload or use the native bridge"
+        : "Needs WebAssembly, which this browser lacks",
       tone: "error",
     };
   }

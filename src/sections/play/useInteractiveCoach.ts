@@ -41,6 +41,7 @@ import { Color, MoveClassification } from "@/types/enums";
 import { PositionEval } from "@/types/eval";
 import { useMoveCoach } from "./useMoveCoach";
 import {
+  botErrorAtom,
   botStrengthAtom,
   botThinkingAtom,
   challengeIdAtom,
@@ -160,10 +161,11 @@ export function useInteractiveCoach(
   const voiceEnabled = useAtomValue(coachVoiceEnabledAtom);
   const reviewPly = useAtomValue(reviewPlyAtom);
   const root = game.history({ verbose: true })[0]?.before ?? game.fen();
-  const standard = root === DEFAULT_POSITION && playerColor === Color.White;
+  const standard = root === DEFAULT_POSITION;
   const challengeId = useAtomValue(challengeIdAtom);
   const cascadeActive = useAtomValue(playCascadeActiveAtom);
   const setBotThinking = useSetAtom(botThinkingAtom);
+  const setBotError = useSetAtom(botErrorAtom);
   const { playMove, goToMove } = useChessActions(gameAtom);
 
   // Use the user's configured coach dialogue engine if available, otherwise fall back to bundled Stockfish 19 Lite
@@ -501,6 +503,7 @@ export function useInteractiveCoach(
             )
               continue;
             fetchingBotMoveRef.current = true;
+            setBotError(null);
             setBotThinking(true);
             try {
               const minThink = sleep(
@@ -544,6 +547,13 @@ export function useInteractiveCoach(
               }
             } catch (err) {
               console.error(err);
+              if (token === sessionTokenRef.current) {
+                setBotError(
+                  err instanceof Error
+                    ? err.message
+                    : "The bot could not make a move."
+                );
+              }
             } finally {
               fetchingBotMoveRef.current = false;
               setBotThinking(false);
@@ -559,7 +569,14 @@ export function useInteractiveCoach(
         }
       }
     },
-    [applyResponse, playerColor, setBotThinking, store, switchToPositionCoach]
+    [
+      applyResponse,
+      playerColor,
+      setBotError,
+      setBotThinking,
+      store,
+      switchToPositionCoach,
+    ]
   );
 
   enqueueAndDrainRef.current = (reqs: CoachEngineRequest[], token: number) => {

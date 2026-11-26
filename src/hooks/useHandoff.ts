@@ -3,7 +3,8 @@ import { useEffect, useRef } from "react";
 
 export const useHandoff = <K extends Handoff["kind"]>(
   kinds: K[],
-  onHandoff: (handoff: Extract<Handoff, { kind: K }>) => void
+  onHandoff: (handoff: Extract<Handoff, { kind: K }>) => void,
+  enabled = true
 ) => {
   const onHandoffRef = useRef(onHandoff);
 
@@ -14,6 +15,7 @@ export const useHandoff = <K extends Handoff["kind"]>(
   const kindList = kinds.join("|");
 
   useEffect(() => {
+    if (!enabled) return;
     const accepted = kindList.split("|") as K[];
 
     const consume = () => {
@@ -27,5 +29,5 @@ export const useHandoff = <K extends Handoff["kind"]>(
     return () => {
       window.removeEventListener(HANDOFF_EVENT, consume);
     };
-  }, [kindList]);
+  }, [kindList, enabled]);
 };

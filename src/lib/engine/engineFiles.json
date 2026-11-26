@@ -5,6 +5,36 @@
     "engines/stockfish-19/stockfish-19-lite-single.wasm"
   ],
   "files": {
+    "engines/fairy-stockfish-14/stockfish.js": {
+      "bytes": 64273,
+      "sha256": "9080a62e3133e50da0c47b88b186d9c29ed37cc5129401bdeed8bffb5b9a4ca9",
+      "url": "https://unpkg.com/fairy-stockfish-nnue.wasm@1.1.12/stockfish.js"
+    },
+    "engines/fairy-stockfish-14/stockfish.wasm": {
+      "bytes": 1636293,
+      "sha256": "7cea742b8ca1a324fbc500f89112f168134cf68eb49475df23be6c42336255c6",
+      "url": "https://unpkg.com/fairy-stockfish-nnue.wasm@1.1.12/stockfish.wasm"
+    },
+    "engines/fairy-stockfish-14/stockfish.worker.js": {
+      "bytes": 3321,
+      "sha256": "067be484ac62f728b0dad28496997e5862f3c61f9091f59bb35d9d1b1ed14573",
+      "url": "https://unpkg.com/fairy-stockfish-nnue.wasm@1.1.12/stockfish.worker.js"
+    },
+    "engines/fairy-stockfish-mv/stockfish.js": {
+      "bytes": 31164,
+      "sha256": "e5cbeecffb6099246601c86c1042bcc77b54c3f9330c96e7720c2c65c802239c",
+      "url": "https://unpkg.com/stockfish-mv.wasm@0.6.1/stockfish.js"
+    },
+    "engines/fairy-stockfish-mv/stockfish.wasm": {
+      "bytes": 552336,
+      "sha256": "f46bb4e81dfa9f24755e4da44b0113f15cd605c52b3695e3dd0372d7427baa1d",
+      "url": "https://unpkg.com/stockfish-mv.wasm@0.6.1/stockfish.wasm"
+    },
+    "engines/fairy-stockfish-mv/stockfish.worker.js": {
+      "bytes": 3194,
+      "sha256": "237a224dda748965660c59f084dbf03682a72b01d49f131df8a5438880fb4ce5",
+      "url": "https://unpkg.com/stockfish-mv.wasm@0.6.1/stockfish.worker.js"
+    },
     "engines/lozza/lozzaBeal.js": {
       "bytes": 64060,
       "sha256": "1b583485d06802ff6af33f79759a9ed6d06b329d1ec5fdfda1d89c3aa2ee8899",

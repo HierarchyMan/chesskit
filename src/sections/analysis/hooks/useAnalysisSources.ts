@@ -19,7 +19,12 @@ import {
   analysisSourceErrorAtom,
   restoreAnalysisSessionAtom,
 } from "../sessionAtoms";
-import { arrangeModeAtom, editablePositionAtom, boardAtom } from "../states";
+import {
+  analysisInitialTabAtom,
+  arrangeModeAtom,
+  editablePositionAtom,
+  boardAtom,
+} from "../states";
 import { useArrangeMode } from "../arrange/useArrangeMode";
 import { useLoadAnalysisGame } from "./useLoadAnalysisGame";
 
@@ -31,6 +36,7 @@ export function useAnalysisSources(startInArrangeMode: boolean) {
   const restore = useSetAtom(restoreAnalysisSessionAtom);
   const setArrange = useSetAtom(arrangeModeAtom);
   const setPosition = useSetAtom(editablePositionAtom);
+  const setInitialTab = useSetAtom(analysisInitialTabAtom);
   const setSourceError = useSetAtom(analysisSourceErrorAtom);
   const { gameId, sessionId, lichessGameId, orientation } = router.query;
   const requestKey = JSON.stringify([
@@ -119,10 +125,14 @@ export function useAnalysisSources(startInArrangeMode: boolean) {
   ]);
 
   useHandoff(["fen", "pgn"], (handoff) => {
-    if (handoff.kind === "pgn")
+    if (handoff.kind === "pgn") {
       loadPgn(handoff.pgn, handoff.orientation !== "black");
-    else if (startInArrangeMode) enterArrange(handoff.fen);
-    else loadFen(handoff.fen);
+      if (handoff.initialTab) setInitialTab(handoff.initialTab);
+    } else if (startInArrangeMode) {
+      enterArrange(handoff.fen);
+    } else {
+      loadFen(handoff.fen);
+    }
   });
 
   useEffect(() => {

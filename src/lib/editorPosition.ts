@@ -208,8 +208,45 @@ const kingSquares = (pieces: EditablePosition["pieces"], king: PieceCode) =>
     .filter(([, piece]) => piece === king)
     .map(([square]) => square);
 
+export interface ValidatePositionOptions {
+  /** When true (e.g. Fairy-Stockfish is selected), >8 pawns / >16 pieces emit no warnings. */
+  allowExtraPieces?: boolean;
+}
+
+/** True when a FEN has >8 pawns or >16 pieces for either side (rejected by standard Stockfish / Reckless). */
+export const fenHasExtraPieces = (fen: string): boolean => {
+  const [placement = ""] = fen.trim().split(/\s+/);
+  let white = 0;
+  let black = 0;
+  let whitePawns = 0;
+  let blackPawns = 0;
+
+  for (const char of placement) {
+    if (char === "P") {
+      white++;
+      whitePawns++;
+    } else if (char === "p") {
+      black++;
+      blackPawns++;
+    } else if (/[NBRQK]/.test(char)) {
+      white++;
+    } else if (/[nbrqk]/.test(char)) {
+      black++;
+    }
+  }
+
+  return (
+    whitePawns > 8 ||
+    blackPawns > 8 ||
+    white > 16 ||
+    black > 16 ||
+    white + black > 32
+  );
+};
+
 export const validatePosition = (
-  position: EditablePosition
+  position: EditablePosition,
+  options?: ValidatePositionOptions
 ): PositionValidation => {
   const problems: string[] = [];
   const warnings: string[] = [];
@@ -230,15 +267,21 @@ export const validatePosition = (
     problems.push("Pawns can't stand on the first or eighth rank.");
   }
 
-  for (const color of ["w", "b"] as const) {
-    const own = entries.filter(([, piece]) => piece[0] === color);
-    const name = color === "w" ? "White" : "Black";
+  if (!options?.allowExtraPieces) {
+    for (const color of ["w", "b"] as const) {
+      const own = entries.filter(([, piece]) => piece[0] === color);
+      const name = color === "w" ? "White" : "Black";
 
-    if (own.filter(([, piece]) => piece[1] === "P").length > 8) {
-      problems.push(`${name} can't have more than eight pawns.`);
-    }
-    if (own.length > 16) {
-      problems.push(`${name} can't have more than sixteen pieces.`);
+      if (own.filter(([, piece]) => piece[1] === "P").length > 8) {
+        warnings.push(
+          `${name} has more than eight pawns. Standard Stockfish and Reckless reject this — switch to Fairy-Stockfish to run an engine.`
+        );
+      }
+      if (own.length > 16) {
+        warnings.push(
+          `${name} has more than sixteen pieces. Standard Stockfish and Reckless reject this — switch to Fairy-Stockfish to run an engine.`
+        );
+      }
     }
   }
 

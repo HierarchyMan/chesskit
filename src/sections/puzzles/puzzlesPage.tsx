@@ -6,7 +6,6 @@ import { useAtomValue } from "jotai";
 import BoardWorkspace from "@/components/boardWorkspace";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { Color } from "@/types/enums";
-import { Box } from "@mui/material";
 import { useMemo } from "react";
 import { arrowFromUci } from "@/lib/arrows/uci";
 import { BoardArrow } from "@/lib/arrows/types";
@@ -89,23 +88,13 @@ export default function PuzzlesPage() {
         />
       }
       inspector={
-        <Box
-          data-inspector-scroller
-          sx={{
-            minHeight: 0,
-            overflowY: "auto",
-            overscrollBehavior: "contain",
-            scrollbarGutter: "stable",
-          }}
-        >
-          <PuzzlePanel
-            trainer={trainer}
-            onShowStory={(value) =>
-              story.start(value, { exitLabel: "Back to puzzle" })
-            }
-            storyControls={<StoryControls story={story} />}
-          />
-        </Box>
+        <PuzzlePanel
+          trainer={trainer}
+          onShowStory={(value) =>
+            story.start(value, { exitLabel: "Back to puzzle" })
+          }
+          storyControls={<StoryControls story={story} />}
+        />
       }
     />
   );

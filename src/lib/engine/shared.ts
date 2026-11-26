@@ -16,9 +16,17 @@ export const isMobileDevice = () =>
   (typeof navigator !== "undefined" &&
     /Android|Opera Mini/i.test(navigator.userAgent));
 
+export const isSharedArrayBufferSupported = () =>
+  typeof SharedArrayBuffer !== "undefined" &&
+  (typeof crossOriginIsolated === "undefined" || crossOriginIsolated);
+
 export const isModelSupported = (model: EngineModel): boolean => {
   if (model.source === "bridge") return typeof WebSocket !== "undefined";
-  return !model.needsWasm || isWasmSupported();
+  if (model.needsWasm && !isWasmSupported()) return false;
+  if (model.needsSharedArrayBuffer && !isSharedArrayBufferSupported()) {
+    return false;
+  }
+  return true;
 };
 
 export const isEngineSupported = (name: EngineId): boolean =>

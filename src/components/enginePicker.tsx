@@ -24,6 +24,8 @@ import {
   ListItemButton,
   ListSubheader,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -36,33 +38,51 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 export type EngineRole = "analysis" | "play" | "feature";
 export type EnginePick = EngineId | "analysis";
 
-const GROUPS: { id: EngineGroup; title: string; blurb: string }[] = [
+const GROUPS: {
+  id: EngineGroup;
+  title: string;
+  tabLabel: string;
+  blurb: string;
+}[] = [
   {
     id: "native",
     title: "On this computer",
+    tabLabel: "Native",
     blurb:
       "Native programs that you run on this computer through the local bridge: the strongest option.",
   },
   {
     id: "stockfish",
     title: "Stockfish",
+    tabLabel: "Stockfish",
     blurb:
       "Every Stockfish build, in the browser. One comes with the app; download any other to use it.",
   },
   {
+    id: "fairy",
+    title: "Fairy-Stockfish",
+    tabLabel: "Fairy-Stockfish",
+    blurb:
+      "Variant Stockfish builds in the browser. Support >8 pawns and >16 pieces per side (up to 64 pieces).",
+  },
+  {
     id: "other",
     title: "Other engines",
+    tabLabel: "Other",
     blurb:
       "Different authors, different styles, all in the browser. Download one to use it.",
   },
   {
     id: "joke",
     title: "Joke engines",
+    tabLabel: "Jokes",
     blurb: "For fun. They play, but their opinions are not to be trusted.",
   },
 ];
 
-type Filter = "all" | "strong" | "light" | "nowasm" | "joke";
+type EngineTab = "all" | EngineGroup;
+
+type Filter = "all" | "extra" | "strong" | "light" | "nowasm";
 
 const FILTERS: {
   id: Filter;
@@ -70,6 +90,11 @@ const FILTERS: {
   test: (model: EngineModel) => boolean;
 }[] = [
   { id: "all", label: "All", test: () => true },
+  {
+    id: "extra",
+    label: "Extra pieces",
+    test: (model) => !!model.supportsExtraPieces,
+  },
   {
     id: "strong",
     label: "3500+",
@@ -88,7 +113,6 @@ const FILTERS: {
     label: "No WebAssembly",
     test: (model) => model.source === "browser" && !model.needsWasm,
   },
-  { id: "joke", label: "Jokes", test: (model) => model.group === "joke" },
 ];
 
 const ratingText = (model: EngineModel): string | undefined =>
@@ -302,6 +326,7 @@ function PickerContent({
   const { models, refresh, download, bridge } = useModels();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [tab, setTab] = useState<EngineTab>("all");
 
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -316,28 +341,87 @@ function PickerContent({
     return () => cancelAnimationFrame(frame);
   }, [refresh]);
 
-  const filters = FILTERS.filter(
-    (entry) => role !== "feature" || entry.id !== "joke"
-  );
-
-  const groups = useMemo(() => {
+  const matchingModels = useMemo(() => {
     const test =
       FILTERS.find((entry) => entry.id === filter)?.test ?? (() => true);
-    return GROUPS.map((group) => ({
-      ...group,
-      views: models
+    const q = query.trim();
+    return models.filter(
+      (view) =>
+        (role === "feature"
+          ? view.model.roles.analysis && view.model.reliableEval
+          : view.model.roles[role]) &&
+        test(view.model) &&
+        matches(view.model, q)
+    );
+  }, [models, role, filter, query]);
+
+  const visibleTabs = useMemo(() => {
+    const categoryGroups = GROUPS.filter(
+      (group) => role !== "feature" || group.id !== "joke"
+    );
+    return [
+      { id: "all" as EngineTab, label: "All", count: matchingModels.length },
+      ...categoryGroups.map((group) => ({
+        id: group.id as EngineTab,
+        label: group.tabLabel,
+        count: matchingModels.filter((view) =>
+          group.id === "fairy"
+            ? view.model.group === "fairy" ||
+              (view.model.group === "native" &&
+                !!view.model.supportsExtraPieces)
+            : view.model.group === group.id
+        ).length,
+      })),
+    ];
+  }, [matchingModels, role]);
+
+  const groups = useMemo(() => {
+    if (tab === "fairy") {
+      const nativeFairy = matchingModels
         .filter(
           (view) =>
-            view.model.group === group.id &&
-            (role === "feature"
-              ? view.model.roles.analysis && view.model.reliableEval
-              : view.model.roles[role]) &&
-            test(view.model) &&
-            matches(view.model, query.trim())
+            view.model.group === "native" && !!view.model.supportsExtraPieces
         )
-        .sort(byRating),
-    })).filter((group) => group.views.length > 0);
-  }, [models, role, filter, query]);
+        .sort(byRating);
+      const browserFairy = matchingModels
+        .filter((view) => view.model.group === "fairy")
+        .sort(byRating);
+      return [
+        ...(nativeFairy.length
+          ? [
+              {
+                id: "native" as EngineGroup,
+                title: "Native Fairy-Stockfish (local bridge)",
+                tabLabel: "Native",
+                blurb:
+                  "Native Fairy-Stockfish builds on this computer: fastest and strongest for >8 pawns / >16 pieces.",
+                views: nativeFairy,
+              },
+            ]
+          : []),
+        ...(browserFairy.length
+          ? [
+              {
+                ...GROUPS.find((entry) => entry.id === "fairy")!,
+                views: browserFairy,
+              },
+            ]
+          : []),
+      ];
+    }
+
+    const activeGroups =
+      tab === "all" ? GROUPS : GROUPS.filter((group) => group.id === tab);
+
+    return activeGroups
+      .map((group) => ({
+        ...group,
+        views: matchingModels
+          .filter((view) => view.model.group === group.id)
+          .sort(byRating),
+      }))
+      .filter((group) => group.views.length > 0);
+  }, [matchingModels, tab]);
 
   const choose = (pick: EnginePick) => {
     onSelect(pick);
@@ -360,12 +444,12 @@ function PickerContent({
           <Icon icon="mdi:close" height={20} />
         </IconButton>
       </DialogTitle>
-      <Box sx={{ px: 3, pb: 1.5 }}>
+      <Box sx={{ px: 3, pb: 1 }}>
         <TextField
           fullWidth
           size="small"
           autoFocus={!fullScreen}
-          placeholder="Search engines: stockfish, nnue, joke, javascript…"
+          placeholder="Search engines: stockfish, fairy, nnue, joke, javascript…"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           slotProps={{
@@ -379,7 +463,7 @@ function PickerContent({
           }}
         />
         <Stack direction="row" gap={0.75} mt={1.25} flexWrap="wrap">
-          {filters.map((entry) => (
+          {FILTERS.map((entry) => (
             <Chip
               key={entry.id}
               label={entry.label}
@@ -390,6 +474,36 @@ function PickerContent({
             />
           ))}
         </Stack>
+      </Box>
+      <Box sx={{ borderTop: 1, borderColor: "divider", px: 1 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, next: EngineTab) => setTab(next)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          aria-label="Engine categories"
+          sx={{
+            minHeight: 40,
+            "& .MuiTab-root": {
+              minHeight: 40,
+              minWidth: "auto",
+              px: 1.5,
+              py: 0.75,
+              textTransform: "none",
+              fontSize: "0.82rem",
+              fontWeight: 500,
+            },
+          }}
+        >
+          {visibleTabs.map((entry) => (
+            <Tab
+              key={entry.id}
+              value={entry.id}
+              label={`${entry.label} (${entry.count})`}
+            />
+          ))}
+        </Tabs>
       </Box>
       <DialogContent dividers sx={{ px: 0, py: 0 }}>
         <List disablePadding ref={listRef}>
@@ -458,9 +572,17 @@ function PickerContent({
             </li>
           ))}
           {!groups.length && (
-            <Typography sx={{ p: 3, opacity: 0.75 }} variant="body2">
-              No engine matches. Clear the search or pick another filter.
-            </Typography>
+            <Stack spacing={1} alignItems="flex-start" sx={{ p: 3 }}>
+              <Typography sx={{ opacity: 0.75 }} variant="body2">
+                No engine matches in this tab. Clear the search or pick another
+                filter.
+              </Typography>
+              {tab !== "all" && matchingModels.length > 0 && (
+                <Button size="small" onClick={() => setTab("all")}>
+                  Show all {matchingModels.length} matches across all tabs
+                </Button>
+              )}
+            </Stack>
           )}
         </List>
       </DialogContent>

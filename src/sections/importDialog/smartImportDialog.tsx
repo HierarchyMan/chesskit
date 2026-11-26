@@ -122,7 +122,8 @@ export default function SmartImportDialog() {
   const openPgn = (
     pgn: string,
     path: string,
-    orientation?: "white" | "black"
+    orientation?: "white" | "black",
+    initialTab?: "moves" | "review"
   ) => {
     setHandoff(
       {
@@ -131,6 +132,8 @@ export default function SmartImportDialog() {
         orientation:
           orientation ??
           (detected.kind === "lichess" ? detected.orientation : undefined),
+        initialTab,
+        source: "Import",
       },
       path
     );
@@ -138,7 +141,7 @@ export default function SmartImportDialog() {
   };
 
   const openFen = (fen: string, path: string) => {
-    setHandoff({ kind: "fen", fen }, path);
+    setHandoff({ kind: "fen", fen, source: "Import" }, path);
     go(path);
   };
 
@@ -188,8 +191,9 @@ export default function SmartImportDialog() {
 
     openPgn(
       pgn,
-      sourceAction === "learn" ? "/learn" : "/analysis",
-      orientation
+      "/analysis",
+      orientation,
+      sourceAction === "learn" ? "review" : "moves"
     );
   };
 
@@ -450,8 +454,12 @@ export default function SmartImportDialog() {
               {pgnGames && (
                 <PgnChoices
                   games={pgnGames}
-                  onAnalyze={(game) => openPgn(game.pgn, "/analysis")}
-                  onReview={(game) => openPgn(game.pgn, "/learn")}
+                  onAnalyze={(game) =>
+                    openPgn(game.pgn, "/analysis", undefined, "moves")
+                  }
+                  onReview={(game) =>
+                    openPgn(game.pgn, "/analysis", undefined, "review")
+                  }
                   onSave={saveGames}
                 />
               )}

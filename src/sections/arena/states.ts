@@ -88,4 +88,5 @@ export const arenaRunningAtom = atom(false);
 export const arenaFlippedAtom = atom(false);
 export const arenaEditingPlayersAtom = atom(false);
 export const arenaStartFenAtom = atom<string | undefined>(undefined);
+export const arenaQueuedSourceAtom = atom<string | null>(null);
 export const arenaSavedGameIdAtom = atom<number | null>(null);

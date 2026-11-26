@@ -1,5 +1,10 @@
-import ArrowOverlay from "@/components/board/arrowOverlay";
+import { ArrowOverlayControls } from "@/components/board/arrowOverlay";
 import { useWorkspacePageFlow } from "@/components/boardWorkspace";
+import {
+  InspectorPopover,
+  PopoverSectionLabel,
+  PopoverSwitchRow,
+} from "@/components/inspector/inspectorPopover";
 import MovesList from "@/components/movesList";
 import StrengthControl from "@/components/strengthControl";
 import { ToolbarButton } from "@/components/ToolbarButton";
@@ -29,6 +34,7 @@ import { getGameResult, getOutcomeFor } from "@/lib/gameResult";
 import { EngineName } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
+  Alert,
   Box,
   Button,
   ButtonBase,
@@ -39,12 +45,9 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
-  FormControlLabel,
   IconButton,
-  Popover,
   Snackbar,
   Stack,
-  Switch,
   Tooltip,
   Typography,
   alpha,
@@ -57,6 +60,8 @@ import {
   activeCoachAtom,
   activeGameModeAtom,
   boardFlippedAtom,
+  botErrorAtom,
+  botRetryTickAtom,
   botStrengthAtom,
   botThinkingAtom,
   challengeIdAtom,
@@ -71,8 +76,10 @@ import {
   playCascadeActiveAtom,
   playEvalBarAtom,
   playerColorAtom,
+  queuedStartSourceAtom,
   reviewPlyAtom,
   savedGameIdAtom,
+  startingPositionAtom,
 } from "./states";
 import { useInteractiveCoach } from "./useInteractiveCoach";
 import { useMoveCoach } from "./useMoveCoach";
@@ -123,7 +130,11 @@ export default function GamePanel({
   const [coachActive, setCoachActive] = useAtom(activeCoachAtom);
   const [end, setEnd] = useAtom(gameEndAtom);
   const botThinking = useAtomValue(botThinkingAtom);
-  const botEngineName = useAtomValue(enginePlayNameAtom);
+  const [botError, setBotError] = useAtom(botErrorAtom);
+  const bumpBotRetry = useSetAtom(botRetryTickAtom);
+  const [queuedSource, setQueuedSource] = useAtom(queuedStartSourceAtom);
+  const setStartingPosition = useSetAtom(startingPositionAtom);
+  const [botEngineName, setBotEngineName] = useAtom(enginePlayNameAtom);
   const [savedStrength, setSavedStrength] = useAtom(botStrengthAtom);
   const challengeId = useAtomValue(challengeIdAtom);
   const challenge = challengeId ? getEndgame(challengeId) : undefined;
@@ -281,6 +292,33 @@ export default function GamePanel({
     if (!coachActive && hintsOpen) toggleHints();
     setCoachActive(!coachActive);
   };
+
+  useKeyboardShortcut("a", () =>
+    overlay.engine.update({ enabled: !overlay.engine.prefs.enabled })
+  );
+  const arrowDigits = useMemo(
+    () =>
+      Array.from(
+        { length: overlay.capabilities.maxMoves },
+        (_, i) => `${i + 1}`
+      ),
+    [overlay.capabilities.maxMoves]
+  );
+  useKeyboardShortcut(
+    arrowDigits,
+    (event) =>
+      overlay.engine.update({ enabled: true, moves: Number(event.key) }),
+    overlay.capabilities.maxMoves > 0
+  );
+  useKeyboardShortcut(
+    "x",
+    () =>
+      overlay.engine.update({
+        enabled: true,
+        threats: !overlay.engine.prefs.threats,
+      }),
+    overlay.capabilities.threats
+  );
 
   useKeyboardShortcut("f", (event) => {
     event.preventDefault();
@@ -478,7 +516,7 @@ export default function GamePanel({
         />
       </Stack>
 
-      {/* Zone 2 — Game Result Card (top when game over) */}
+      {/* Zone 2 — Game Result Card / Bot Error / Queued Start Position */}
       {!isInProgress && info.over && (
         <ResultCard
           reason={info.reason}
@@ -486,6 +524,82 @@ export default function GamePanel({
           result={info.result}
           opponent={engineLabel(botEngineName).small}
         />
+      )}
+
+      {isInProgress && botError && (
+        <Box
+          sx={{
+            px: 1.25,
+            py: 0.75,
+            flexShrink: 0,
+            borderBottom: 1,
+            borderColor: "divider",
+          }}
+        >
+          <Alert
+            severity="error"
+            sx={{ py: 0.25 }}
+            action={
+              <Stack direction="row" gap={0.5} alignItems="center">
+                {botError.includes("Fairy-Stockfish") && (
+                  <Button
+                    size="small"
+                    color="inherit"
+                    onClick={() => {
+                      setBotError(null);
+                      setBotEngineName(EngineName.FairyStockfish14);
+                    }}
+                  >
+                    Use Fairy-SF
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  color="inherit"
+                  onClick={() => {
+                    setBotError(null);
+                    bumpBotRetry((v) => v + 1);
+                  }}
+                >
+                  Retry
+                </Button>
+              </Stack>
+            }
+          >
+            {botError}
+          </Alert>
+        </Box>
+      )}
+
+      {queuedSource && (
+        <Box
+          sx={{
+            px: 1.25,
+            py: 0.6,
+            flexShrink: 0,
+            borderBottom: 1,
+            borderColor: "divider",
+          }}
+        >
+          <Alert
+            severity="info"
+            sx={{ py: 0.15, "& .MuiAlert-message": { fontSize: "0.78rem" } }}
+            action={
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => {
+                  setQueuedSource(null);
+                  setStartingPosition("");
+                }}
+              >
+                Clear
+              </Button>
+            }
+          >
+            Next game will inherit the board from {queuedSource}.
+          </Alert>
+        </Box>
       )}
 
       {/* Zone 3 — Live Coach Commentary Feed (directly below header, zero buttons above) */}
@@ -931,95 +1045,38 @@ export default function GamePanel({
         </Stack>
       </Box>
 
-      {/* Options & Overlays Popover (keepMounted preserves ArrowOverlay keyboard shortcuts A / 1-9 / X) */}
-      <Popover
-        keepMounted
+      {/* Options & Overlays Popover (inline Board Overlays — no nested popover, no duplicate switches) */}
+      <InspectorPopover
+        title="Game options"
         open={optionsOpen}
         anchorEl={optionsAnchor}
-        onClose={() => setOptionsAnchor(null)}
-        anchorOrigin={{ vertical: "top", horizontal: "left" }}
-        transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-        slotProps={{
-          paper: {
-            sx: {
-              width: "min(300px, calc(100vw - 32px))",
-              p: 1.5,
-              borderRadius: 1.5,
-              border: 1,
-              borderColor: "divider",
-              mb: 0.75,
-            },
-          },
+        onClose={() => {
+          setOptionsAnchor(null);
+          overlay.engine.setFocus(null);
         }}
+        width={316}
       >
         <Stack spacing={1.25}>
           {isInProgress && isCasual && (
             <>
               <Stack spacing={0.25}>
-                <FormControlLabel
-                  labelPlacement="start"
-                  label={<Typography variant="body2">Coach</Typography>}
-                  control={
-                    <Switch
-                      size="small"
-                      checked={coachActive}
-                      onChange={toggleCoach}
-                    />
-                  }
-                  sx={{
-                    m: 0,
-                    minHeight: 34,
-                    justifyContent: "space-between",
-                    gap: 2,
-                  }}
+                <PopoverSectionLabel>Assistance</PopoverSectionLabel>
+                <PopoverSwitchRow
+                  label="Interactive coach"
+                  checked={coachActive}
+                  onChange={toggleCoach}
                 />
-                <FormControlLabel
-                  labelPlacement="start"
-                  label={<Typography variant="body2">Eval bar</Typography>}
-                  control={
-                    <Switch
-                      size="small"
-                      checked={evalBar}
-                      onChange={(_, checked) => setEvalBar(checked)}
-                    />
-                  }
-                  sx={{
-                    m: 0,
-                    minHeight: 34,
-                    justifyContent: "space-between",
-                    gap: 2,
-                  }}
+                <PopoverSwitchRow
+                  label="Evaluation bar"
+                  checked={evalBar}
+                  onChange={setEvalBar}
                 />
                 {coachActive && (
-                  <FormControlLabel
-                    labelPlacement="start"
-                    label={
-                      <Box>
-                        <Typography variant="body2">
-                          Engine arrows with coach
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ display: "block", lineHeight: 1.25 }}
-                        >
-                          Show suggestion &amp; threat arrows while coach is on
-                        </Typography>
-                      </Box>
-                    }
-                    control={
-                      <Switch
-                        size="small"
-                        checked={arrowsWithCoach}
-                        onChange={(_, checked) => setArrowsWithCoach(checked)}
-                      />
-                    }
-                    sx={{
-                      m: 0,
-                      minHeight: 36,
-                      justifyContent: "space-between",
-                      gap: 1.5,
-                    }}
+                  <PopoverSwitchRow
+                    label="Engine arrows with coach"
+                    help="Show suggestion and threat arrows while coach is on"
+                    checked={arrowsWithCoach}
+                    onChange={setArrowsWithCoach}
                   />
                 )}
               </Stack>
@@ -1066,42 +1123,18 @@ export default function GamePanel({
             </>
           )}
 
-          <ArrowOverlay
-            view="inspector"
-            prefs={overlay.engine.prefs}
-            capabilities={overlay.capabilities}
-            onChange={overlay.engine.update}
-            arrows={overlay.engine.arrows}
-            nameOf={overlay.nameOf}
-            turn={overlay.turn}
-            onFocus={overlay.engine.setFocus}
-            extra={
-              isInProgress && isCasual && coachActive ? (
-                <FormControlLabel
-                  labelPlacement="start"
-                  label={
-                    <Typography variant="body2">
-                      Show engine arrows with coach
-                    </Typography>
-                  }
-                  control={
-                    <Switch
-                      size="small"
-                      checked={arrowsWithCoach}
-                      onChange={(_, checked) => setArrowsWithCoach(checked)}
-                    />
-                  }
-                  sx={{
-                    m: 0,
-                    minHeight: 34,
-                    width: "100%",
-                    justifyContent: "space-between",
-                    gap: 2,
-                  }}
-                />
-              ) : undefined
-            }
-          />
+          <Stack spacing={0.75}>
+            <PopoverSectionLabel>Board overlays</PopoverSectionLabel>
+            <ArrowOverlayControls
+              prefs={overlay.engine.prefs}
+              capabilities={overlay.capabilities}
+              onChange={overlay.engine.update}
+              arrows={overlay.engine.arrows}
+              nameOf={overlay.nameOf}
+              turn={overlay.turn}
+              onFocus={overlay.engine.setFocus}
+            />
+          </Stack>
 
           {isInProgress && isCasual && (
             <>
@@ -1153,7 +1186,7 @@ export default function GamePanel({
             </>
           )}
         </Stack>
-      </Popover>
+      </InspectorPopover>
 
       <Snackbar
         open={!!notice}

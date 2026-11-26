@@ -43,6 +43,9 @@ export const hintPositionKeyAtom = atom(
 export const hintArrowsAtom = createPositionArrowsAtom(hintPositionKeyAtom);
 export const playArrowPrefsAtom = createArrowPrefsAtom("play");
 export const botThinkingAtom = atom(false);
+export const botErrorAtom = atom<string | null>(null);
+export const botRetryTickAtom = atom(0);
+export const queuedStartSourceAtom = atom<string | null>(null);
 export const challengeIdAtom = atom<string | null>(null);
 export const challengeStatusAtom = atom<ChallengeStatus>("active");
 

@@ -17,6 +17,7 @@ import {
   clocksAtom,
   coachAtom,
   boardFlippedAtom,
+  botErrorAtom,
   botStrengthAtom,
   challengeIdAtom,
   challengeStatusAtom,
@@ -68,7 +69,11 @@ export const useStartGame = () => {
             : Color.Black
           : store.get(colorChoiceAtom));
       const playerColor =
-        choice === "random" ? store.get(playerColorAtom) : choice;
+        choice === "random"
+          ? Math.random() < 0.5
+            ? Color.White
+            : Color.Black
+          : choice;
       const botColor = playerColor === Color.White ? Color.Black : Color.White;
       const restarting = overrides?.restart === true;
       const mode = challenge
@@ -143,6 +148,7 @@ export const useStartGame = () => {
       store.set(savedGameIdAtom, null);
       store.set(boardFlippedAtom, false);
       store.set(hintArrowsAtom, []);
+      store.set(botErrorAtom, null);
       store.set(gameIdAtom, store.get(gameIdAtom) + 1);
       store.set(isGameInProgressAtom, true);
 
@@ -161,6 +167,7 @@ export const useStartGame = () => {
     store.set(gameEndAtom, null);
     store.set(savedGameIdAtom, null);
     store.set(hintArrowsAtom, []);
+    store.set(botErrorAtom, null);
     store.set(boardFlippedAtom, false);
     store.set(challengeIdAtom, null);
     store.set(challengeStatusAtom, "active");

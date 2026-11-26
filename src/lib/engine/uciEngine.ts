@@ -19,6 +19,7 @@ import { EngineWorker, WorkerJob } from "@/types/engine";
 import { getEngineWorker, sendCommandsToWorker } from "./worker";
 import { UciOption, parseUciOptions } from "./uciOptions";
 import { getEngineModel } from "./models";
+import { fenHasExtraPieces } from "../editorPosition";
 import { logMessageIfLocalhost } from "../helpers";
 
 /** UCI commands for a new worker, built from the options the engine advertised. */
@@ -185,6 +186,15 @@ export class UciEngine {
     if (!this.isReady) {
       throw new Error(`${this.name} is not ready`);
     }
+  }
+
+  private assertPositionSupported(fen: string) {
+    if (!fenHasExtraPieces(fen)) return;
+    const model = getEngineModel(this.name);
+    if (model.supportsExtraPieces) return;
+    throw new Error(
+      `${model.label.small} does not support positions with more than 8 pawns or 16 pieces per side. Switch to Fairy-Stockfish to analyze or play this position.`
+    );
   }
 
   public shutdown(): void {
@@ -496,6 +506,7 @@ export class UciEngine {
     fen: string,
     depth = 16
   ): Promise<PositionEval> {
+    this.assertPositionSupported(fen);
     const results = await this.sendCommands(
       [`position fen ${fen}`, `go depth ${depth}`],
       "bestmove"
@@ -514,6 +525,7 @@ export class UciEngine {
     elo,
   }: EvaluatePositionWithUpdateParams): Promise<PositionEval> {
     this.throwErrorIfNotReady();
+    this.assertPositionSupported(fen);
     const generation = ++this.positionGeneration;
     const current = () =>
       generation === this.positionGeneration && this.isReady;
@@ -585,9 +597,22 @@ export class UciEngine {
     movetimeMs?: number
   ): Promise<string | undefined> {
     this.throwErrorIfNotReady();
+    this.assertPositionSupported(fen);
+    const generation = ++this.positionGeneration;
+    const current = () =>
+      generation === this.positionGeneration && this.isReady;
 
-    await this.stopAllCurrentJobs();
-    await this.setElo(elo);
+    const prepare = this.positionSetup
+      .catch(() => undefined)
+      .then(async () => {
+        if (!current()) return;
+        await this.stopCurrentJobs();
+        if (!current()) return;
+        await this.setElo(elo);
+      });
+    this.positionSetup = prepare;
+    await prepare;
+    if (!current()) return undefined;
 
     logMessageIfLocalhost(`Evaluating position: ${fen}`);
 
@@ -600,6 +625,7 @@ export class UciEngine {
       ],
       "bestmove"
     );
+    if (!current()) return undefined;
 
     const moveResult = results.find((result) => result.startsWith("bestmove"));
     const move = getResultProperty(moveResult ?? "", "bestmove");

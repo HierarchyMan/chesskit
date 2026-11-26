@@ -45,6 +45,7 @@ interface Harness {
  * progressive hints, blunders, undos, and glossary definitions end-to-end.
  */
 function createDrWolfHarness(options?: {
+  playerColor?: "w" | "b";
   evalOverrides?: Record<string, { cp: number; pv: string[] }[]>;
   botMoveOverrides?: Record<string, string>;
 }): Harness {
@@ -206,11 +207,31 @@ function createDrWolfHarness(options?: {
     action: "beginner",
     parameters: JSON.stringify({ analyticsId: "Beginner" }),
   });
-  send({
+  if (options?.playerColor === "b") {
+    send({
+      what: "choice_response",
+      action: "choice_black",
+      parameters: JSON.stringify({ analyticsId: "Black" }),
+    });
+  }
+  const initialRes = send({
     what: "user_interface_event",
     gameScreen: "PLAY",
     id: "first_game_started",
   });
+  for (const bm of initialRes.botMoves) {
+    const botFenBefore = game.fen();
+    const playedBot = game.move(bm);
+    assert.ok(playedBot, `Dr. Wolf emitted illegal opening bot move ${JSON.stringify(bm)}`);
+    send({
+      what: "move_made",
+      gameScreen: "PLAY",
+      from: playedBot.from,
+      to: playedBot.to,
+      promotion: playedBot.promotion ?? null,
+      fenBeforeMove: botFenBefore,
+    });
+  }
 
   const playPlayerMove = (san: string) => {
     const fenBefore = game.fen();
@@ -411,4 +432,51 @@ test("explain.ts and analysisFeedback.ts detect tactical motifs and generate edi
   );
   assert.ok(bookNote?.sentence.includes("central push") || bookNote?.sentence.includes("Sicilian"));
   assert.equal(bookNote?.motifLabel, "Book Theory");
+});
+
+test("deobfuscated Dr. Wolf bundle plays White move 1 and coaches Black cleanly when bot has White", () => {
+  const h = createDrWolfHarness({
+    playerColor: "b",
+    evalOverrides: {
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w": [
+        { cp: 30, pv: ["e2e4", "e7e5", "g1f3"] },
+      ],
+      "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b": [
+        { cp: 30, pv: ["e7e5", "g1f3", "b8c6"] },
+      ],
+      "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w": [
+        { cp: 35, pv: ["g1f3", "b8c6", "f1c4"] },
+      ],
+      "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b": [
+        { cp: 30, pv: ["b8c6", "f1c4", "g8f6"] },
+      ],
+      "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w": [
+        { cp: 35, pv: ["f1c4", "f8c5", "e1g1"] },
+      ],
+    },
+    botMoveOverrides: {
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w": "e2e4",
+      "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w": "g1f3",
+      "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w": "f1c4",
+    },
+  });
+
+  // Bot (White) should have already played an opening move on game start!
+  assert.equal(h.game.history().length, 1, "White bot should play opening move 1");
+  assert.equal(h.game.turn(), "b");
+
+  // Player (Black) replies with a legal move -> White bot replies on ply 3
+  const blackReply1 = h.game.moves().includes("e5") ? "e5" : h.game.moves()[0];
+  const m1 = h.playPlayerMove(blackReply1);
+  assert.equal(h.game.history().length, 3, "White bot should reply on ply 3");
+  assert.equal(h.game.turn(), "b");
+  assert.ok(m1.says.length >= 1, "Dr. Wolf should speak when coaching Black");
+
+  // Player (Black) replies again -> White bot replies on ply 5
+  const blackReply2 = h.game.moves().includes("Nc6") ? "Nc6" : h.game.moves()[0];
+  const m2 = h.playPlayerMove(blackReply2);
+  assert.equal(h.game.history().length, 5, "White bot should reply on ply 5");
+  assert.equal(h.game.turn(), "b");
+  assert.ok(m2.says.length >= 1);
+  assert.equal(h.errors.length, 0, `expected 0 errors, got: ${h.errors.join("; ")}`);
 });

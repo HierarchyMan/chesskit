@@ -4,6 +4,7 @@ import { useModels } from "@/hooks/useModels";
 import { isEngineSupported, isWasmSupported } from "@/lib/engine/shared";
 import { EngineName } from "@/types/enums";
 import { engineNameAtom, useCloudEvalAtom } from "@/sections/analysis/states";
+import { enginePlayNameAtom } from "@/sections/play/states";
 import { Icon } from "@iconify/react";
 import {
   Box,
@@ -21,11 +22,13 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { settingsOpenAtom, settingsTabAtom } from "./states";
 
-const ENGINE_CHIP_ROUTES = new Set(["/analysis", "/editor", "/arena"]);
+const ENGINE_CHIP_ROUTES = new Set(["/analysis", "/editor", "/play"]);
 
 export default function EngineChip() {
   const { pathname } = useRouter();
-  const [engineName, setEngineName] = useAtom(engineNameAtom);
+  const isPlayRoute = pathname === "/play";
+  const [analysisEngine, setAnalysisEngine] = useAtom(engineNameAtom);
+  const [playEngine, setPlayEngine] = useAtom(enginePlayNameAtom);
   const [useCloudEval, setUseCloudEval] = useAtom(useCloudEvalAtom);
   const setSettingsOpen = useSetAtom(settingsOpenAtom);
   const setSettingsTab = useSetAtom(settingsTabAtom);
@@ -33,6 +36,9 @@ export default function EngineChip() {
   const [open, setOpen] = useState(false);
   const theme = useTheme();
   const showLabel = useMediaQuery(theme.breakpoints.up("sm"));
+
+  const engineName = isPlayRoute ? playEngine : analysisEngine;
+  const setEngineName = isPlayRoute ? setPlayEngine : setAnalysisEngine;
 
   useEffect(() => {
     if (isEngineSupported(engineName)) return;
@@ -54,7 +60,8 @@ export default function EngineChip() {
     (view?.model.source === "bridge" && view.bridge === "down") ||
     (!!view && !view.available && !view.canDownload);
   const isAmber =
-    !hasError && (!!view?.progress || needsDownload || useCloudEval);
+    !hasError &&
+    (!!view?.progress || needsDownload || (!isPlayRoute && useCloudEval));
 
   const dotColor = hasError
     ? "error.main"
@@ -68,9 +75,11 @@ export default function EngineChip() {
       ? "Downloading…"
       : needsDownload
         ? "Download required"
-        : useCloudEval
+        : !isPlayRoute && useCloudEval
           ? "Cloud eval enabled"
           : "Ready";
+
+  const roleLabel = isPlayRoute ? "Bot engine" : "Analysis engine";
 
   const openSettings = (tab?: "models") => {
     setOpen(false);
@@ -81,13 +90,13 @@ export default function EngineChip() {
   return (
     <>
       <Tooltip
-        title={`Analysis engine: ${engineLabel(engineName).full} · ${statusHint}`}
+        title={`${roleLabel}: ${engineLabel(engineName).full} · ${statusHint}`}
       >
         <Button
           size="small"
           color="inherit"
           onClick={() => setOpen(true)}
-          aria-label="Choose analysis engine"
+          aria-label={`Choose ${roleLabel.toLowerCase()}`}
           startIcon={
             <Box
               sx={{
@@ -140,25 +149,27 @@ export default function EngineChip() {
         onSelect={(next) => {
           if (next !== "analysis") setEngineName(next);
         }}
-        role="analysis"
-        title="Analysis engine"
+        role={isPlayRoute ? "play" : "analysis"}
+        title={roleLabel}
         footer={
           <Stack spacing={1} sx={{ width: "100%" }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  size="small"
-                  checked={useCloudEval}
-                  onChange={(_, checked) => setUseCloudEval(checked)}
-                />
-              }
-              label={
-                <Typography variant="body2">
-                  Use Lichess cloud evaluations when available (faster, but not
-                  from your engine)
-                </Typography>
-              }
-            />
+            {!isPlayRoute && (
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={useCloudEval}
+                    onChange={(_, checked) => setUseCloudEval(checked)}
+                  />
+                }
+                label={
+                  <Typography variant="body2">
+                    Use Lichess cloud evaluations when available (faster, but
+                    not from your engine)
+                  </Typography>
+                }
+              />
+            )}
             <Stack direction="row" gap={1} flexWrap="wrap">
               <Button
                 size="small"

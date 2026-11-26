@@ -377,13 +377,13 @@ export default function GameDatabase() {
       </Stack>
 
       {games.length === 0 ? (
-        <Panel sx={{ borderRadius: "12px", py: 5, textAlign: "center" }}>
+        <Panel sx={{ borderRadius: 1.5, py: 5, textAlign: "center" }}>
           <Stack spacing={1.5} alignItems="center" maxWidth={440} mx="auto">
             <Box
               sx={{
                 width: 52,
                 height: 52,
-                borderRadius: "12px",
+                borderRadius: 1.5,
                 bgcolor: "action.hover",
                 display: "flex",
                 alignItems: "center",
@@ -492,7 +492,7 @@ export default function GameDatabase() {
                 },
               }}
               sx={{
-                borderRadius: "12px",
+                borderRadius: 1.5,
                 bgcolor: "background.paper",
                 "& .MuiDataGrid-row": { cursor: "pointer" },
               }}

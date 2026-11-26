@@ -1,11 +1,21 @@
-import Panel from "@/components/panel";
+import {
+  InspectorBody,
+  InspectorDeck,
+  InspectorHeader,
+  InspectorPill,
+  InspectorShell,
+} from "@/components/inspector/inspectorShell";
 import StrengthControl from "@/components/strengthControl";
 import { EngineFailureAlert } from "@/components/engineDownloadAlert";
 import { EngineField } from "@/components/enginePicker";
 import { DEFAULT_ENGINE, engineLabel } from "@/constants";
 import { EngineState } from "@/hooks/useEngine";
+import { fenHasExtraPieces } from "@/lib/editorPosition";
+import { getEngineModel } from "@/lib/engine/models";
+import { setHandoff } from "@/lib/handoff";
 import { ODDS_OPTIONS } from "@/lib/odds";
-import { Color, EngineId } from "@/types/enums";
+import { playSetupPosition } from "@/lib/setupPosition";
+import { Color, EngineName } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
   Alert,
@@ -42,8 +52,6 @@ import {
   timeControlAtom,
 } from "./states";
 import { useStartGame } from "./useStartGame";
-import { playSetupPosition } from "@/lib/setupPosition";
-import { setHandoff } from "@/lib/handoff";
 
 const TIME_PRESETS: { label: string; minutes: number; increment: number }[] = [
   { label: "No clock", minutes: 0, increment: 0 },
@@ -88,13 +96,9 @@ export default function NewGamePanel({ botEngine }: Props) {
   const router = useRouter();
 
   useEffect(() => {
-    setPlayerColor(
-      colorChoice === "random"
-        ? Math.random() < 0.5
-          ? Color.White
-          : Color.Black
-        : colorChoice
-    );
+    if (colorChoice !== "random") {
+      setPlayerColor(colorChoice);
+    }
   }, [colorChoice, setPlayerColor]);
 
   useEffect(() => {
@@ -107,6 +111,10 @@ export default function NewGamePanel({ botEngine }: Props) {
     odds,
     playerColor === Color.White ? Color.Black : Color.White
   );
+  const extraPiecesBlocked =
+    !setup.error &&
+    fenHasExtraPieces(setup.fen) &&
+    !getEngineModel(engineName).supportsExtraPieces;
 
   const handleStart = () => {
     const message = startGame();
@@ -114,15 +122,316 @@ export default function NewGamePanel({ botEngine }: Props) {
   };
 
   return (
-    <Panel title="New game" sx={{ maxHeight: "none", borderBottom: 0 }}>
-      <Stack spacing={2.25}>
-        {/* Settings are remembered, so Start leads: on a tall screen it sits
-            right under the board instead of after a form that can expand. */}
-        <Stack spacing={1}>
+    <InspectorShell>
+      <InspectorHeader
+        left={
+          <Typography variant="subtitle2" fontWeight={700} noWrap>
+            New game
+          </Typography>
+        }
+        right={
+          <InspectorPill
+            tone={
+              botEngine.status === "ready"
+                ? "success"
+                : botEngine.status === "error"
+                  ? "error"
+                  : "neutral"
+            }
+            label={
+              botEngine.status === "ready"
+                ? `${engineLabel(engineName).small} ready`
+                : botEngine.status === "error"
+                  ? "Unavailable"
+                  : "Loading…"
+            }
+          />
+        }
+      />
+
+      <InspectorBody sx={{ p: 1.5 }}>
+        <Stack spacing={2}>
+          {botEngine.status === "error" && (
+            <EngineFailureAlert
+              state={botEngine}
+              onUseDefault={() => setEngineName(DEFAULT_ENGINE)}
+            />
+          )}
+
+          {extraPiecesBlocked && (
+            <Alert
+              severity="warning"
+              sx={{ py: 0.25 }}
+              action={
+                <Button
+                  size="small"
+                  color="inherit"
+                  onClick={() => setEngineName(EngineName.FairyStockfish14)}
+                >
+                  Use Fairy-SF
+                </Button>
+              }
+            >
+              {engineLabel(engineName).small} does not support &gt;8 pawns or
+              &gt;16 pieces per side.
+            </Alert>
+          )}
+
+          <Section title="Opponent">
+            <Stack spacing={1.25}>
+              <EngineField
+                label="Opponent engine"
+                role="play"
+                value={engineName}
+                onChange={(next) => {
+                  if (next !== "analysis") setEngineName(next);
+                }}
+              />
+              <StrengthControl
+                value={strength}
+                onChange={setStrength}
+                engineName={engineName}
+              />
+            </Stack>
+          </Section>
+
+          <Section title="You play as">
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={colorChoice}
+              onChange={(_, value: ColorChoice | null) =>
+                value && setColorChoice(value)
+              }
+              sx={TOGGLE_GROUP_SX}
+            >
+              <ToggleButton value={Color.White}>White</ToggleButton>
+              <ToggleButton value="random">Random</ToggleButton>
+              <ToggleButton value={Color.Black}>Black</ToggleButton>
+            </ToggleButtonGroup>
+          </Section>
+
+          <Section title="Game type">
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={mode}
+              onChange={(_, value: GameMode | null) => value && setMode(value)}
+              sx={TOGGLE_GROUP_SX}
+            >
+              <ToggleButton value="casual">Casual</ToggleButton>
+              <ToggleButton value="formal">Formal</ToggleButton>
+            </ToggleButtonGroup>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mt: 0.75, fontSize: "0.8rem", lineHeight: 1.45 }}
+            >
+              {mode === "casual"
+                ? "Hints, top moves, live coach, and takebacks are available."
+                : "No hints, coach, or takebacks — every move counts."}
+            </Typography>
+            {mode === "casual" && (
+              <Stack
+                spacing={0.25}
+                sx={{
+                  mt: 1,
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  bgcolor: "action.hover",
+                }}
+              >
+                <FormControlLabel
+                  labelPlacement="start"
+                  sx={{
+                    m: 0,
+                    minHeight: 34,
+                    justifyContent: "space-between",
+                    gap: 1.5,
+                  }}
+                  control={
+                    <Switch
+                      size="small"
+                      checked={coach}
+                      onChange={(_, checked) => setCoach(checked)}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Live coach
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", lineHeight: 1.3 }}
+                      >
+                        Rate moves and explain mistakes on the board
+                      </Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  labelPlacement="start"
+                  sx={{
+                    m: 0,
+                    minHeight: 32,
+                    justifyContent: "space-between",
+                    gap: 1.5,
+                  }}
+                  control={
+                    <Switch
+                      size="small"
+                      checked={evalBar}
+                      onChange={(_, checked) => setEvalBar(checked)}
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" color="text.secondary">
+                      Evaluation bar beside the board
+                    </Typography>
+                  }
+                />
+              </Stack>
+            )}
+          </Section>
+
+          <Section title="Time control">
+            <Stack direction="row" flexWrap="wrap" gap={0.75}>
+              {TIME_PRESETS.map((preset) => {
+                const selected =
+                  preset.minutes === timeControl.minutes &&
+                  preset.increment === timeControl.increment;
+
+                return (
+                  <Chip
+                    key={preset.label}
+                    label={preset.label}
+                    size="small"
+                    color={selected ? "primary" : "default"}
+                    variant={selected ? "filled" : "outlined"}
+                    onClick={() =>
+                      setTimeControl({
+                        minutes: preset.minutes,
+                        increment: preset.increment,
+                      })
+                    }
+                    sx={{
+                      fontVariantNumeric: "tabular-nums",
+                      fontWeight: selected ? 700 : 500,
+                    }}
+                  />
+                );
+              })}
+            </Stack>
+          </Section>
+
+          <Section title="Handicap">
+            <FormControl size="small" fullWidth>
+              <Select
+                value={odds}
+                onChange={(event) => setOdds(event.target.value as typeof odds)}
+                inputProps={{ "aria-label": "Handicap" }}
+              >
+                {ODDS_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                    {option.value !== "none" && (
+                      <Typography
+                        component="span"
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ ml: 1 }}
+                      >
+                        {option.hint}
+                      </Typography>
+                    )}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Section>
+
+          <Box>
+            <Button
+              size="small"
+              color="inherit"
+              onClick={() => setShowPosition((value) => !value)}
+              startIcon={
+                <Icon
+                  icon={showPosition ? "mdi:chevron-up" : "mdi:chevron-down"}
+                  height={18}
+                />
+              }
+              disabled={odds !== "none"}
+              sx={{
+                px: 0.75,
+                ml: -0.75,
+                borderRadius: 1,
+                color: "text.secondary",
+                textTransform: "none",
+              }}
+            >
+              Start from a position
+            </Button>
+            <Collapse in={showPosition && odds === "none"}>
+              <Stack spacing={1} mt={1}>
+                <TextField
+                  size="small"
+                  multiline
+                  minRows={2}
+                  maxRows={6}
+                  label="FEN or PGN"
+                  value={startingPosition}
+                  onChange={(event) => setStartingPosition(event.target.value)}
+                  error={!!setup.error}
+                  helperText={
+                    setup.error ??
+                    "The board previews this starting position. Clear to use the standard position."
+                  }
+                />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon icon="mdi:pencil-ruler" height={18} />}
+                  disabled={!!setup.error}
+                  onClick={() => {
+                    setHandoff(
+                      { kind: "fen", fen: setup.fen, source: "Play setup" },
+                      "/editor"
+                    );
+                    void router.push("/editor");
+                  }}
+                  sx={{ alignSelf: "flex-start", borderRadius: 1 }}
+                >
+                  Build one in the board editor
+                </Button>
+              </Stack>
+            </Collapse>
+          </Box>
+        </Stack>
+      </InspectorBody>
+
+      <InspectorDeck sx={{ p: 1.25 }}>
+        <Stack spacing={0.75}>
+          {error && (
+            <Alert severity="error" sx={{ py: 0.25 }}>
+              {error}
+            </Alert>
+          )}
+          {setup.error && (
+            <Typography variant="caption" color="error.main">
+              The starting position above is not valid.
+            </Typography>
+          )}
           <Button
             variant="contained"
             size="large"
-            disabled={!ready || !!setup.error}
+            fullWidth
+            disabled={!ready || !!setup.error || extraPiecesBlocked}
             onClick={handleStart}
             startIcon={<Icon icon="mdi:play" height={22} />}
             sx={{ borderRadius: 1, fontWeight: 700 }}
@@ -133,255 +442,9 @@ export default function NewGamePanel({ botEngine }: Props) {
                 ? "Engine unavailable"
                 : "Loading engine…"}
           </Button>
-          {error && <Alert severity="error">{error}</Alert>}
-          {setup.error && (
-            <Typography variant="caption" color="error.main">
-              The starting position below is not valid.
-            </Typography>
-          )}
         </Stack>
-
-        <Section title="Opponent">
-          <Stack spacing={1.25}>
-            <EngineField
-              label="Opponent engine"
-              role="play"
-              value={engineName}
-              onChange={(next) => {
-                if (next !== "analysis") setEngineName(next);
-              }}
-            />
-
-            <EngineStatusLine
-              engine={botEngine}
-              engineName={engineName}
-              onUseDefault={() => setEngineName(DEFAULT_ENGINE)}
-            />
-
-            <StrengthControl
-              value={strength}
-              onChange={setStrength}
-              engineName={engineName}
-            />
-          </Stack>
-        </Section>
-
-        <Section title="You play as">
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            value={colorChoice}
-            onChange={(_, value: ColorChoice | null) =>
-              value && setColorChoice(value)
-            }
-            sx={TOGGLE_GROUP_SX}
-          >
-            <ToggleButton value={Color.White}>White</ToggleButton>
-            <ToggleButton value="random">Random</ToggleButton>
-            <ToggleButton value={Color.Black}>Black</ToggleButton>
-          </ToggleButtonGroup>
-        </Section>
-
-        <Section title="Game type">
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            value={mode}
-            onChange={(_, value: GameMode | null) => value && setMode(value)}
-            sx={TOGGLE_GROUP_SX}
-          >
-            <ToggleButton value="casual">Casual</ToggleButton>
-            <ToggleButton value="formal">Formal</ToggleButton>
-          </ToggleButtonGroup>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ mt: 0.75, fontSize: "0.8rem", lineHeight: 1.45 }}
-          >
-            {mode === "casual"
-              ? "Hints, top moves, live coach, and takebacks are available."
-              : "No hints, coach, or takebacks — every move counts."}
-          </Typography>
-          {mode === "casual" && (
-            <Stack
-              spacing={0.25}
-              sx={{
-                mt: 1,
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
-                bgcolor: "action.hover",
-              }}
-            >
-              <FormControlLabel
-                labelPlacement="start"
-                sx={{
-                  m: 0,
-                  minHeight: 34,
-                  justifyContent: "space-between",
-                  gap: 1.5,
-                }}
-                control={
-                  <Switch
-                    size="small"
-                    checked={coach}
-                    onChange={(_, checked) => setCoach(checked)}
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="body2" fontWeight={500}>
-                      Live coach
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", lineHeight: 1.3 }}
-                    >
-                      Rate moves and explain mistakes on the board
-                    </Typography>
-                  </Box>
-                }
-              />
-              <FormControlLabel
-                labelPlacement="start"
-                sx={{
-                  m: 0,
-                  minHeight: 32,
-                  justifyContent: "space-between",
-                  gap: 1.5,
-                }}
-                control={
-                  <Switch
-                    size="small"
-                    checked={evalBar}
-                    onChange={(_, checked) => setEvalBar(checked)}
-                  />
-                }
-                label={
-                  <Typography variant="body2" color="text.secondary">
-                    Evaluation bar beside the board
-                  </Typography>
-                }
-              />
-            </Stack>
-          )}
-        </Section>
-
-        <Section title="Time control">
-          <Stack direction="row" flexWrap="wrap" gap={0.75}>
-            {TIME_PRESETS.map((preset) => {
-              const selected =
-                preset.minutes === timeControl.minutes &&
-                preset.increment === timeControl.increment;
-
-              return (
-                <Chip
-                  key={preset.label}
-                  label={preset.label}
-                  size="small"
-                  color={selected ? "primary" : "default"}
-                  variant={selected ? "filled" : "outlined"}
-                  onClick={() =>
-                    setTimeControl({
-                      minutes: preset.minutes,
-                      increment: preset.increment,
-                    })
-                  }
-                  sx={{
-                    fontVariantNumeric: "tabular-nums",
-                    fontWeight: selected ? 700 : 500,
-                  }}
-                />
-              );
-            })}
-          </Stack>
-        </Section>
-
-        <Section title="Handicap">
-          <FormControl size="small" fullWidth>
-            <Select
-              value={odds}
-              onChange={(event) => setOdds(event.target.value as typeof odds)}
-              inputProps={{ "aria-label": "Handicap" }}
-            >
-              {ODDS_OPTIONS.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                  {option.value !== "none" && (
-                    <Typography
-                      component="span"
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ ml: 1 }}
-                    >
-                      {option.hint}
-                    </Typography>
-                  )}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Section>
-
-        <Box>
-          <Button
-            size="small"
-            color="inherit"
-            onClick={() => setShowPosition((value) => !value)}
-            startIcon={
-              <Icon
-                icon={showPosition ? "mdi:chevron-up" : "mdi:chevron-down"}
-                height={18}
-              />
-            }
-            disabled={odds !== "none"}
-            sx={{
-              px: 0.75,
-              ml: -0.75,
-              borderRadius: 1,
-              color: "text.secondary",
-              textTransform: "none",
-            }}
-          >
-            Start from a position
-          </Button>
-          <Collapse in={showPosition && odds === "none"}>
-            <Stack spacing={1} mt={1}>
-              <TextField
-                size="small"
-                multiline
-                minRows={2}
-                maxRows={6}
-                label="FEN or PGN"
-                value={startingPosition}
-                onChange={(event) => setStartingPosition(event.target.value)}
-                error={!!setup.error}
-                helperText={
-                  setup.error ??
-                  "The board previews this starting position. Clear to use the standard position."
-                }
-              />
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<Icon icon="mdi:pencil-ruler" height={18} />}
-                disabled={!!setup.error}
-                onClick={() => {
-                  setHandoff({ kind: "fen", fen: setup.fen }, "/editor");
-                  void router.push("/editor");
-                }}
-                sx={{ alignSelf: "flex-start", borderRadius: 1 }}
-              >
-                Build one in the board editor
-              </Button>
-            </Stack>
-          </Collapse>
-        </Box>
-      </Stack>
-    </Panel>
+      </InspectorDeck>
+    </InspectorShell>
   );
 }
 
@@ -408,45 +471,5 @@ function Section({
       </Typography>
       <Box mt={0.5}>{children}</Box>
     </Box>
-  );
-}
-
-function EngineStatusLine({
-  engine,
-  engineName,
-  onUseDefault,
-}: {
-  engine: EngineState;
-  engineName: EngineId;
-  onUseDefault: () => void;
-}) {
-  if (engine.status === "ready") {
-    return (
-      <Stack direction="row" alignItems="center" gap={0.6}>
-        <Box
-          aria-hidden
-          sx={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            bgcolor: "success.main",
-            flexShrink: 0,
-          }}
-        />
-        <Typography variant="caption" color="success.main" fontWeight={600}>
-          {engineLabel(engineName).small} is ready
-        </Typography>
-      </Stack>
-    );
-  }
-
-  if (engine.status === "error") {
-    return <EngineFailureAlert state={engine} onUseDefault={onUseDefault} />;
-  }
-
-  return (
-    <Typography variant="caption" color="text.secondary">
-      Loading {engineLabel(engineName).small}…
-    </Typography>
   );
 }

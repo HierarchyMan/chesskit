@@ -2,7 +2,7 @@ import Board from "@/components/board";
 import StoryControls from "@/components/board/storyControls";
 import { useInBoardCascade } from "@/lib/coachCascade";
 import { chessPathKey } from "@/lib/chessHistory";
-import ArrowOverlay from "@/components/board/arrowOverlay";
+import { ArrowOverlayControls } from "@/components/board/arrowOverlay";
 import { useEngineArrows } from "@/components/board/useEngineArrows";
 import { colorNamer } from "@/lib/arrows/legend";
 import { ARROW_CAPABILITIES } from "@/lib/arrows/prefs";
@@ -18,14 +18,23 @@ import {
   arenaFlippedAtom,
   arenaGameAtom,
   arenaProposalArrowsAtom,
+  arenaQueuedSourceAtom,
 } from "@/sections/arena/states";
 import { sideLabel, useArena } from "@/sections/arena/useArena";
 import { BoardArrow } from "@/lib/arrows/types";
+import { Handoff } from "@/lib/handoff";
 import { Color } from "@/types/enums";
-import { Box } from "@mui/material";
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+} from "@mui/material";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { setupPosition } from "@/lib/setupPosition";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 const NO_ARROWS: BoardArrow[] = [];
 
@@ -53,8 +62,20 @@ export default function Arena() {
     extra: proposals,
   });
 
-  useHandoff(["fen"], ({ fen }) => {
-    arena.setStartFen(fen);
+  const setQueuedSource = useSetAtom(arenaQueuedSourceAtom);
+  const [pendingHandoff, setPendingHandoff] = useState<Extract<
+    Handoff,
+    { kind: "fen" }
+  > | null>(null);
+
+  useHandoff(["fen"], (handoff) => {
+    if (arena.started) {
+      arena.setRunning(false);
+      setPendingHandoff(handoff);
+    } else {
+      arena.setStartFen(handoff.fen);
+      setQueuedSource(null);
+    }
   });
 
   useKeyboardShortcut(
@@ -85,6 +106,30 @@ export default function Arena() {
     () => arena.goToPly(null),
     arena.started && arena.isReviewing && !story.projection.active
   );
+  useKeyboardShortcut(
+    "a",
+    () => engine.update({ enabled: !engine.prefs.enabled }),
+    arena.started
+  );
+  const arenaArrowDigits = useMemo(
+    () =>
+      Array.from(
+        { length: ARROW_CAPABILITIES.arena.maxMoves },
+        (_, i) => `${i + 1}`
+      ),
+    []
+  );
+  useKeyboardShortcut(
+    arenaArrowDigits,
+    (event) => engine.update({ enabled: true, moves: Number(event.key) }),
+    arena.started && ARROW_CAPABILITIES.arena.maxMoves > 0
+  );
+  useKeyboardShortcut(
+    "x",
+    () => engine.update({ enabled: true, threats: !engine.prefs.threats }),
+    arena.started && ARROW_CAPABILITIES.arena.threats
+  );
+
   useKeyboardShortcut(
     ["f", "F"],
     () => setFlipped((value) => !value),
@@ -141,46 +186,73 @@ export default function Arena() {
           />
         }
         inspector={
-          <Box
-            data-inspector-scroller
-            sx={{
-              minHeight: 0,
-              overflowY: "auto",
-              overscrollBehavior: "contain",
-              scrollbarGutter: "stable",
-            }}
-          >
-            <ArenaSidePanel
-              arena={arena}
-              story={story}
-              storyControls={<StoryControls story={story} />}
-              onArrows={setArrows}
-              overlays={
-                arena.started ? (
-                  <Box
-                    sx={{
-                      px: 1.5,
-                      borderBottom: 1,
-                      borderColor: "divider",
-                    }}
-                  >
-                    <ArrowOverlay
-                      view="inspector"
-                      prefs={engine.prefs}
-                      capabilities={ARROW_CAPABILITIES.arena}
-                      onChange={engine.update}
-                      arrows={engine.arrows}
-                      nameOf={colorNamer}
-                      turn={displayedFen.split(" ")[1] === "b" ? "b" : "w"}
-                      onFocus={engine.setFocus}
-                    />
-                  </Box>
-                ) : undefined
-              }
-            />
-          </Box>
+          <ArenaSidePanel
+            arena={arena}
+            story={story}
+            storyControls={<StoryControls story={story} />}
+            onArrows={setArrows}
+            overlayControls={
+              arena.started ? (
+                <ArrowOverlayControls
+                  prefs={engine.prefs}
+                  capabilities={ARROW_CAPABILITIES.arena}
+                  onChange={engine.update}
+                  arrows={engine.arrows}
+                  nameOf={colorNamer}
+                  turn={displayedFen.split(" ")[1] === "b" ? "b" : "w"}
+                  onFocus={engine.setFocus}
+                />
+              ) : undefined
+            }
+          />
         }
       />
+
+      <Dialog
+        open={!!pendingHandoff}
+        onClose={() => setPendingHandoff(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Arena match already open</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            A custom board arrived from{" "}
+            {pendingHandoff?.source ?? "another page"}. You can replace the
+            current match now, or queue this board so your next match inherits
+            it.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ flexWrap: "wrap", gap: 0.75, px: 2.5, pb: 2 }}>
+          <Button onClick={() => setPendingHandoff(null)}>
+            Keep current match
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => {
+              if (!pendingHandoff) return;
+              arena.setStartFen(pendingHandoff.fen);
+              setQueuedSource(pendingHandoff.source ?? "another mode");
+              setPendingHandoff(null);
+            }}
+          >
+            Use for next match
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={() => {
+              if (!pendingHandoff) return;
+              arena.setStartFen(pendingHandoff.fen);
+              setQueuedSource(null);
+              arena.stop();
+              setPendingHandoff(null);
+            }}
+          >
+            Start new match now
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

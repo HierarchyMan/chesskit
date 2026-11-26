@@ -15,10 +15,12 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import Image from "next/image";
 import NextLink from "next/link";
 import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { ActiveModeId, activeModeIndicatorsAtom } from "@/lib/modeLifecycle";
 import {
   HOME_ITEM,
   NAV_GROUPS,
@@ -41,14 +43,22 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const isNarrow = useMediaQuery("(max-width:1279.95px)");
   const [navPreference, setNavPreference] = useAtom(navPreferenceAtom);
+  const activeIndicators = useAtomValue(activeModeIndicatorsAtom);
   const setShortcutsOpen = useSetAtom(shortcutsOpenAtom);
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const expanded = isDesktop ? (navPreference ?? !isNarrow) : true;
   const width = expanded ? NAV_EXPANDED_WIDTH : NAV_COLLAPSED_WIDTH;
 
   const renderItem = (item: NavItem) => {
     const active = isNavItemActive(item, router.pathname);
+    const hasSession =
+      mounted && Boolean(activeIndicators[item.id as ActiveModeId]);
 
     const button = (
       <ListItemButton
@@ -92,12 +102,30 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
       >
         <ListItemIcon
           sx={{
+            position: "relative",
             minWidth: expanded ? 36 : 0,
             color: active ? "primary.main" : "inherit",
             justifyContent: "center",
           }}
         >
           <Icon icon={item.icon} height={20} />
+          {!expanded && hasSession && (
+            <Box
+              component="span"
+              aria-hidden
+              sx={{
+                position: "absolute",
+                top: -2,
+                right: -3,
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                bgcolor: item.accent,
+                border: "1.5px solid",
+                borderColor: "background.paper",
+              }}
+            />
+          )}
         </ListItemIcon>
         {expanded && (
           <ListItemText
@@ -111,13 +139,34 @@ export default function NavMenu({ mobileOpen, onMobileClose }: Props) {
             }}
           />
         )}
+        {expanded && hasSession && (
+          <Tooltip title="Session in progress" placement="right">
+            <Box
+              component="span"
+              aria-label="Session in progress"
+              sx={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                bgcolor: item.accent,
+                flexShrink: 0,
+                ml: 1,
+                boxShadow: `0 0 0 2px ${alpha(item.accent, 0.22)}`,
+              }}
+            />
+          </Tooltip>
+        )}
       </ListItemButton>
     );
 
     return expanded ? (
       <Box key={item.id}>{button}</Box>
     ) : (
-      <Tooltip key={item.id} title={item.label} placement="right">
+      <Tooltip
+        key={item.id}
+        title={hasSession ? `${item.label} · Active` : item.label}
+        placement="right"
+      >
         <Box>{button}</Box>
       </Tooltip>
     );

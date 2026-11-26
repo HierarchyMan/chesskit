@@ -13,7 +13,7 @@ import engineFiles from "./engineFiles.json";
 // "builtin": written in this app and run in the page (the joke engines).
 export type EngineSource = "browser" | "bridge" | "builtin";
 
-export type EngineGroup = "native" | "stockfish" | "other" | "joke";
+export type EngineGroup = "native" | "stockfish" | "fairy" | "other" | "joke";
 
 export interface EngineRating {
   elo: number;
@@ -44,6 +44,12 @@ export interface EngineModel {
   // Such engines may run analysis, but features that grade moves never use them.
   reliableEval: boolean;
   needsWasm: boolean;
+  // True when the browser WASM build uses Emscripten pthreads (requires SharedArrayBuffer).
+  needsSharedArrayBuffer?: boolean;
+  // True when the engine accepts >8 pawns or >16 pieces per side (e.g. Fairy-Stockfish).
+  supportsExtraPieces?: boolean;
+  // Wraps UMD Emscripten scripts via /fairy-worker.js so they speak standard Worker postMessage.
+  workerAdapter?: { exportName: string };
   // The engine's UCI_Elo range, when it can limit its own strength.
   nativeElo?: { min: number; max: number };
   // Most lines the engine can list at once (its MultiPV maximum, 1 if it has none).
@@ -65,13 +71,37 @@ const partFiles = (base: string): string[] =>
   Array.from({ length: 6 }, (_, index) => `${base}-part-${index}.wasm`);
 
 const SF_HOME = "https://stockfishchess.org";
+const FSF_HOME = "https://github.com/fairy-stockfish/Fairy-Stockfish";
 const LOZZA_HOME = "https://github.com/op12no2/lozza";
 
 const BROWSER_ROLES = { analysis: true, play: true };
 const SF_ELO = { min: 1320, max: 3190 };
+const FSF_ELO = { min: 500, max: 2850 };
 
 // Size and the bundled flag come from engineFiles.json, never from an entry.
 type Entry = Omit<EngineModel, "name" | "sizeMb" | "bundled">;
+
+const fairyStockfish = (
+  entry: Partial<Entry> & Pick<Entry, "label">
+): Entry => ({
+  family: "Fairy-Stockfish",
+  group: "fairy",
+  description: "",
+  source: "browser",
+  script: "",
+  assets: [],
+  roles: BROWSER_ROLES,
+  reliableEval: true,
+  needsWasm: true,
+  needsSharedArrayBuffer: true,
+  supportsExtraPieces: true,
+  nativeElo: FSF_ELO,
+  maxMultiPv: 500,
+  tags: ["Extra pieces"],
+  homepage: FSF_HOME,
+  license: "GPL-3.0",
+  ...entry,
+});
 
 const stockfish = (entry: Partial<Entry> & Pick<Entry, "label">): Entry => ({
   family: "Stockfish",
@@ -279,6 +309,57 @@ const ENTRIES: Record<EngineName, Entry> = {
     nativeElo: undefined,
     maxMultiPv: 500,
     tags: ["Hand-written eval", "No WebAssembly"],
+  }),
+  [EngineName.FairyStockfish14]: fairyStockfish({
+    label: {
+      full: "Fairy-Stockfish 14 (WASM)",
+      small: "Fairy-Stockfish 14",
+    },
+    description:
+      "Variant Stockfish in WebAssembly. Supports >8 pawns and >16 pieces per side (up to 64 pieces).",
+    script: "engines/fairy-stockfish-14/stockfish.js",
+    assets: [
+      "engines/fairy-stockfish-14/stockfish.wasm",
+      "engines/fairy-stockfish-14/stockfish.worker.js",
+    ],
+    rating: { elo: 3200, source: "author" },
+    workerAdapter: { exportName: "Stockfish" },
+    tags: ["Extra pieces", "Small"],
+  }),
+  [EngineName.FairyStockfish14Lite]: fairyStockfish({
+    label: {
+      full: "Fairy-Stockfish 14 Lite (HCE)",
+      small: "Fairy-SF 14 Lite",
+    },
+    description:
+      "Fairy-Stockfish 14 with classical hand-written evaluation forced on. Fast on crowded custom boards.",
+    script: "engines/fairy-stockfish-14/stockfish.js",
+    assets: [
+      "engines/fairy-stockfish-14/stockfish.wasm",
+      "engines/fairy-stockfish-14/stockfish.worker.js",
+    ],
+    rating: { elo: 3050, source: "author" },
+    init: ["setoption name Use NNUE value false"],
+    workerAdapter: { exportName: "Stockfish" },
+    tags: ["Extra pieces", "Hand-written eval", "Small"],
+  }),
+  [EngineName.FairyStockfishMv]: fairyStockfish({
+    label: {
+      full: "Stockfish Multi-Variant Lite",
+      small: "SF Multi-Variant Lite",
+    },
+    description:
+      "Ultra-lightweight (0.6 MB) multi-variant Stockfish with classical evaluation. Handles 32+ piece boards effortlessly.",
+    script: "engines/fairy-stockfish-mv/stockfish.js",
+    assets: [
+      "engines/fairy-stockfish-mv/stockfish.wasm",
+      "engines/fairy-stockfish-mv/stockfish.worker.js",
+    ],
+    rating: { elo: 3000, source: "author" },
+    nativeElo: undefined,
+    workerAdapter: { exportName: "StockfishMv" },
+    tags: ["Extra pieces", "Hand-written eval", "Small"],
+    homepage: "https://github.com/ddugovic/Stockfish",
   }),
   [EngineName.LozzaNNUE]: lozza(
     "NNUE",
@@ -550,6 +631,7 @@ export interface NativeEngineInfo {
   name: string;
   elo?: number;
   description?: string;
+  supportsExtraPieces?: boolean;
   // Read from the engine's own "uci" reply by the bridge.
   options?: { name: string; min?: number; max?: number }[];
 }
@@ -562,10 +644,13 @@ const optionRange = (info: NativeEngineInfo, name: string) =>
 export const nativeModelFromInfo = (info: NativeEngineInfo): EngineModel => {
   const uciElo = optionRange(info, "uci_elo");
   const multiPv = optionRange(info, "multipv");
+  const supportsExtraPieces =
+    info.supportsExtraPieces === true ||
+    /fairy|multi-?variant/i.test(`${info.id} ${info.name}`);
   return {
     name: `native:${info.id}`,
     label: { full: `${info.name} (local bridge)`, small: info.name },
-    family: info.name,
+    family: supportsExtraPieces ? "Fairy-Stockfish" : info.name,
     group: "native",
     description:
       info.description ?? "A native engine from engines/engines.json.",
@@ -578,12 +663,13 @@ export const nativeModelFromInfo = (info: NativeEngineInfo): EngineModel => {
     roles: BROWSER_ROLES,
     reliableEval: true,
     needsWasm: false,
+    supportsExtraPieces,
     nativeElo:
       uciElo?.min !== undefined && uciElo.max !== undefined
         ? { min: uciElo.min, max: uciElo.max }
         : undefined,
     maxMultiPv: multiPv?.max ?? 1,
-    tags: ["Native"],
+    tags: supportsExtraPieces ? ["Native", "Extra pieces"] : ["Native"],
   };
 };
 

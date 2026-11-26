@@ -8,6 +8,7 @@ import {
 import { setHandoff } from "@/lib/handoff";
 import { statsAtom } from "@/lib/stats";
 import { isGameInProgressAtom } from "@/sections/play/states";
+import { hasPersistedPlayDraft } from "@/sections/play/usePlayRecovery";
 import { Color } from "@/types/enums";
 import { Icon } from "@iconify/react";
 import {
@@ -41,12 +42,15 @@ export default function EndgamesPage() {
   const done = ENDGAMES.filter(({ id }) => completed.includes(id)).length;
 
   const launch = (endgame: Endgame) => {
-    setHandoff({ kind: "challenge", id: endgame.id }, "/play");
+    setHandoff(
+      { kind: "challenge", id: endgame.id, source: "Endgames" },
+      "/play"
+    );
     router.push("/play");
   };
 
   const practice = (endgame: Endgame) => {
-    if (gameInProgress) setPending(endgame);
+    if (gameInProgress || hasPersistedPlayDraft()) setPending(endgame);
     else launch(endgame);
   };
 

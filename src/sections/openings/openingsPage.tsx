@@ -1,6 +1,15 @@
 import Board from "@/components/board";
 import MiniBoard from "@/components/board/miniBoard";
-import Panel from "@/components/panel";
+import {
+  DeckButton,
+  InspectorBody,
+  InspectorDeck,
+  InspectorDeckRow,
+  InspectorHeader,
+  InspectorPill,
+  InspectorShell,
+} from "@/components/inspector/inspectorShell";
+import { ToolbarButton } from "@/components/ToolbarButton";
 import { OPENING_LINES, OpeningLine } from "@/data/openingLines";
 import BoardWorkspace from "@/components/boardWorkspace";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
@@ -17,12 +26,10 @@ import { Icon } from "@iconify/react";
 import {
   Alert,
   Box,
-  Button,
   Card,
   CardActionArea,
   Chip,
   Grid2 as Grid,
-  IconButton,
   LinearProgress,
   Stack,
   ToggleButton,
@@ -275,452 +282,357 @@ function StudyView({
         />
       }
       inspector={
-        <Stack
-          spacing={0}
-          data-inspector-scroller
-          sx={{
-            minHeight: 0,
-            overflowY: "auto",
-            overscrollBehavior: "contain",
-            scrollbarGutter: "stable",
-          }}
-        >
-          <Panel>
-            <Stack spacing={1.25}>
-              <Stack
-                direction="row"
-                alignItems="center"
-                gap={0.75}
-                flexWrap="wrap"
-              >
-                <Button
-                  size="small"
-                  color="inherit"
-                  startIcon={<Icon icon="mdi:chevron-left" height={18} />}
-                  onClick={() => onSelect()}
-                >
-                  All openings
-                </Button>
-                <Chip size="small" variant="outlined" label={line.eco} />
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  label={`You play ${line.side === "w" ? "White" : "Black"}`}
-                />
-                {study.alreadyLearned && (
-                  <Chip
-                    size="small"
-                    color="success"
-                    variant="outlined"
-                    icon={<Icon icon="mdi:check-circle" height={14} />}
-                    label="Learned"
-                  />
-                )}
-              </Stack>
-
-              <Typography variant="h6" fontWeight={700}>
-                {line.name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {line.summary}
-              </Typography>
-
-              <ToggleButtonGroup
-                exclusive
-                fullWidth
-                size="small"
-                value={study.mode}
-                onChange={(_, value: OpeningMode | null) => {
-                  if (value === "learn") study.startLearn();
-                  if (value === "drill") study.startDrill();
-                }}
-              >
-                <ToggleButton value="learn" sx={{ gap: 0.75 }}>
-                  <Icon icon="mdi:book-open-page-variant-outline" height={16} />
-                  Learn
-                </ToggleButton>
-                <ToggleButton value="drill" sx={{ gap: 0.75 }}>
-                  <Icon icon="mdi:target" height={16} />
-                  Drill
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Stack>
-          </Panel>
-
-          {learnMode ? (
-            <LearnPanel study={study} />
-          ) : (
-            <DrillPanel
-              study={study}
-              onNext={() => onSelect(next.id)}
-              nextName={next.name}
-            />
-          )}
-        </Stack>
+        <OpeningStudyInspector
+          line={line}
+          study={study}
+          onSelect={onSelect}
+          next={next}
+        />
       }
     />
   );
 }
 
-function LearnPanel({ study }: { study: OpeningStudy }) {
-  const router = useRouter();
-  const { line, steps, ply } = study;
-
-  const analyze = () => {
-    setHandoff({ kind: "pgn", pgn: lineToPgn(line, steps) }, "/analysis");
-    router.push("/analysis");
-  };
-
-  return (
-    <>
-      <Panel
-        title="The line"
-        actions={
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<Icon icon="mdi:chart-line" height={16} />}
-            onClick={analyze}
-          >
-            Analyze
-          </Button>
-        }
-      >
-        <Stack spacing={1.5}>
-          <Stack
-            data-board-shortcuts
-            direction="row"
-            justifyContent="center"
-            gap={0.5}
-          >
-            <Tooltip title="Start (Home)">
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label="Start"
-                  disabled={ply <= 0}
-                  onClick={() => study.goTo(0)}
-                >
-                  <Icon icon="mdi:skip-previous" height={20} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="Previous move (←)">
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label="Previous move"
-                  disabled={ply <= 0}
-                  onClick={() => study.goTo(ply - 1)}
-                >
-                  <Icon icon="mdi:chevron-left" height={22} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title={study.playing ? "Pause" : "Auto-play"}>
-              <IconButton
-                size="small"
-                aria-label={study.playing ? "Pause" : "Play"}
-                onClick={study.togglePlaying}
-              >
-                <Icon
-                  icon={study.playing ? "mdi:pause" : "mdi:play"}
-                  height={20}
-                />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Next move (→)">
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label="Next move"
-                  disabled={ply >= steps.length}
-                  onClick={() => study.goTo(ply + 1)}
-                >
-                  <Icon icon="mdi:chevron-right" height={22} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="End (End)">
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label="End"
-                  disabled={ply >= steps.length}
-                  onClick={() => study.goTo(steps.length)}
-                >
-                  <Icon icon="mdi:skip-next" height={20} />
-                </IconButton>
-              </span>
-            </Tooltip>
-          </Stack>
-
-          <Stack direction="row" flexWrap="wrap" gap={0.5}>
-            {steps.map((step) => (
-              <Chip
-                key={step.ply}
-                size="small"
-                label={step.color === "w" ? moveLabel(step) : step.san}
-                color={step.ply + 1 === ply ? "primary" : "default"}
-                variant={step.ply < ply ? "filled" : "outlined"}
-                onClick={() => study.goTo(step.ply + 1)}
-              />
-            ))}
-          </Stack>
-
-          <Box
-            sx={{
-              p: 1.5,
-              minHeight: 72,
-              borderRadius: 1.5,
-              border: 1,
-              borderColor: "divider",
-              backgroundColor: "action.hover",
-            }}
-          >
-            <Typography variant="body2">
-              {study.currentNote ??
-                (ply === 0
-                  ? "Step forward or click a move to see the idea behind each move."
-                  : "Book move in this line.")}
-            </Typography>
-          </Box>
-        </Stack>
-      </Panel>
-
-      <Panel title="Key plans" sx={{ borderBottom: 0 }}>
-        <Stack component="ul" spacing={0.75} sx={{ m: 0, pl: 2.5 }}>
-          {line.plans.map((plan) => (
-            <Typography key={plan} component="li" variant="body2">
-              {plan}
-            </Typography>
-          ))}
-        </Stack>
-      </Panel>
-    </>
-  );
-}
-
-function DrillPanel({
+function OpeningStudyInspector({
+  line,
   study,
-  onNext,
-  nextName,
+  onSelect,
+  next,
 }: {
+  line: OpeningLine;
   study: OpeningStudy;
-  onNext: () => void;
-  nextName: string;
+  onSelect: (id?: string) => void;
+  next: OpeningLine;
 }) {
-  const { line, phase, steps, ply, drillPly } = study;
+  const router = useRouter();
+  const { steps, ply, drillPly, phase } = study;
+  const learnMode = study.mode === "learn";
+  const isDone = phase === "done";
+  const canStep = learnMode || isDone;
   const mine = steps.filter((step) => step.color === line.side);
   const done = mine.filter((step) => step.ply < drillPly).length;
   const playedSteps = steps.slice(0, drillPly);
-  const isDone = phase === "done";
+
+  const analyze = () => {
+    setHandoff(
+      { kind: "pgn", pgn: lineToPgn(line, steps), source: "Openings" },
+      "/analysis"
+    );
+    void router.push("/analysis");
+  };
 
   return (
-    <Panel title="Drill" sx={{ borderBottom: 0 }}>
-      <Stack spacing={1.5}>
-        <Stack direction="row" gap={0.75} flexWrap="wrap">
-          <Chip
+    <InspectorShell>
+      {/* Zone 1 — Slim Context Header */}
+      <InspectorHeader
+        left={
+          <>
+            <ToolbarButton
+              tooltip="All openings"
+              icon="mdi:arrow-left"
+              iconHeight={18}
+              onClick={() => onSelect()}
+            />
+            <Typography variant="subtitle2" fontWeight={700} noWrap>
+              {line.name}
+            </Typography>
+            <InspectorPill label={line.eco} />
+            {study.alreadyLearned && (
+              <InspectorPill
+                tone="success"
+                icon="mdi:check-circle"
+                label="Learned"
+              />
+            )}
+          </>
+        }
+        right={
+          <ToggleButtonGroup
+            exclusive
             size="small"
-            label={`Move ${Math.min(done + 1, mine.length)} of ${mine.length}`}
-            sx={{ fontVariantNumeric: "tabular-nums" }}
-          />
-          <Chip
-            size="small"
-            variant="outlined"
-            color={study.mistakes ? "warning" : "default"}
-            label={`${study.mistakes} mistake${study.mistakes === 1 ? "" : "s"}`}
-            sx={{ fontVariantNumeric: "tabular-nums" }}
-          />
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`${study.hints} hint${study.hints === 1 ? "" : "s"}`}
-            sx={{ fontVariantNumeric: "tabular-nums" }}
-          />
-        </Stack>
+            value={study.mode}
+            onChange={(_, value: OpeningMode | null) => {
+              if (value === "learn") study.startLearn();
+              if (value === "drill") study.startDrill();
+            }}
+            sx={{
+              "& .MuiToggleButton-root": {
+                py: 0.25,
+                px: 0.9,
+                minHeight: 26,
+                fontSize: "0.74rem",
+              },
+            }}
+          >
+            <ToggleButton value="learn">Learn</ToggleButton>
+            <ToggleButton value="drill">Drill</ToggleButton>
+          </ToggleButtonGroup>
+        }
+      />
 
-        {/* Single consolidated status / feedback banner */}
-        {isDone ? (
-          <Alert severity={study.learned ? "success" : "info"}>
-            <Stack spacing={0.5}>
-              <Typography variant="body2" fontWeight={600}>
-                {study.learned
-                  ? "Clean drill — opening marked as learned!"
-                  : `Finished with ${study.mistakes} mistake${study.mistakes === 1 ? "" : "s"} and ${study.hints} hint${study.hints === 1 ? "" : "s"}.`}
-              </Typography>
-              {!study.learned && (
-                <Typography variant="caption">
-                  Complete a drill with zero mistakes and zero hints to mark it
-                  learned.
-                </Typography>
-              )}
-              {study.currentNote && (
-                <Typography variant="caption" color="text.secondary">
-                  {study.currentNote}
-                </Typography>
-              )}
-            </Stack>
-          </Alert>
-        ) : (
-          <Alert
-            severity={
-              phase === "wrong"
-                ? "error"
-                : study.feedback.mine || study.feedback.reply
-                  ? "success"
-                  : "info"
-            }
-            icon={
-              <Icon
-                icon={
+      {/* Zone 2 — Flexing Body */}
+      <InspectorBody sx={{ p: 1.5 }}>
+        <Stack spacing={1.5}>
+          <Stack direction="row" alignItems="center" gap={0.65} flexWrap="wrap">
+            <InspectorPill
+              label={`You play ${line.side === "w" ? "White" : "Black"}`}
+            />
+            {!learnMode && (
+              <>
+                <InspectorPill
+                  label={`Move ${Math.min(done + 1, mine.length)}/${mine.length}`}
+                />
+                <InspectorPill
+                  tone={study.mistakes ? "warning" : "neutral"}
+                  label={`${study.mistakes} mistake${study.mistakes === 1 ? "" : "s"}`}
+                />
+                <InspectorPill
+                  label={`${study.hints} hint${study.hints === 1 ? "" : "s"}`}
+                />
+              </>
+            )}
+          </Stack>
+
+          <Typography variant="body2" color="text.secondary">
+            {line.summary}
+          </Typography>
+
+          {!learnMode &&
+            (isDone ? (
+              <Alert
+                severity={study.learned ? "success" : "info"}
+                sx={{ py: 0.5 }}
+              >
+                <Stack spacing={0.25}>
+                  <Typography variant="body2" fontWeight={600}>
+                    {study.learned
+                      ? "Clean drill — opening marked as learned!"
+                      : `Finished with ${study.mistakes} mistake${study.mistakes === 1 ? "" : "s"} and ${study.hints} hint${study.hints === 1 ? "" : "s"}.`}
+                  </Typography>
+                  {!study.learned && (
+                    <Typography variant="caption">
+                      Complete a drill with zero mistakes and zero hints to mark
+                      it learned.
+                    </Typography>
+                  )}
+                </Stack>
+              </Alert>
+            ) : (
+              <Alert
+                severity={
                   phase === "wrong"
-                    ? "mdi:close-circle"
+                    ? "error"
                     : study.feedback.mine || study.feedback.reply
-                      ? "mdi:check-circle"
-                      : "mdi:target"
+                      ? "success"
+                      : "info"
                 }
-                height={20}
-              />
-            }
-          >
-            {phase === "wrong"
-              ? "Not the book move — try again."
-              : phase === "replying"
-                ? (study.feedback.mine ?? "Book move! Opponent replying…")
-                : study.feedback.reply
-                  ? study.feedback.reply
-                  : study.feedback.mine
-                    ? study.feedback.mine
-                    : `Your move — play the book move for ${line.name}.`}
-          </Alert>
-        )}
+                icon={
+                  <Icon
+                    icon={
+                      phase === "wrong"
+                        ? "mdi:close-circle"
+                        : study.feedback.mine || study.feedback.reply
+                          ? "mdi:check-circle"
+                          : "mdi:target"
+                    }
+                    height={19}
+                  />
+                }
+                sx={{ py: 0.4 }}
+              >
+                {phase === "wrong"
+                  ? "Not the book move — try again."
+                  : phase === "replying"
+                    ? (study.feedback.mine ?? "Book move! Opponent replying…")
+                    : study.feedback.reply
+                      ? study.feedback.reply
+                      : study.feedback.mine
+                        ? study.feedback.mine
+                        : `Your move — play the book move for ${line.name}.`}
+              </Alert>
+            ))}
 
-        <Stack direction="row" gap={1} flexWrap="wrap">
-          {!isDone && (
-            <Tooltip title="Using a hint won't count as a clean drill">
-              <span>
-                <Button
+          {(learnMode ? steps : playedSteps).length > 0 && (
+            <Stack direction="row" flexWrap="wrap" gap={0.5}>
+              {(learnMode ? steps : playedSteps).map((step) => (
+                <Chip
+                  key={step.ply}
                   size="small"
-                  variant="outlined"
-                  disabled={phase !== "playing" || !!study.hintUci}
-                  startIcon={
-                    <Icon icon="mdi:lightbulb-on-outline" height={18} />
+                  label={step.color === "w" ? moveLabel(step) : step.san}
+                  clickable={canStep}
+                  color={
+                    canStep && step.ply + 1 === ply ? "primary" : "default"
                   }
-                  onClick={study.askHint}
-                >
-                  Hint
-                </Button>
-              </span>
-            </Tooltip>
+                  variant={
+                    learnMode
+                      ? step.ply < ply
+                        ? "filled"
+                        : "outlined"
+                      : step.color === line.side
+                        ? "filled"
+                        : "outlined"
+                  }
+                  onClick={canStep ? () => study.goTo(step.ply + 1) : undefined}
+                />
+              ))}
+            </Stack>
           )}
 
-          {isDone && study.learned && (
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<Icon icon="mdi:skip-next" height={18} />}
-              onClick={onNext}
+          {(learnMode || (isDone && study.currentNote)) && (
+            <Box
+              sx={{
+                p: 1.25,
+                minHeight: 68,
+                borderRadius: 1,
+                border: 1,
+                borderColor: "divider",
+                bgcolor: "action.hover",
+              }}
             >
-              Next: {nextName}
-            </Button>
+              <Typography variant="body2">
+                {study.currentNote ??
+                  (ply === 0
+                    ? "Step forward or click a move to see the idea behind each move."
+                    : "Book move in this line.")}
+              </Typography>
+            </Box>
           )}
 
-          <Button
-            size="small"
-            variant={isDone && !study.learned ? "contained" : "outlined"}
-            startIcon={<Icon icon="mdi:refresh" height={18} />}
-            onClick={study.startDrill}
-          >
-            {isDone ? "Drill again" : "Restart"}
-          </Button>
-
-          {isDone && !study.learned && (
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<Icon icon="mdi:skip-next" height={18} />}
-              onClick={onNext}
-            >
-              Next: {nextName}
-            </Button>
+          {learnMode && (
+            <Box>
+              <Typography
+                variant="overline"
+                color="text.secondary"
+                sx={{ fontWeight: 700, letterSpacing: "0.08em" }}
+              >
+                Key plans
+              </Typography>
+              <Stack
+                component="ul"
+                spacing={0.6}
+                sx={{ m: 0, mt: 0.5, pl: 2.25 }}
+              >
+                {line.plans.map((plan) => (
+                  <Typography key={plan} component="li" variant="body2">
+                    {plan}
+                  </Typography>
+                ))}
+              </Stack>
+            </Box>
           )}
         </Stack>
+      </InspectorBody>
 
-        {isDone && (
-          <Stack
-            data-board-shortcuts
-            direction="row"
-            justifyContent="center"
-            gap={0.5}
-          >
-            <Tooltip title="Start (Home)">
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label="Start"
-                  disabled={ply <= 0}
-                  onClick={() => study.goTo(0)}
-                >
-                  <Icon icon="mdi:skip-previous" height={20} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="Previous move (←)">
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label="Previous move"
-                  disabled={ply <= 0}
-                  onClick={() => study.goTo(ply - 1)}
-                >
-                  <Icon icon="mdi:chevron-left" height={22} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="Next move (→)">
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label="Next move"
-                  disabled={ply >= steps.length}
-                  onClick={() => study.goTo(ply + 1)}
-                >
-                  <Icon icon="mdi:chevron-right" height={22} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="End (End)">
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label="End"
-                  disabled={ply >= steps.length}
-                  onClick={() => study.goTo(steps.length)}
-                >
-                  <Icon icon="mdi:skip-next" height={20} />
-                </IconButton>
-              </span>
-            </Tooltip>
-          </Stack>
-        )}
-
-        {playedSteps.length > 0 && (
-          <Stack direction="row" flexWrap="wrap" gap={0.5}>
-            {playedSteps.map((step) => (
-              <Chip
-                key={step.ply}
-                size="small"
-                label={step.color === "w" ? moveLabel(step) : step.san}
-                clickable={isDone}
-                onClick={isDone ? () => study.goTo(step.ply + 1) : undefined}
-                color={isDone && step.ply + 1 === ply ? "primary" : "default"}
-                variant={step.color === line.side ? "filled" : "outlined"}
+      {/* Zone 3 — Unified Docked Bottom Control Deck */}
+      <InspectorDeck>
+        {canStep && (
+          <InspectorDeckRow sx={{ py: 0.45, minHeight: 38 }}>
+            <Stack
+              data-board-shortcuts
+              direction="row"
+              alignItems="center"
+              gap={0.15}
+            >
+              <ToolbarButton
+                tooltip="Start (Home)"
+                icon="mdi:skip-previous"
+                iconHeight={20}
+                disabled={ply <= 0}
+                onClick={() => study.goTo(0)}
               />
-            ))}
-          </Stack>
+              <ToolbarButton
+                tooltip="Previous move (←)"
+                icon="mdi:chevron-left"
+                iconHeight={22}
+                disabled={ply <= 0}
+                onClick={() => study.goTo(ply - 1)}
+              />
+              {learnMode && (
+                <ToolbarButton
+                  tooltip={study.playing ? "Pause" : "Auto-play"}
+                  icon={study.playing ? "mdi:pause" : "mdi:play"}
+                  iconHeight={20}
+                  active={study.playing ? true : undefined}
+                  onClick={study.togglePlaying}
+                />
+              )}
+              <ToolbarButton
+                tooltip="Next move (→)"
+                icon="mdi:chevron-right"
+                iconHeight={22}
+                disabled={ply >= steps.length}
+                onClick={() => study.goTo(ply + 1)}
+              />
+              <ToolbarButton
+                tooltip="End (End)"
+                icon="mdi:skip-next"
+                iconHeight={20}
+                disabled={ply >= steps.length}
+                onClick={() => study.goTo(steps.length)}
+              />
+            </Stack>
+          </InspectorDeckRow>
         )}
-      </Stack>
-    </Panel>
+
+        <InspectorDeckRow dividerTop={canStep}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={0.45}
+            flexWrap="nowrap"
+            sx={{ flexShrink: 0 }}
+          >
+            {learnMode ? (
+              <DeckButton active icon="mdi:target" onClick={study.startDrill}>
+                Start drill
+              </DeckButton>
+            ) : (
+              <>
+                {!isDone && (
+                  <Tooltip title="Using a hint won't count as a clean drill">
+                    <span>
+                      <DeckButton
+                        icon="mdi:lightbulb-on-outline"
+                        disabled={phase !== "playing" || !!study.hintUci}
+                        onClick={study.askHint}
+                      >
+                        Hint
+                      </DeckButton>
+                    </span>
+                  </Tooltip>
+                )}
+                {isDone && (
+                  <DeckButton
+                    active={study.learned}
+                    icon="mdi:skip-next"
+                    onClick={() => onSelect(next.id)}
+                  >
+                    Next: {next.name}
+                  </DeckButton>
+                )}
+                <DeckButton
+                  active={isDone && !study.learned}
+                  icon="mdi:refresh"
+                  onClick={study.startDrill}
+                >
+                  {isDone ? "Drill again" : "Restart"}
+                </DeckButton>
+              </>
+            )}
+          </Stack>
+
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={0.25}
+            sx={{ ml: "auto", flexShrink: 0 }}
+          >
+            <DeckButton subtle icon="mdi:chart-line" onClick={analyze}>
+              Analyze
+            </DeckButton>
+          </Stack>
+        </InspectorDeckRow>
+      </InspectorDeck>
+    </InspectorShell>
   );
 }

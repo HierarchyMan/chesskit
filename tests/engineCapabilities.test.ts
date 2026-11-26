@@ -22,10 +22,21 @@ describe("hasNativeEloLimit", () => {
     }
   });
 
+  it("is true for Fairy-Stockfish 14 builds and false for Multi-Variant Lite", () => {
+    assert.equal(hasNativeEloLimit(EngineName.FairyStockfish14), true);
+    assert.equal(hasNativeEloLimit(EngineName.FairyStockfish14Lite), true);
+    assert.equal(hasNativeEloLimit(EngineName.FairyStockfishMv), false);
+  });
+
   it("is false for Lozza, tomitankChess and the joke engines", () => {
     // Their "uci" replies list no UCI_Elo (checked against each build).
     for (const model of Object.values(ENGINE_MODELS)) {
-      if (model.family === "Stockfish" || model.family === "Reckless") continue;
+      if (
+        model.family === "Stockfish" ||
+        model.family === "Fairy-Stockfish" ||
+        model.family === "Reckless"
+      )
+        continue;
       assert.equal(hasNativeEloLimit(model.name), false, model.name);
     }
   });

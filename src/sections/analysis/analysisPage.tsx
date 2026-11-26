@@ -9,17 +9,26 @@ import { useAnalysisOverlay } from "@/sections/analysis/hooks/useAnalysisOverlay
 import AnalysisTab from "@/sections/analysis/panelBody/analysisTab";
 import EngineLines from "@/sections/analysis/panelBody/analysisTab/engineLines";
 import ClassificationTab from "@/sections/analysis/panelBody/classificationTab";
-import { arrangeModeAtom } from "@/sections/analysis/states";
+import {
+  analysisInitialTabAtom,
+  arrangeModeAtom,
+} from "@/sections/analysis/states";
+import { arrangeHistoryAtom } from "./sessionAtoms";
 import {
   Box,
   Alert,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Stack,
   Tab,
   Tabs,
+  Typography,
 } from "@mui/material";
-import { useAtomValue } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { Activity, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { PageTitle } from "@/components/pageTitle";
@@ -71,11 +80,23 @@ export default function AnalysisPage(props: Props) {
 function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
   const [tab, setTab] = useState(0);
   const [visited, setVisited] = useState(() => new Set([0]));
+  const [initialTab, setInitialTab] = useAtom(analysisInitialTabAtom);
+  const [confirmLeaveArrange, setConfirmLeaveArrange] = useState(false);
 
   const arrange = useAtomValue(arrangeModeAtom);
-  const { enterArrange } = useArrangeMode();
+  const arrangeHistory = useAtomValue(arrangeHistoryAtom);
+  const { enterArrange, leaveArrange, finishArrange, validation } =
+    useArrangeMode();
   // One composition for the page: the board draws it and the overlay lists it.
   const overlay = useAnalysisOverlay();
+
+  useEffect(() => {
+    if (!initialTab) return;
+    const next = initialTab === "review" ? 1 : 0;
+    setVisited((previous) => new Set([...previous, next]));
+    setTab(next);
+    setInitialTab(null);
+  }, [initialTab, setInitialTab]);
 
   const enteredWithMode = useRef(false);
   useEffect(() => {
@@ -84,8 +105,20 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
 
     if (startInArrangeMode && !arrange) {
       enterArrange();
+    } else if (!startInArrangeMode && arrange) {
+      if (arrangeHistory.past.length > 0) {
+        setConfirmLeaveArrange(true);
+      } else {
+        leaveArrange();
+      }
     }
-  }, [startInArrangeMode, arrange, enterArrange]);
+  }, [
+    startInArrangeMode,
+    arrange,
+    arrangeHistory.past.length,
+    enterArrange,
+    leaveArrange,
+  ]);
 
   // Establish the route's default mode before consuming an explicit handoff;
   // otherwise the default editor effect can overwrite the requested FEN.
@@ -262,6 +295,45 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
           </>
         }
       />
+
+      <Dialog
+        open={confirmLeaveArrange}
+        onClose={() => setConfirmLeaveArrange(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Unsaved board editor changes</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            You have unsaved changes from the Board Editor. Apply them to
+            Analysis, or discard them and return to your analysis session.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmLeaveArrange(false)}>
+            Stay in editor
+          </Button>
+          <Button
+            color="error"
+            onClick={() => {
+              setConfirmLeaveArrange(false);
+              leaveArrange();
+            }}
+          >
+            Discard edits
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!validation.ok}
+            onClick={() => {
+              setConfirmLeaveArrange(false);
+              finishArrange();
+            }}
+          >
+            Apply &amp; Analyze
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

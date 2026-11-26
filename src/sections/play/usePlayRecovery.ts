@@ -61,34 +61,51 @@ const restoreAtom = atom(null, (_get, set, draft: Draft, game: Chess) => {
 });
 
 function readDraft() {
-  const raw = localStorage.getItem(KEY);
-  if (!raw) return null;
-  const draft = JSON.parse(raw) as Draft;
-  if (
-    !draft ||
-    !Number.isSafeInteger(draft.gameId) ||
-    draft.gameId < 1 ||
-    (draft.color !== Color.White && draft.color !== Color.Black) ||
-    (draft.mode !== "formal" && draft.mode !== "casual") ||
-    !draft.time ||
-    !Number.isFinite(draft.time.minutes) ||
-    draft.time.minutes < 0 ||
-    !Number.isFinite(draft.time.increment) ||
-    draft.time.increment < 0 ||
-    !isEngineId(draft.engine) ||
-    !draft.strength ||
-    !["elo", "depth", "max"].includes(draft.strength.mode) ||
-    !Number.isFinite(draft.strength.elo) ||
-    !Number.isFinite(draft.strength.depth) ||
-    typeof draft.coach !== "boolean" ||
-    typeof draft.flipped !== "boolean" ||
-    typeof draft.pgn !== "string" ||
-    (draft.clocks &&
-      (!Number.isFinite(draft.clocks.w) || !Number.isFinite(draft.clocks.b)))
-  ) {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as Draft;
+    if (
+      !draft ||
+      !Number.isSafeInteger(draft.gameId) ||
+      draft.gameId < 1 ||
+      (draft.color !== Color.White && draft.color !== Color.Black) ||
+      (draft.mode !== "formal" && draft.mode !== "casual") ||
+      !draft.time ||
+      !Number.isFinite(draft.time.minutes) ||
+      draft.time.minutes < 0 ||
+      !Number.isFinite(draft.time.increment) ||
+      draft.time.increment < 0 ||
+      !isEngineId(draft.engine) ||
+      !draft.strength ||
+      !["elo", "depth", "max"].includes(draft.strength.mode) ||
+      !Number.isFinite(draft.strength.elo) ||
+      !Number.isFinite(draft.strength.depth) ||
+      typeof draft.coach !== "boolean" ||
+      typeof draft.flipped !== "boolean" ||
+      typeof draft.pgn !== "string" ||
+      (draft.clocks &&
+        (!Number.isFinite(draft.clocks.w) || !Number.isFinite(draft.clocks.b)))
+    ) {
+      return null;
+    }
+    return draft;
+  } catch {
     return null;
   }
-  return draft;
+}
+
+/** True when an unfinished Play game is saved in localStorage (even before /play mounts). */
+export function hasPersistedPlayDraft(): boolean {
+  const draft = readDraft();
+  if (!draft) return false;
+  try {
+    const game = loadGameFromText(draft.pgn);
+    return !game.isGameOver();
+  } catch {
+    return false;
+  }
 }
 
 /** Persist the active game on moves and save the live clock at bounded intervals. */

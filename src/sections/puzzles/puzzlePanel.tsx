@@ -1,6 +1,20 @@
-import { ReactNode } from "react";
-import Panel from "@/components/panel";
+import {
+  InspectorPopover,
+  PopoverSectionLabel,
+  PopoverSwitchRow,
+} from "@/components/inspector/inspectorPopover";
+import {
+  DeckButton,
+  InspectorBody,
+  InspectorDeck,
+  InspectorDeckRow,
+  InspectorHeader,
+  InspectorPill,
+  InspectorShell,
+} from "@/components/inspector/inspectorShell";
+import { ToolbarButton } from "@/components/ToolbarButton";
 import { setHandoff } from "@/lib/handoff";
+import { MOVE_TIMES, MoveTime } from "@/lib/puzzleFlow";
 import { PUZZLE_THEMES } from "@/lib/puzzles";
 import { displayThemes } from "@/lib/puzzleThemes";
 import { buildMoveStory, MoveStory } from "@/lib/visualize/moveStory";
@@ -11,19 +25,21 @@ import {
   Button,
   Chip,
   Divider,
-  IconButton,
   LinearProgress,
+  ListItemIcon,
+  ListItemText,
+  Menu,
   MenuItem,
   Select,
   Stack,
-  Tooltip,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
+  alpha,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import { useRouter } from "next/router";
-import PuzzleControls from "./puzzleControls";
+import { ReactNode, useState } from "react";
 import { PuzzleSource } from "./states";
 import { PuzzleTrainer } from "./usePuzzleTrainer";
 
@@ -46,6 +62,8 @@ export default function PuzzlePanel({
   storyControls,
 }: Props) {
   const router = useRouter();
+  const [optionsAnchor, setOptionsAnchor] = useState<HTMLElement | null>(null);
+  const [moreAnchor, setMoreAnchor] = useState<HTMLElement | null>(null);
   const { puzzle, phase, source, stats } = trainer;
 
   const solved = phase === "solved";
@@ -60,15 +78,15 @@ export default function PuzzlePanel({
   const canAdvanceMistake = source !== "mistakes" || trainer.mistakeCount >= 2;
 
   const openWithFen = (path: string) => {
+    setMoreAnchor(null);
     if (!puzzle) return;
-    setHandoff({ kind: "fen", fen: puzzle.fen }, path);
-    router.push(path);
+    setHandoff({ kind: "fen", fen: puzzle.fen, source: "Puzzles" }, path);
+    void router.push(path);
   };
 
   const visualizeMistake = () => {
     const entry = trainer.mistakeEntry;
     if (!entry) return;
-
     onShowStory(
       buildMoveStory({
         fenBefore: entry.fenBefore,
@@ -79,14 +97,235 @@ export default function PuzzlePanel({
     );
   };
 
+  const currentSource = SOURCES.find((s) => s.id === source);
+
   return (
-    <Stack spacing={0}>
-      <Panel>
+    <InspectorShell>
+      {/* Zone 1 — Slim Context Header */}
+      <InspectorHeader
+        left={
+          <>
+            <Typography variant="subtitle2" fontWeight={700} noWrap>
+              {currentSource?.label ?? "Puzzles"}
+            </Typography>
+            {source === "mistakes" && trainer.mistakeCount > 0 && (
+              <InspectorPill
+                label={`${trainer.mistakeNumber + 1}/${trainer.mistakeCount}`}
+              />
+            )}
+          </>
+        }
+        right={
+          <>
+            <InspectorPill
+              icon="mdi:trophy-outline"
+              label={stats.rating}
+              tooltip="Puzzle rating"
+            />
+            <InspectorPill
+              icon="mdi:fire"
+              tone={stats.streak > 0 ? "warning" : "neutral"}
+              label={stats.streak}
+              tooltip={`Current streak (best ${stats.bestStreak})`}
+            />
+          </>
+        }
+      />
+
+      {/* Zone 2 — Semantic Status Banner (pinned at top, zero jump) */}
+      {puzzle && phase !== "loading" && phase !== "empty" && (
+        <Box
+          role="status"
+          aria-live="polite"
+          sx={(theme) => {
+            const tone =
+              phase === "wrong"
+                ? theme.palette.error.main
+                : solved
+                  ? helped
+                    ? theme.palette.warning.main
+                    : theme.palette.success.main
+                  : phase === "replying"
+                    ? theme.palette.success.main
+                    : theme.palette.primary.main;
+            const isNeutral =
+              phase === "setup" || phase === "solving" || phase === "showing";
+            return {
+              px: 1.5,
+              py: 1.1,
+              flexShrink: 0,
+              borderBottom: 1,
+              borderColor: isNeutral ? "divider" : alpha(tone, 0.4),
+              bgcolor: isNeutral
+                ? theme.palette.mode === "dark"
+                  ? alpha(theme.palette.common.white, 0.02)
+                  : alpha(theme.palette.common.black, 0.02)
+                : alpha(tone, 0.11),
+            };
+          }}
+        >
+          <Stack direction="row" alignItems="center" gap={1.15}>
+            {solved ? (
+              <Icon
+                icon={helped ? "mdi:check-circle-outline" : "mdi:check-circle"}
+                height={21}
+                style={{
+                  color: helped ? "#ed6c02" : "#2e7d32",
+                  flexShrink: 0,
+                }}
+              />
+            ) : phase === "wrong" ? (
+              <Icon
+                icon="mdi:close-circle"
+                height={21}
+                style={{ color: "#d32f2f", flexShrink: 0 }}
+              />
+            ) : phase === "replying" ? (
+              <Icon
+                icon="mdi:check-circle"
+                height={21}
+                style={{ color: "#2e7d32", flexShrink: 0 }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  border: 2,
+                  borderColor: "divider",
+                  backgroundColor:
+                    trainer.solver === "w" ? "#f2f2f2" : "#1d1d1d",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                lineHeight={1.25}
+              >
+                {solved
+                  ? helped
+                    ? isMistake
+                      ? "Move found"
+                      : "Solved with help"
+                    : "Solved!"
+                  : phase === "wrong"
+                    ? `${trainer.playedSan} is not the move`
+                    : phase === "replying"
+                      ? `${trainer.playedSan} is right!`
+                      : phase === "showing"
+                        ? "Showing solution"
+                        : `${sideName} to move`}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  display: "block",
+                  mt: 0.15,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {solved ? (
+                  <>
+                    {helped
+                      ? isMistake
+                        ? "Review the line or tap Show why."
+                        : "Step through the line to lock in the pattern."
+                      : "Clean solve."}
+                    {trainer.ratingDelta !== null && (
+                      <>
+                        {" "}
+                        Rating{" "}
+                        <b>
+                          {trainer.ratingDelta >= 0 ? "+" : ""}
+                          {trainer.ratingDelta}
+                        </b>{" "}
+                        → {stats.rating}
+                      </>
+                    )}
+                  </>
+                ) : phase === "setup" ? (
+                  "Watch your opponent's last move…"
+                ) : phase === "wrong" ? (
+                  trainer.revealed ? (
+                    "That is not the solution move."
+                  ) : (
+                    "Take another look."
+                  )
+                ) : phase === "replying" ? (
+                  trainer.waiting ? (
+                    "Press Next move to see the reply."
+                  ) : (
+                    "Opponent replying…"
+                  )
+                ) : phase === "showing" ? (
+                  trainer.waiting ? (
+                    "Play the arrowed move or press Next move."
+                  ) : (
+                    "Playing out the winning line…"
+                  )
+                ) : trainer.replySan ? (
+                  <>
+                    Opponent played <b>{trainer.replySan}</b>.{" "}
+                    {trainer.failed
+                      ? "Find the next move."
+                      : "Keep going — find the next move."}
+                  </>
+                ) : trainer.failed ? (
+                  "Finish the line. This puzzle no longer counts for rating."
+                ) : (
+                  `Find the best move for ${sideName}.`
+                )}
+              </Typography>
+            </Box>
+
+            {multiStep && !solved && (
+              <Stack
+                direction="row"
+                gap={0.45}
+                sx={{ flexShrink: 0 }}
+                role="img"
+                aria-label={`Move ${Math.min(
+                  trainer.movesDone + 1,
+                  trainer.solverMoves
+                )} of ${trainer.solverMoves}`}
+              >
+                {Array.from({ length: trainer.solverMoves }, (_, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: "50%",
+                      border: 1.5,
+                      borderColor:
+                        index <= trainer.movesDone ? "success.main" : "divider",
+                      backgroundColor:
+                        index < trainer.movesDone
+                          ? "success.main"
+                          : "transparent",
+                    }}
+                  />
+                ))}
+              </Stack>
+            )}
+          </Stack>
+        </Box>
+      )}
+
+      {/* Zone 3 — Flexing Body */}
+      <InspectorBody sx={{ p: 1.5 }}>
         <Stack spacing={1.5}>
           {trainer.notice && (
             <Alert
               severity="info"
-              icon={<Icon icon="mdi:wifi-off" height={20} />}
+              icon={<Icon icon="mdi:wifi-off" height={18} />}
+              sx={{ py: 0.25 }}
             >
               {trainer.notice}
             </Alert>
@@ -112,7 +351,7 @@ export default function PuzzlePanel({
                 <Button
                   variant="contained"
                   size="small"
-                  onClick={() => router.push("/play")}
+                  onClick={() => void router.push("/play")}
                 >
                   Play a game
                 </Button>
@@ -129,200 +368,11 @@ export default function PuzzlePanel({
 
           {puzzle && phase !== "loading" && phase !== "empty" && (
             <>
-              {/* Semantic status banner at TOP above all actions */}
-              <Box
-                role="status"
-                aria-live="polite"
-                sx={(theme) => {
-                  const tone =
-                    phase === "wrong"
-                      ? theme.palette.error.main
-                      : solved
-                        ? helped
-                          ? theme.palette.warning.main
-                          : theme.palette.success.main
-                        : phase === "replying"
-                          ? theme.palette.success.main
-                          : theme.palette.primary.main;
-                  const isNeutral =
-                    phase === "setup" ||
-                    phase === "solving" ||
-                    phase === "showing";
-                  return {
-                    px: 1.5,
-                    py: 1.25,
-                    borderRadius: 1.5,
-                    border: 1,
-                    borderColor: isNeutral ? "divider" : alpha(tone, 0.45),
-                    bgcolor: isNeutral ? "action.hover" : alpha(tone, 0.12),
-                  };
-                }}
-              >
-                <Stack direction="row" alignItems="center" gap={1.25}>
-                  {solved ? (
-                    <Icon
-                      icon={
-                        helped ? "mdi:check-circle-outline" : "mdi:check-circle"
-                      }
-                      height={22}
-                      style={{
-                        color: helped ? "#ed6c02" : "#2e7d32",
-                        flexShrink: 0,
-                      }}
-                    />
-                  ) : phase === "wrong" ? (
-                    <Icon
-                      icon="mdi:close-circle"
-                      height={22}
-                      style={{ color: "#d32f2f", flexShrink: 0 }}
-                    />
-                  ) : phase === "replying" ? (
-                    <Icon
-                      icon="mdi:check-circle"
-                      height={22}
-                      style={{ color: "#2e7d32", flexShrink: 0 }}
-                    />
-                  ) : (
-                    <Box
-                      sx={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        border: 2,
-                        borderColor: "divider",
-                        backgroundColor:
-                          trainer.solver === "w" ? "#f2f2f2" : "#1d1d1d",
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
-
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={700}
-                      lineHeight={1.25}
-                    >
-                      {solved
-                        ? helped
-                          ? isMistake
-                            ? "Move found"
-                            : "Solved with help"
-                          : "Solved!"
-                        : phase === "wrong"
-                          ? `${trainer.playedSan} is not the move`
-                          : phase === "replying"
-                            ? `${trainer.playedSan} is right!`
-                            : phase === "showing"
-                              ? "Showing solution"
-                              : `${sideName} to move`}
-                    </Typography>
-
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{
-                        display: "block",
-                        mt: 0.25,
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {solved ? (
-                        <>
-                          {helped
-                            ? isMistake
-                              ? "Review the line or tap Show why."
-                              : "Step through the line to lock in the pattern."
-                            : "Clean solve."}
-                          {trainer.ratingDelta !== null && (
-                            <>
-                              {" "}
-                              Rating{" "}
-                              <b>
-                                {trainer.ratingDelta >= 0 ? "+" : ""}
-                                {trainer.ratingDelta}
-                              </b>{" "}
-                              → {stats.rating}
-                            </>
-                          )}
-                        </>
-                      ) : phase === "setup" ? (
-                        "Watch your opponent's last move…"
-                      ) : phase === "wrong" ? (
-                        trainer.revealed ? (
-                          "That is not the solution move."
-                        ) : (
-                          "Take another look."
-                        )
-                      ) : phase === "replying" ? (
-                        trainer.waiting ? (
-                          "Press Next move to see the reply."
-                        ) : (
-                          "Opponent replying…"
-                        )
-                      ) : phase === "showing" ? (
-                        trainer.waiting ? (
-                          "Play the arrowed move or press Next move."
-                        ) : (
-                          "Playing out the winning line…"
-                        )
-                      ) : trainer.replySan ? (
-                        <>
-                          Opponent played <b>{trainer.replySan}</b>.{" "}
-                          {trainer.failed
-                            ? "Find the next move."
-                            : "Keep going — find the next move."}
-                        </>
-                      ) : trainer.failed ? (
-                        "Finish the line. This puzzle no longer counts for rating."
-                      ) : (
-                        `Find the best move for ${sideName}.`
-                      )}
-                    </Typography>
-                  </Box>
-
-                  {multiStep && !solved && (
-                    <Stack
-                      direction="row"
-                      gap={0.5}
-                      sx={{ flexShrink: 0 }}
-                      role="img"
-                      aria-label={`Move ${Math.min(
-                        trainer.movesDone + 1,
-                        trainer.solverMoves
-                      )} of ${trainer.solverMoves}`}
-                    >
-                      {Array.from(
-                        { length: trainer.solverMoves },
-                        (_, index) => (
-                          <Box
-                            key={index}
-                            sx={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: "50%",
-                              border: 1.5,
-                              borderColor:
-                                index <= trainer.movesDone
-                                  ? "success.main"
-                                  : "divider",
-                              backgroundColor:
-                                index < trainer.movesDone
-                                  ? "success.main"
-                                  : "transparent",
-                            }}
-                          />
-                        )
-                      )}
-                    </Stack>
-                  )}
-                </Stack>
-              </Box>
-
               {trainer.shownHints.length > 0 && phase === "solving" && (
                 <Alert
                   severity="info"
-                  icon={<Icon icon="mdi:lightbulb-on-outline" height={20} />}
+                  icon={<Icon icon="mdi:lightbulb-on-outline" height={18} />}
+                  sx={{ py: 0.25 }}
                 >
                   <Stack spacing={0.25}>
                     {trainer.shownHints.map((hint, index) => (
@@ -339,226 +389,6 @@ export default function PuzzlePanel({
               )}
 
               {storyControls}
-
-              {/* Action controls: separated cleanly by risk when solving, unified when solved */}
-              {!solved ? (
-                <Stack spacing={0.75} data-board-shortcuts>
-                  <Stack
-                    direction="row"
-                    gap={1}
-                    flexWrap="wrap"
-                    alignItems="center"
-                  >
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color={trainer.nextHintReveals ? "warning" : "primary"}
-                      disabled={
-                        phase !== "solving" ||
-                        trainer.hintsTotal === 0 ||
-                        trainer.hintLevel >= trainer.hintsTotal
-                      }
-                      startIcon={
-                        <Icon icon="mdi:lightbulb-on-outline" height={18} />
-                      }
-                      onClick={trainer.askHint}
-                      sx={{
-                        minWidth: 112,
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {trainer.nextHintReveals
-                        ? "Show move"
-                        : trainer.hintLevel < trainer.hintsTotal
-                          ? `Hint ${trainer.hintLevel + 1}/${trainer.hintsTotal}`
-                          : "Hint"}
-                    </Button>
-
-                    {canAdvanceMistake && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="inherit"
-                        startIcon={<Icon icon="mdi:skip-next" height={18} />}
-                        onClick={trainer.next}
-                        sx={{ borderColor: "divider" }}
-                      >
-                        Skip
-                      </Button>
-                    )}
-
-                    {trainer.waiting && (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        startIcon={<Icon icon="mdi:skip-next" height={18} />}
-                        onClick={trainer.advance}
-                      >
-                        Next move
-                      </Button>
-                    )}
-
-                    <Box sx={{ flex: 1 }} />
-
-                    <Button
-                      size="small"
-                      variant="text"
-                      color="error"
-                      disabled={phase !== "solving"}
-                      startIcon={<Icon icon="mdi:eye-outline" height={18} />}
-                      onClick={trainer.revealSolution}
-                      sx={{
-                        color: "text.secondary",
-                        "&:hover": { color: "error.main" },
-                      }}
-                    >
-                      Give up
-                    </Button>
-                  </Stack>
-
-                  {!isMistake && phase === "solving" && (
-                    <Typography variant="caption" color="text.secondary">
-                      {trainer.nextHintReveals
-                        ? "Show move or Give up counts as missed for rating. Skip is unrated."
-                        : "Give up reveals the solution and counts as missed. Skip is unrated."}
-                    </Typography>
-                  )}
-                </Stack>
-              ) : (
-                <Stack spacing={1} data-board-shortcuts>
-                  <Stack
-                    direction="row"
-                    gap={1}
-                    flexWrap="wrap"
-                    alignItems="center"
-                  >
-                    {canAdvanceMistake && (
-                      <Tooltip title="Next puzzle (Space / Enter / N)">
-                        <Button
-                          size="small"
-                          variant="contained"
-                          startIcon={<Icon icon="mdi:skip-next" height={18} />}
-                          onClick={trainer.next}
-                        >
-                          {source === "mistakes"
-                            ? "Next mistake"
-                            : "Next puzzle"}
-                        </Button>
-                      </Tooltip>
-                    )}
-
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<Icon icon="mdi:refresh" height={18} />}
-                      onClick={trainer.retry}
-                    >
-                      Retry
-                    </Button>
-
-                    {trainer.mistakeEntry && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<Icon icon="mdi:eye-outline" height={18} />}
-                        onClick={visualizeMistake}
-                      >
-                        Show why
-                      </Button>
-                    )}
-
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<Icon icon="mdi:chart-line" height={18} />}
-                      onClick={() => openWithFen("/analysis")}
-                    >
-                      Analyze
-                    </Button>
-
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<Icon icon="mdi:chess-pawn" height={18} />}
-                      onClick={() => openWithFen("/play")}
-                    >
-                      Play it out
-                    </Button>
-
-                    {puzzle.url && (
-                      <Button
-                        size="small"
-                        variant="text"
-                        component="a"
-                        href={puzzle.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        startIcon={<Icon icon="mdi:open-in-new" height={18} />}
-                      >
-                        Lichess
-                      </Button>
-                    )}
-                  </Stack>
-                </Stack>
-              )}
-
-              {solved && trainer.line.length > 0 && (
-                <Stack
-                  data-board-shortcuts
-                  direction="row"
-                  justifyContent="center"
-                  gap={0.5}
-                >
-                  <Tooltip title="Start (Home)">
-                    <span>
-                      <IconButton
-                        size="small"
-                        aria-label="Go to the start"
-                        disabled={!trainer.canStepBack}
-                        onClick={() => trainer.review("start")}
-                      >
-                        <Icon icon="mdi:skip-previous" height={20} />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                  <Tooltip title="Previous move (←)">
-                    <span>
-                      <IconButton
-                        size="small"
-                        aria-label="Previous move"
-                        disabled={!trainer.canStepBack}
-                        onClick={() => trainer.review("previous")}
-                      >
-                        <Icon icon="mdi:chevron-left" height={22} />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                  <Tooltip title="Next move (→)">
-                    <span>
-                      <IconButton
-                        size="small"
-                        aria-label="Next move"
-                        disabled={!trainer.canStepForward}
-                        onClick={() => trainer.review("next")}
-                      >
-                        <Icon icon="mdi:chevron-right" height={22} />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                  <Tooltip title="End (End)">
-                    <span>
-                      <IconButton
-                        size="small"
-                        aria-label="Go to the end"
-                        disabled={!trainer.canStepForward}
-                        onClick={() => trainer.review("end")}
-                      >
-                        <Icon icon="mdi:skip-next" height={20} />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Stack>
-              )}
 
               {trainer.line.length > 0 && (
                 <Stack
@@ -608,14 +438,14 @@ export default function PuzzlePanel({
               {solved && (trainer.mistakeEntry || lessons.length > 0) && (
                 <Stack spacing={1}>
                   {trainer.mistakeEntry && (
-                    <Alert severity="info">
+                    <Alert severity="info" sx={{ py: 0.25 }}>
                       In your game you played <b>{trainer.mistakeEntry.san}</b>{" "}
                       here.
                     </Alert>
                   )}
                   {lessons.length > 0 && (
-                    <Stack spacing={0.75}>
-                      <Typography variant="subtitle2">
+                    <Stack spacing={0.5}>
+                      <Typography variant="subtitle2" fontWeight={700}>
                         What to take from it
                       </Typography>
                       {lessons.map((lesson) => (
@@ -634,7 +464,7 @@ export default function PuzzlePanel({
                   <Divider />
                   <Stack
                     direction="row"
-                    gap={0.75}
+                    gap={0.65}
                     flexWrap="wrap"
                     alignItems="center"
                   >
@@ -652,66 +482,242 @@ export default function PuzzlePanel({
                   </Stack>
                 </>
               )}
+
+              {!solved && !isMistake && phase === "solving" && (
+                <Typography variant="caption" color="text.secondary">
+                  {trainer.nextHintReveals
+                    ? "Show move or Give up counts as missed for rating. Skip is unrated."
+                    : "Give up reveals the solution and counts as missed. Skip is unrated."}
+                </Typography>
+              )}
             </>
           )}
         </Stack>
-      </Panel>
+      </InspectorBody>
 
-      <Panel>
-        <Stack spacing={1.5}>
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            value={source}
-            aria-label="Puzzle source"
-            onChange={(_, value: PuzzleSource | null) =>
-              value && trainer.setSource(value)
-            }
-          >
-            {SOURCES.map(({ id, label, icon }) => (
-              <ToggleButton
-                key={id}
-                value={id}
-                aria-label={label}
-                sx={{ p: 0 }}
+      {/* Zone 4 — Docked Bottom Control Deck */}
+      <InspectorDeck>
+        {(solved && trainer.line.length > 0) ||
+        (source === "mistakes" && trainer.mistakeCount >= 2) ? (
+          <InspectorDeckRow sx={{ py: 0.45, minHeight: 38 }}>
+            {solved && trainer.line.length > 0 ? (
+              <Stack
+                direction="row"
+                alignItems="center"
+                gap={0.15}
+                data-board-shortcuts
               >
-                <Tooltip title={label}>
-                  <Box
-                    component="span"
-                    sx={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 0.75,
-                      py: 0.75,
-                      px: 1,
-                      width: "100%",
-                    }}
+                <ToolbarButton
+                  tooltip="Start (Home)"
+                  icon="mdi:skip-previous"
+                  iconHeight={20}
+                  disabled={!trainer.canStepBack}
+                  onClick={() => trainer.review("start")}
+                />
+                <ToolbarButton
+                  tooltip="Previous move (←)"
+                  icon="mdi:chevron-left"
+                  iconHeight={22}
+                  disabled={!trainer.canStepBack}
+                  onClick={() => trainer.review("previous")}
+                />
+                <ToolbarButton
+                  tooltip="Next move (→)"
+                  icon="mdi:chevron-right"
+                  iconHeight={22}
+                  disabled={!trainer.canStepForward}
+                  onClick={() => trainer.review("next")}
+                />
+                <ToolbarButton
+                  tooltip="End (End)"
+                  icon="mdi:skip-next"
+                  iconHeight={20}
+                  disabled={!trainer.canStepForward}
+                  onClick={() => trainer.review("end")}
+                />
+              </Stack>
+            ) : (
+              <Box />
+            )}
+
+            {source === "mistakes" && trainer.mistakeCount >= 2 && (
+              <Stack direction="row" alignItems="center" gap={0.25}>
+                <ToolbarButton
+                  tooltip="Previous mistake"
+                  icon="mdi:chevron-left"
+                  iconHeight={20}
+                  onClick={trainer.previous}
+                />
+                <ToolbarButton
+                  tooltip="Next mistake"
+                  icon="mdi:chevron-right"
+                  iconHeight={20}
+                  onClick={trainer.next}
+                />
+              </Stack>
+            )}
+          </InspectorDeckRow>
+        ) : null}
+
+        <InspectorDeckRow
+          dividerTop={
+            (solved && trainer.line.length > 0) ||
+            (source === "mistakes" && trainer.mistakeCount >= 2)
+          }
+        >
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={0.45}
+            flexWrap="nowrap"
+            sx={{ flexShrink: 0 }}
+            data-board-shortcuts
+          >
+            {!solved ? (
+              <>
+                <DeckButton
+                  icon="mdi:lightbulb-on-outline"
+                  disabled={
+                    phase !== "solving" ||
+                    trainer.hintsTotal === 0 ||
+                    trainer.hintLevel >= trainer.hintsTotal
+                  }
+                  onClick={trainer.askHint}
+                >
+                  {trainer.nextHintReveals
+                    ? "Show move"
+                    : trainer.hintLevel < trainer.hintsTotal
+                      ? `Hint ${trainer.hintLevel + 1}/${trainer.hintsTotal}`
+                      : "Hint"}
+                </DeckButton>
+
+                {trainer.waiting ? (
+                  <DeckButton
+                    active
+                    icon="mdi:skip-next"
+                    onClick={trainer.advance}
                   >
-                    <Icon icon={icon} height={16} />
-                    <Box
-                      component="span"
-                      sx={{ display: { xs: "none", sm: "inline" } }}
-                    >
-                      {label}
-                    </Box>
-                  </Box>
-                </Tooltip>
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+                    Next move
+                  </DeckButton>
+                ) : (
+                  canAdvanceMistake && (
+                    <DeckButton icon="mdi:skip-next" onClick={trainer.next}>
+                      Skip
+                    </DeckButton>
+                  )
+                )}
+              </>
+            ) : (
+              <>
+                {canAdvanceMistake && (
+                  <Tooltip title="Next puzzle (Space / Enter / N)">
+                    <span>
+                      <DeckButton
+                        active
+                        icon="mdi:skip-next"
+                        onClick={trainer.next}
+                      >
+                        {source === "mistakes" ? "Next" : "Next puzzle"}
+                      </DeckButton>
+                    </span>
+                  </Tooltip>
+                )}
+                <DeckButton icon="mdi:refresh" onClick={trainer.retry}>
+                  Retry
+                </DeckButton>
+                {trainer.mistakeEntry && (
+                  <DeckButton icon="mdi:eye-outline" onClick={visualizeMistake}>
+                    Show why
+                  </DeckButton>
+                )}
+              </>
+            )}
+
+            <DeckButton
+              active={!!optionsAnchor}
+              icon="mdi:tune-variant"
+              onClick={(event) => setOptionsAnchor(event.currentTarget)}
+            >
+              Options
+            </DeckButton>
+          </Stack>
+
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={0.25}
+            flexWrap="nowrap"
+            sx={{ ml: "auto", flexShrink: 0 }}
+          >
+            {!solved ? (
+              <DeckButton
+                subtle
+                danger
+                icon="mdi:eye-outline"
+                disabled={phase !== "solving"}
+                onClick={trainer.revealSolution}
+              >
+                Give up
+              </DeckButton>
+            ) : (
+              <DeckButton
+                subtle
+                icon="mdi:dots-horizontal"
+                onClick={(event) => setMoreAnchor(event.currentTarget)}
+              >
+                Open in
+              </DeckButton>
+            )}
+          </Stack>
+        </InspectorDeckRow>
+      </InspectorDeck>
+
+      {/* Puzzle Options Popover (Source, Theme, Pace, Automation, Stats) */}
+      <InspectorPopover
+        title="Puzzle options"
+        open={!!optionsAnchor}
+        anchorEl={optionsAnchor}
+        onClose={() => setOptionsAnchor(null)}
+        width={324}
+      >
+        <Stack spacing={1.5}>
+          <Box>
+            <PopoverSectionLabel>Source</PopoverSectionLabel>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={source}
+              aria-label="Puzzle source"
+              onChange={(_, value: PuzzleSource | null) =>
+                value && trainer.setSource(value)
+              }
+              sx={{
+                mt: 0.6,
+                "& .MuiToggleButton-root": {
+                  py: 0.45,
+                  px: 0.6,
+                  fontSize: "0.74rem",
+                },
+              }}
+            >
+              {SOURCES.map(({ id, label }) => (
+                <ToggleButton key={id} value={id}>
+                  {label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
 
           {usesThemes && (
-            <Stack direction="row" alignItems="center" gap={1}>
-              <Typography variant="body2" color="text.secondary">
-                Theme
-              </Typography>
+            <Box>
+              <PopoverSectionLabel>Theme</PopoverSectionLabel>
               <Select
                 size="small"
                 fullWidth
                 value={trainer.theme}
                 onChange={(event) => trainer.setTheme(event.target.value)}
+                sx={{ mt: 0.6 }}
               >
                 {PUZZLE_THEMES.map(({ id, label }) => (
                   <MenuItem key={id} value={id}>
@@ -719,88 +725,150 @@ export default function PuzzlePanel({
                   </MenuItem>
                 ))}
               </Select>
-            </Stack>
+            </Box>
           )}
 
-          {source === "mistakes" && trainer.mistakeCount > 0 && (
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
+          <Box>
+            <PopoverSectionLabel>Move pace</PopoverSectionLabel>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={trainer.moveTime}
+              aria-label="Move pace"
+              onChange={(_, value: MoveTime | null) =>
+                value && trainer.setMoveTime(value)
+              }
+              sx={{
+                mt: 0.6,
+                "& .MuiToggleButton-root": { py: 0.4, fontSize: "0.75rem" },
+              }}
             >
-              <Button
-                size="small"
-                disabled={trainer.mistakeCount < 2}
-                onClick={trainer.previous}
-                startIcon={<Icon icon="mdi:chevron-left" height={18} />}
-              >
-                Previous
-              </Button>
+              {MOVE_TIMES.map(({ id, label }) => (
+                <ToggleButton key={id} value={id}>
+                  {label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
+
+          <Stack spacing={0.25}>
+            <PopoverSwitchRow
+              label="Opponent replies automatically"
+              help="When off, press Next move to play each opponent reply"
+              checked={trainer.autoNext}
+              onChange={trainer.setAutoNext}
+            />
+            <PopoverSwitchRow
+              label="Auto-advance on clean solve"
+              checked={trainer.autoJump}
+              onChange={trainer.setAutoJump}
+            />
+          </Stack>
+
+          <Divider />
+
+          <Stack
+            direction="row"
+            justifyContent="space-around"
+            textAlign="center"
+          >
+            <Box>
               <Typography
                 variant="body2"
+                fontWeight={700}
                 sx={{ fontVariantNumeric: "tabular-nums" }}
               >
-                Mistake {trainer.mistakeNumber + 1} of {trainer.mistakeCount}
+                {stats.rating}
               </Typography>
-              <Button
-                size="small"
-                disabled={trainer.mistakeCount < 2}
-                onClick={trainer.next}
-                endIcon={<Icon icon="mdi:chevron-right" height={18} />}
+              <Typography variant="caption" color="text.secondary">
+                Rating
+              </Typography>
+            </Box>
+            <Box>
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{ fontVariantNumeric: "tabular-nums" }}
               >
-                Next
-              </Button>
-            </Stack>
-          )}
-
-          <PuzzleControls trainer={trainer} />
+                {stats.streak} / {stats.bestStreak}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Streak / Best
+              </Typography>
+            </Box>
+            <Box>
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {stats.solved}/{stats.solved + stats.failed}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Solved
+              </Typography>
+            </Box>
+          </Stack>
         </Stack>
-      </Panel>
+      </InspectorPopover>
 
-      <Panel sx={{ borderBottom: 0 }}>
-        <Stack direction="row" justifyContent="space-around" textAlign="center">
-          <Stat label="Rating" value={stats.rating} icon="mdi:trophy-outline" />
-          <Stat label="Streak" value={stats.streak} icon="mdi:fire" />
-          <Stat label="Best" value={stats.bestStreak} icon="mdi:star-outline" />
-          <Stat
-            label="Solved"
-            value={`${stats.solved}/${stats.solved + stats.failed}`}
-            icon="mdi:check-circle-outline"
-          />
-        </Stack>
-      </Panel>
-    </Stack>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  icon: string;
-}) {
-  return (
-    <Box>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="center"
-        gap={0.5}
+      {/* Post-solve Overflow Menu */}
+      <Menu
+        anchorEl={moreAnchor}
+        open={!!moreAnchor}
+        onClose={() => setMoreAnchor(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "right" }}
+        slotProps={{
+          paper: {
+            sx: {
+              minWidth: 200,
+              borderRadius: 1.5,
+              border: 1,
+              borderColor: "divider",
+              mb: 0.5,
+            },
+          },
+        }}
       >
-        <Icon icon={icon} height={18} />
-        <Typography
-          fontWeight={700}
-          sx={{ fontVariantNumeric: "tabular-nums" }}
-        >
-          {value}
-        </Typography>
-      </Stack>
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-    </Box>
+        <MenuItem dense onClick={() => openWithFen("/analysis")}>
+          <ListItemIcon sx={{ minWidth: 32 }}>
+            <Icon icon="mdi:chart-line" height={18} />
+          </ListItemIcon>
+          <ListItemText
+            primary="Analyze position"
+            slotProps={{ primary: { fontSize: "0.84rem" } }}
+          />
+        </MenuItem>
+        <MenuItem dense onClick={() => openWithFen("/play")}>
+          <ListItemIcon sx={{ minWidth: 32 }}>
+            <Icon icon="mdi:chess-pawn" height={18} />
+          </ListItemIcon>
+          <ListItemText
+            primary="Play it out vs bot"
+            slotProps={{ primary: { fontSize: "0.84rem" } }}
+          />
+        </MenuItem>
+        {puzzle?.url && (
+          <MenuItem
+            dense
+            component="a"
+            href={puzzle.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setMoreAnchor(null)}
+          >
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              <Icon icon="mdi:open-in-new" height={18} />
+            </ListItemIcon>
+            <ListItemText
+              primary="Open on Lichess"
+              slotProps={{ primary: { fontSize: "0.84rem" } }}
+            />
+          </MenuItem>
+        )}
+      </Menu>
+    </InspectorShell>
   );
 }

@@ -37,6 +37,8 @@ export function createStaticServer(root = path.join(project, "out")) {
       "Content-Type": types[extension] ?? "application/octet-stream",
       "Cache-Control": /\/(?:_next\/static|engines)\//.test(pathname) ? "public, max-age=31536000, immutable" : "no-cache",
       "X-Content-Type-Options": "nosniff",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "credentialless",
       ...(compress ? { "Content-Encoding": "gzip", Vary: "Accept-Encoding" } : { "Content-Length": statSync(file).size }),
     });
     if (request.method === "HEAD") { response.end(); return; }

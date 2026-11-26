@@ -162,7 +162,7 @@ export default function LearnPage() {
               variant="outlined"
               sx={{
                 height: "100%",
-                borderRadius: "12px",
+                borderRadius: 1.5,
                 borderColor: "divider",
                 transition: "transform 0.15s, border-color 0.15s",
                 "&:hover": {
@@ -228,7 +228,7 @@ export default function LearnPage() {
       <Grid container spacing={2} alignItems="flex-start">
         <Grid size={{ xs: 12, md: 7 }}>
           <Panel
-            sx={{ borderRadius: "12px" }}
+            sx={{ borderRadius: 1.5 }}
             title="Your biggest mistakes"
             actions={
               <Typography
@@ -358,10 +358,7 @@ export default function LearnPage() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 5 }}>
-          <Panel
-            sx={{ borderRadius: "12px" }}
-            title="The blunder-check routine"
-          >
+          <Panel sx={{ borderRadius: 1.5 }} title="The blunder-check routine">
             <Stack spacing={1.25}>
               {CHECKLIST.map((item, index) => (
                 <Stack

@@ -256,8 +256,12 @@ export default function ScanPage() {
   const highConfidenceValid = !!validation?.ok && unsureCount === 0;
 
   const open = (path: string, asPgn = false) => {
-    if (asPgn) setHandoff({ kind: "pgn", pgn: fenToPgn(fen) }, path);
-    else setHandoff({ kind: "fen", fen }, path);
+    if (asPgn)
+      setHandoff(
+        { kind: "pgn", pgn: fenToPgn(fen), source: "Scan board" },
+        path
+      );
+    else setHandoff({ kind: "fen", fen, source: "Scan board" }, path);
     void router.push(path);
   };
 
@@ -326,7 +330,7 @@ export default function ScanPage() {
         <Card
           variant="outlined"
           sx={(theme) => ({
-            borderRadius: "12px",
+            borderRadius: 1.5,
             borderStyle: "dashed",
             borderWidth: 2,
             borderColor: alpha(theme.palette.primary.main, 0.5),
@@ -459,7 +463,7 @@ export default function ScanPage() {
             sx={{
               width: { xs: "100%", md: 400 },
               flexShrink: 0,
-              borderRadius: "12px",
+              borderRadius: 1.5,
             }}
           >
             <Stack spacing={1.5} alignItems="center">

@@ -1,5 +1,18 @@
 import { useBoardAppearance } from "@/components/board/appearance";
-import Panel from "@/components/panel";
+import {
+  InspectorPopover,
+  PopoverSectionLabel,
+  PopoverSwitchRow,
+} from "@/components/inspector/inspectorPopover";
+import {
+  DeckButton,
+  InspectorBody,
+  InspectorDeck,
+  InspectorDeckRow,
+  InspectorHeader,
+  InspectorPill,
+  InspectorShell,
+} from "@/components/inspector/inspectorShell";
 import BoardWorkspace, { SquareBoardStage } from "@/components/boardWorkspace";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import ArrowLayer from "@/components/board/arrowLayer";
@@ -10,15 +23,14 @@ import {
   Box,
   Button,
   Chip,
+  Divider,
   LinearProgress,
   Stack,
-  Switch,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
-  FormControlLabel,
 } from "@mui/material";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Chessboard from "@/components/board/motionChessboard";
 import { PIECE_SLIDE_MS } from "@/lib/pieceMotion";
 import {
@@ -135,6 +147,7 @@ const buildBoard = (trainer: VisionTrainer) => {
 export default function VisionPage() {
   const trainer = useVisionTrainer();
   const appearance = useBoardAppearance();
+  const [optionsAnchor, setOptionsAnchor] = useState<HTMLElement | null>(null);
 
   const { styles, arrows, position } = useMemo(
     () => buildBoard(trainer),
@@ -322,177 +335,261 @@ export default function VisionPage() {
         </SquareBoardStage>
       }
       inspector={
-        <Stack
-          spacing={0}
-          data-inspector-scroller
-          sx={{
-            minHeight: 0,
-            overflowY: "auto",
-            overscrollBehavior: "contain",
-            scrollbarGutter: "stable",
-          }}
-        >
-          <Panel>
+        <InspectorShell>
+          {/* Zone 1 — Slim Context Header */}
+          <InspectorHeader
+            left={
+              <Typography variant="subtitle2" fontWeight={700} noWrap>
+                Board vision
+              </Typography>
+            }
+            right={
+              trainer.mode === "knight" ? (
+                <InspectorPill
+                  icon="mdi:chess-knight"
+                  label={`${trainer.knightSolved} solved`}
+                  tooltip={`${trainer.knightPerfect} perfect routes`}
+                />
+              ) : (
+                <InspectorPill
+                  icon="mdi:trophy-outline"
+                  label={`Best ${trainer.bestScore}`}
+                  tooltip={`${trainer.sessions} timed rounds played`}
+                />
+              )
+            }
+          />
+
+          {/* Mode Selector Strip */}
+          <Box
+            sx={{
+              px: 1.25,
+              py: 0.75,
+              flexShrink: 0,
+              borderBottom: 1,
+              borderColor: "divider",
+            }}
+          >
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={trainer.mode}
+              onChange={(_, value: VisionMode | null) =>
+                value && trainer.setMode(value)
+              }
+            >
+              {MODES.map(({ id, label, icon }) => (
+                <ToggleButton
+                  key={id}
+                  value={id}
+                  sx={{
+                    gap: 0.45,
+                    px: 0.75,
+                    py: 0.45,
+                    fontSize: "0.76rem",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <Icon icon={icon} height={15} />
+                  {label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
+
+          {/* Zone 2 — Flexing Stage */}
+          <InspectorBody sx={{ p: 1.5 }}>
             {trainer.mode === "knight" ? (
               <KnightPanel trainer={trainer} />
             ) : (
               <TimedPanel trainer={trainer} />
             )}
-          </Panel>
+          </InspectorBody>
 
-          <Panel>
-            <Stack spacing={1.5}>
-              <ToggleButtonGroup
-                exclusive
-                fullWidth
-                size="small"
-                value={trainer.mode}
-                onChange={(_, value: VisionMode | null) =>
-                  value && trainer.setMode(value)
-                }
+          {/* Zone 3 — Docked Bottom Control Deck */}
+          <InspectorDeck>
+            <InspectorDeckRow>
+              <Stack
+                direction="row"
+                alignItems="center"
+                gap={0.45}
+                flexWrap="nowrap"
+                sx={{ flexShrink: 0 }}
               >
-                {MODES.map(({ id, label, icon }) => (
-                  <ToggleButton
-                    key={id}
-                    value={id}
-                    sx={{
-                      gap: { xs: 0.4, sm: 0.75 },
-                      px: { xs: 0.75, sm: 1.25 },
-                      py: 0.75,
-                      fontSize: { xs: "0.75rem", sm: "0.8125rem" },
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <Icon icon={icon} height={16} />
-                    {label}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
+                {trainer.phase !== "running" ? (
+                  <DeckButton active icon="mdi:play" onClick={trainer.start}>
+                    {trainer.phase === "done"
+                      ? "Play again"
+                      : trainer.mode === "knight"
+                        ? "Start"
+                        : "Start round"}
+                  </DeckButton>
+                ) : trainer.mode === "knight" ? (
+                  <>
+                    {trainer.knightResult ? (
+                      <>
+                        <DeckButton
+                          active
+                          icon="mdi:skip-next"
+                          onClick={trainer.start}
+                        >
+                          Next route
+                        </DeckButton>
+                        {(trainer.knightResult.used !==
+                          trainer.knightResult.best ||
+                          trainer.knightResult.usedHint) && (
+                          <DeckButton
+                            icon="mdi:refresh"
+                            onClick={trainer.retryKnightRoute}
+                          >
+                            Retry
+                          </DeckButton>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <DeckButton
+                          icon="mdi:undo-variant"
+                          disabled={trainer.path.length < 2}
+                          onClick={trainer.undoKnight}
+                        >
+                          Undo hop
+                        </DeckButton>
+                        <DeckButton
+                          active={trainer.showSolution}
+                          icon="mdi:eye-outline"
+                          onClick={() =>
+                            trainer.setShowSolution(!trainer.showSolution)
+                          }
+                        >
+                          {trainer.showSolution ? "Hide route" : "Route"}
+                        </DeckButton>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <DeckButton icon="mdi:refresh" onClick={trainer.start}>
+                    Restart
+                  </DeckButton>
+                )}
 
-              <Typography variant="body2" color="text.secondary">
-                {MODES.find(({ id }) => id === trainer.mode)?.text}
-              </Typography>
+                <DeckButton
+                  active={!!optionsAnchor}
+                  icon="mdi:tune-variant"
+                  onClick={(event) => setOptionsAnchor(event.currentTarget)}
+                >
+                  Options
+                </DeckButton>
+              </Stack>
 
               <Stack
                 direction="row"
-                gap={1}
                 alignItems="center"
-                flexWrap="wrap"
+                gap={0.25}
+                sx={{ ml: "auto", flexShrink: 0 }}
               >
+                {trainer.phase === "running" && trainer.mode !== "knight" && (
+                  <DeckButton
+                    subtle
+                    danger
+                    icon="mdi:stop"
+                    onClick={trainer.stop}
+                  >
+                    Stop
+                  </DeckButton>
+                )}
+                {trainer.phase === "running" &&
+                  trainer.mode === "knight" &&
+                  !trainer.knightResult && (
+                    <DeckButton
+                      subtle
+                      icon="mdi:skip-next"
+                      onClick={trainer.start}
+                    >
+                      Skip
+                    </DeckButton>
+                  )}
+              </Stack>
+            </InspectorDeckRow>
+          </InspectorDeck>
+
+          <InspectorPopover
+            title="Vision options"
+            open={!!optionsAnchor}
+            anchorEl={optionsAnchor}
+            onClose={() => setOptionsAnchor(null)}
+            width={316}
+          >
+            <Stack spacing={1.5}>
+              <Box>
+                <PopoverSectionLabel>Board perspective</PopoverSectionLabel>
                 <ToggleButtonGroup
                   exclusive
+                  fullWidth
                   size="small"
                   value={trainer.orientationChoice}
                   onChange={(_, value: OrientationChoice | null) =>
                     value && trainer.setOrientationChoice(value)
                   }
+                  sx={{
+                    mt: 0.6,
+                    "& .MuiToggleButton-root": { py: 0.4, fontSize: "0.75rem" },
+                  }}
                 >
-                  <ToggleButton value="white">White side</ToggleButton>
-                  <ToggleButton value="black">Black side</ToggleButton>
+                  <ToggleButton value="white">White</ToggleButton>
                   <ToggleButton value="random">Random</ToggleButton>
+                  <ToggleButton value="black">Black</ToggleButton>
                 </ToggleButtonGroup>
-
-                {labelsAllowed && (
-                  <FormControlLabel
-                    sx={{ ml: 0.5 }}
-                    control={
-                      <Switch
-                        size="small"
-                        checked={trainer.showLabels}
-                        onChange={(event) =>
-                          trainer.setShowLabels(event.target.checked)
-                        }
-                      />
-                    }
-                    label="Show labels"
-                  />
-                )}
-              </Stack>
+              </Box>
 
               {trainer.mode === "knight" && (
-                <ToggleButtonGroup
-                  exclusive
-                  size="small"
-                  value={trainer.difficulty}
-                  onChange={(_, value: Difficulty | null) =>
-                    value && trainer.setDifficulty(value)
-                  }
-                >
-                  {(Object.keys(DIFFICULTY_RANGE) as Difficulty[]).map(
-                    (level) => (
-                      <ToggleButton key={level} value={level}>
-                        {DIFFICULTY_LABELS[level]} (
-                        {DIFFICULTY_RANGE[level].join("–")})
-                      </ToggleButton>
-                    )
-                  )}
-                </ToggleButtonGroup>
+                <Box>
+                  <PopoverSectionLabel>Route length</PopoverSectionLabel>
+                  <ToggleButtonGroup
+                    exclusive
+                    fullWidth
+                    size="small"
+                    value={trainer.difficulty}
+                    onChange={(_, value: Difficulty | null) =>
+                      value && trainer.setDifficulty(value)
+                    }
+                    sx={{
+                      mt: 0.6,
+                      "& .MuiToggleButton-root": {
+                        py: 0.4,
+                        fontSize: "0.74rem",
+                      },
+                    }}
+                  >
+                    {(Object.keys(DIFFICULTY_RANGE) as Difficulty[]).map(
+                      (level) => (
+                        <ToggleButton key={level} value={level}>
+                          {DIFFICULTY_LABELS[level]} (
+                          {DIFFICULTY_RANGE[level].join("–")})
+                        </ToggleButton>
+                      )
+                    )}
+                  </ToggleButtonGroup>
+                </Box>
               )}
-            </Stack>
-          </Panel>
 
-          <Panel sx={{ borderBottom: 0 }}>
-            {trainer.mode === "knight" ? (
-              <Stack
-                direction="row"
-                justifyContent="space-around"
-                textAlign="center"
-              >
-                <Box>
-                  <Typography
-                    fontWeight={700}
-                    sx={{ fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {trainer.knightSolved}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Routes solved
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography
-                    fontWeight={700}
-                    sx={{ fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {trainer.knightPerfect}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Perfect routes
-                  </Typography>
-                </Box>
-              </Stack>
-            ) : (
-              <Stack
-                direction="row"
-                justifyContent="space-around"
-                textAlign="center"
-              >
-                <Box>
-                  <Typography
-                    fontWeight={700}
-                    sx={{ fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {trainer.bestScore}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Best timed round
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography
-                    fontWeight={700}
-                    sx={{ fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {trainer.sessions}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Timed rounds
-                  </Typography>
-                </Box>
-              </Stack>
-            )}
-          </Panel>
-        </Stack>
+              {labelsAllowed && (
+                <PopoverSwitchRow
+                  label="Show square labels"
+                  checked={trainer.showLabels}
+                  onChange={trainer.setShowLabels}
+                />
+              )}
+
+              <Divider />
+
+              <Typography variant="caption" color="text.secondary">
+                {MODES.find(({ id }) => id === trainer.mode)?.text}
+              </Typography>
+            </Stack>
+          </InspectorPopover>
+        </InspectorShell>
       }
     />
   );
@@ -506,26 +603,20 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
 
   if (phase === "idle") {
     return (
-      <Stack spacing={1.5} alignItems="flex-start" sx={{ minHeight: 248 }}>
+      <Stack spacing={1.25} alignItems="flex-start">
         <Typography fontWeight={600}>30-second sprint</Typography>
         <Typography variant="body2" color="text.secondary">
           Answer as many squares as you can before time runs out. Both speed and
-          accuracy are tracked. Press Enter or Space to begin.
+          accuracy are tracked. Press Enter or Space, or click Start round
+          below.
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Icon icon="mdi:play" height={20} />}
-          onClick={trainer.start}
-        >
-          Start round
-        </Button>
       </Stack>
     );
   }
 
   if (phase === "done") {
     return (
-      <Stack spacing={1.25} alignItems="flex-start" sx={{ minHeight: 248 }}>
+      <Stack spacing={1.25} alignItems="flex-start">
         <Stack direction="row" alignItems="center" gap={1}>
           <Typography
             variant="h4"
@@ -545,19 +636,12 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
           {accuracy}% accuracy · {misses} miss{misses === 1 ? "" : "es"} · Best{" "}
           {Math.max(trainer.bestScore, score)}
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Icon icon="mdi:refresh" height={20} />}
-          onClick={trainer.start}
-        >
-          Play again
-        </Button>
       </Stack>
     );
   }
 
   return (
-    <Stack spacing={1.5} sx={{ minHeight: 248 }}>
+    <Stack spacing={1.5}>
       <LinearProgress
         variant="determinate"
         value={(msLeft / ROUND_MS) * 100}
@@ -705,27 +789,6 @@ function TimedPanel({ trainer }: { trainer: VisionTrainer }) {
           Click the target square shown on the board.
         </Typography>
       )}
-
-      <Stack direction="row" gap={1} justifyContent="flex-end" pt={0.5}>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<Icon icon="mdi:refresh" height={16} />}
-          onClick={trainer.start}
-        >
-          Restart
-        </Button>
-        <Button
-          size="small"
-          variant="text"
-          color="inherit"
-          startIcon={<Icon icon="mdi:stop" height={16} />}
-          onClick={trainer.stop}
-          sx={{ color: "text.secondary" }}
-        >
-          Stop
-        </Button>
-      </Stack>
     </Stack>
   );
 }
@@ -735,19 +798,12 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
 
   if (phase === "idle") {
     return (
-      <Stack spacing={1.5} alignItems="flex-start" sx={{ minHeight: 204 }}>
+      <Stack spacing={1.25} alignItems="flex-start">
         <Typography fontWeight={600}>Knight routes</Typography>
         <Typography variant="body2" color="text.secondary">
           Click a reachable square or drag the knight to hop there. Click the
           knight again (or press Backspace) to undo a hop.
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Icon icon="mdi:play" height={20} />}
-          onClick={trainer.start}
-        >
-          Start
-        </Button>
       </Stack>
     );
   }
@@ -763,7 +819,7 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
     knightResult.usedHint;
 
   return (
-    <Stack spacing={1.25} sx={{ minHeight: 204 }}>
+    <Stack spacing={1.25}>
       <Typography fontWeight={700} variant="subtitle1">
         {route.from} → {route.to}
       </Typography>
@@ -775,46 +831,6 @@ function KnightPanel({ trainer }: { trainer: VisionTrainer }) {
         Shortest route: <b>{route.moves}</b> hop{route.moves === 1 ? "" : "s"} ·
         Used: <b>{used}</b>
       </Typography>
-
-      <Stack direction="row" gap={1} flexWrap="wrap">
-        <Button
-          size="small"
-          variant="outlined"
-          disabled={path.length < 2 || !!knightResult}
-          startIcon={<Icon icon="mdi:undo-variant" height={18} />}
-          onClick={trainer.undoKnight}
-        >
-          Undo hop
-        </Button>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<Icon icon="mdi:eye-outline" height={18} />}
-          onClick={() => trainer.setShowSolution(!trainer.showSolution)}
-          sx={{ minWidth: 118 }}
-        >
-          {trainer.showSolution ? "Hide route" : "Show route"}
-        </Button>
-        {knightResult && !isPerfect && (
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<Icon icon="mdi:refresh" height={18} />}
-            onClick={trainer.retryKnightRoute}
-          >
-            Retry
-          </Button>
-        )}
-        <Button
-          size="small"
-          variant={knightResult ? "contained" : "text"}
-          startIcon={<Icon icon="mdi:skip-next" height={18} />}
-          onClick={trainer.start}
-          sx={{ minWidth: 114 }}
-        >
-          {knightResult ? "Next route" : "Skip"}
-        </Button>
-      </Stack>
 
       <Box sx={{ minHeight: 44 }}>
         {knightResult && (

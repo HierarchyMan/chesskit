@@ -35,6 +35,12 @@ const sourceFor = async (
     case "browser":
       // The app serves only the bundled engine; any other runs from the user's download.
       await requireDownloadedEngine(model);
+      if (model.workerAdapter) {
+        const script = model.script.startsWith("/")
+          ? model.script
+          : `/${model.script}`;
+        return `/fairy-worker.js?script=${encodeURIComponent(script)}&export=${encodeURIComponent(model.workerAdapter.exportName)}`;
+      }
       return model.script;
     case "bridge": {
       const status = await probeBridgeEngine(model.script, signal);
@@ -79,7 +85,9 @@ export const createEngine = async (
   const model = getEngineModel(name);
   if (!isModelSupported(model)) {
     throw new Error(
-      `${model.label.small} needs WebAssembly, which this browser lacks.`
+      model.needsSharedArrayBuffer
+        ? `${model.label.small} needs SharedArrayBuffer (cross-origin isolation). Restart the dev server or use a native Fairy-Stockfish bridge engine.`
+        : `${model.label.small} needs WebAssembly, which this browser lacks.`
     );
   }
   if (model.needsAdvisor && options.advisor) {
