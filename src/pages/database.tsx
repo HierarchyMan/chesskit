@@ -2,18 +2,22 @@ import {
   Alert,
   Box,
   Button,
+  CardActionArea,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
   InputAdornment,
   Snackbar,
   Stack,
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { Icon } from "@iconify/react";
 import {
@@ -63,6 +67,8 @@ const formatResult = (result?: string): string => {
 };
 
 export default function GameDatabase() {
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const { games, deleteGame, getGame } = useGameSummaries();
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -463,41 +469,224 @@ export default function GameDatabase() {
             </Stack>
           </Stack>
 
-          <Box
-            sx={{
-              width: "100%",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <DataGrid
-              aria-label="Games list"
-              rows={filteredGames}
-              columns={columns}
-              rowHeight={56}
-              disableColumnMenu
-              disableRowSelectionOnClick
-              pageSizeOptions={[25, 50, 100]}
-              localeText={gridLocaleText}
-              onRowClick={(params) =>
-                void router.push({
-                  pathname: "/analysis",
-                  query: { gameId: params.id },
-                })
-              }
-              initialState={{
-                pagination: { paginationModel: { pageSize: 25, page: 0 } },
-                sorting: {
-                  sortModel: [{ field: "date", sort: "desc" }],
-                },
-              }}
+          {isSmall ? (
+            <Panel sx={{ borderRadius: 1.5, p: 0 }}>
+              {filteredGames.length === 0 ? (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ p: 3, textAlign: "center" }}
+                >
+                  No matching games
+                </Typography>
+              ) : (
+                <Stack
+                  divider={
+                    <Box sx={{ borderTop: 1, borderColor: "divider" }} />
+                  }
+                >
+                  {filteredGames.map((row) => {
+                    const tc = formatTimeControl(row.timeControl);
+                    const eventLabel =
+                      row.event && row.event !== "?"
+                        ? row.event
+                        : row.site || "Casual game";
+                    const meta = [
+                      eventLabel,
+                      row.date && row.date !== "????.??.??"
+                        ? row.date
+                        : undefined,
+                      tc !== "—" ? tc : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+
+                    return (
+                      <Stack
+                        key={row.id}
+                        direction="row"
+                        alignItems="center"
+                        sx={{ pr: 0.75 }}
+                      >
+                        <CardActionArea
+                          onClick={() =>
+                            void router.push({
+                              pathname: "/analysis",
+                              query: { gameId: row.id },
+                            })
+                          }
+                          sx={{ p: 1.25, flex: 1, minWidth: 0 }}
+                        >
+                          <Stack spacing={0.5} minWidth={0}>
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              justifyContent="space-between"
+                              gap={1}
+                            >
+                              <Stack spacing={0.2} minWidth={0} flex={1}>
+                                <Stack
+                                  direction="row"
+                                  alignItems="center"
+                                  gap={0.65}
+                                  minWidth={0}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: "50%",
+                                      bgcolor: "#f2f2f2",
+                                      border: "1px solid",
+                                      borderColor: "divider",
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight={600}
+                                    noWrap
+                                    sx={{ fontVariantNumeric: "tabular-nums" }}
+                                  >
+                                    {formatPlayer(
+                                      row.white?.name,
+                                      row.white?.rating
+                                    )}
+                                  </Typography>
+                                </Stack>
+                                <Stack
+                                  direction="row"
+                                  alignItems="center"
+                                  gap={0.65}
+                                  minWidth={0}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: "50%",
+                                      bgcolor: "#1d1d1d",
+                                      border: "1px solid",
+                                      borderColor: "divider",
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    noWrap
+                                    sx={{ fontVariantNumeric: "tabular-nums" }}
+                                  >
+                                    {formatPlayer(
+                                      row.black?.name,
+                                      row.black?.rating
+                                    )}
+                                  </Typography>
+                                </Stack>
+                              </Stack>
+
+                              <Stack
+                                direction="row"
+                                alignItems="center"
+                                gap={0.5}
+                                flexShrink={0}
+                              >
+                                {row.hasEvaluation && (
+                                  <Icon
+                                    icon="mdi:check-circle"
+                                    height={16}
+                                    style={{ color: "#2e7d32" }}
+                                  />
+                                )}
+                                <Chip
+                                  size="small"
+                                  variant="outlined"
+                                  label={formatResult(row.result)}
+                                  sx={{
+                                    height: 22,
+                                    minWidth: 46,
+                                    fontWeight: 700,
+                                    fontSize: "0.74rem",
+                                    fontVariantNumeric: "tabular-nums",
+                                  }}
+                                />
+                              </Stack>
+                            </Stack>
+
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              noWrap
+                              sx={{ fontVariantNumeric: "tabular-nums" }}
+                            >
+                              {meta}
+                            </Typography>
+                          </Stack>
+                        </CardActionArea>
+
+                        <Stack direction="row" gap={0.25} flexShrink={0}>
+                          <IconButton
+                            size="small"
+                            aria-label="Copy PGN"
+                            onClick={handleCopyGameRow(row.id)}
+                          >
+                            <Icon icon="mdi:content-copy" height={18} />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            aria-label="Delete game"
+                            onClick={() => setPendingDelete(row)}
+                            sx={{
+                              color: "text.secondary",
+                              "&:hover": { color: "error.main" },
+                            }}
+                          >
+                            <Icon icon="mdi:delete-outline" height={19} />
+                          </IconButton>
+                        </Stack>
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+              )}
+            </Panel>
+          ) : (
+            <Box
               sx={{
-                borderRadius: 1.5,
-                bgcolor: "background.paper",
-                "& .MuiDataGrid-row": { cursor: "pointer" },
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
               }}
-            />
-          </Box>
+            >
+              <DataGrid
+                aria-label="Games list"
+                rows={filteredGames}
+                columns={columns}
+                rowHeight={56}
+                disableColumnMenu
+                disableRowSelectionOnClick
+                pageSizeOptions={[25, 50, 100]}
+                localeText={gridLocaleText}
+                onRowClick={(params) =>
+                  void router.push({
+                    pathname: "/analysis",
+                    query: { gameId: params.id },
+                  })
+                }
+                initialState={{
+                  pagination: { paginationModel: { pageSize: 25, page: 0 } },
+                  sorting: {
+                    sortModel: [{ field: "date", sort: "desc" }],
+                  },
+                }}
+                sx={{
+                  borderRadius: 1.5,
+                  bgcolor: "background.paper",
+                  "& .MuiDataGrid-row": { cursor: "pointer" },
+                }}
+              />
+            </Box>
+          )}
         </>
       )}
 

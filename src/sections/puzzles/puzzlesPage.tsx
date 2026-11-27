@@ -9,7 +9,7 @@ import { Color } from "@/types/enums";
 import { useMemo } from "react";
 import { arrowFromUci } from "@/lib/arrows/uci";
 import { BoardArrow } from "@/lib/arrows/types";
-import PuzzlePanel from "./puzzlePanel";
+import PuzzlePanel, { usePuzzleVerticalSlots } from "./puzzlePanel";
 import { puzzleGameAtom } from "./states";
 import { usePuzzleTrainer } from "./usePuzzleTrainer";
 
@@ -55,13 +55,25 @@ export default function PuzzlesPage() {
   useKeyboardShortcut("Home", () => trainer.review("start"), solved);
   useKeyboardShortcut("End", () => trainer.review("end"), solved);
 
+  const showStory = (value: Parameters<typeof story.start>[0]) =>
+    story.start(value, { exitLabel: "Back to puzzle" });
+  const storyControls = <StoryControls story={story} />;
+  const vertical = usePuzzleVerticalSlots({
+    trainer,
+    onShowStory: showStory,
+    storyControls,
+    storyActive: story.projection.active,
+  });
+
   return (
     <BoardWorkspace
       inspectorMinWidth={SIDE_PANEL_WIDTH}
       inspectorLabel="Puzzle controls"
+      vertical={vertical}
       board={
         <Board
           id="PuzzleBoard"
+          hidePlayersInVertical
           canPlay={
             story.projection.active
               ? false
@@ -90,10 +102,8 @@ export default function PuzzlesPage() {
       inspector={
         <PuzzlePanel
           trainer={trainer}
-          onShowStory={(value) =>
-            story.start(value, { exitLabel: "Back to puzzle" })
-          }
-          storyControls={<StoryControls story={story} />}
+          onShowStory={showStory}
+          storyControls={storyControls}
         />
       }
     />

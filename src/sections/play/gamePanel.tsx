@@ -1,10 +1,22 @@
 import { ArrowOverlayControls } from "@/components/board/arrowOverlay";
-import { useWorkspacePageFlow } from "@/components/boardWorkspace";
+import {
+  useWorkspacePageFlow,
+  type VerticalWorkspaceSlots,
+} from "@/components/boardWorkspace";
 import {
   InspectorPopover,
   PopoverSectionLabel,
   PopoverSwitchRow,
 } from "@/components/inspector/inspectorPopover";
+import {
+  DeckButton,
+  InspectorPill,
+} from "@/components/inspector/inspectorShell";
+import {
+  VerticalContextStrip,
+  VerticalLiveStrip,
+  WorkspaceActionBar,
+} from "@/components/inspector/workspaceActionBar";
 import MovesList from "@/components/movesList";
 import StrengthControl from "@/components/strengthControl";
 import { ToolbarButton } from "@/components/ToolbarButton";
@@ -1536,4 +1548,831 @@ function ResultCard({
       </Stack>
     </Box>
   );
+}
+
+/**
+ * Vertical workspace slots for active Play games: keeps bot/strength/status above
+ * the board, attaches CoachStage / ResultCard / horizontal Move Ticker directly
+ * below the board, anchors < > / Take back / Hint / Options in the 52px sticky
+ * thumb bar, and places full move history & challenge tips below the fold.
+ */
+export function usePlayVerticalSlots({
+  botEngine,
+  overlay,
+  coach,
+  interactive,
+  coachSlotRef,
+}: Props): VerticalWorkspaceSlots {
+  const store = useStore();
+  const router = useRouter();
+  const gameId = useAtomValue(gameIdAtom);
+  const inCascade = useAtomValue(playCascadeActiveAtom);
+  const [reviewPly, setReviewPly] = useAtom(reviewPlyAtom);
+  const [evalBar, setEvalBar] = useAtom(playEvalBarAtom);
+  const [arrowsWithCoach, setArrowsWithCoach] = useAtom(
+    playArrowsWithCoachAtom
+  );
+  const { backToSetup, restartGame, startGame, startChallenge } =
+    useStartGame();
+  const [casualExit, setCasualExit] = useState<"restart" | "discard">(
+    "restart"
+  );
+  const [casualExitOpen, setCasualExitOpen] = useState(false);
+  const [optionsAnchor, setOptionsAnchor] = useState<HTMLElement | null>(null);
+  const [offeringDraw, setOfferingDraw] = useState(false);
+  const [strengthOpen, setStrengthOpen] = useState(false);
+  const game = useAtomValue(gameAtom);
+  const playerColor = useAtomValue(playerColorAtom);
+  const savedGameId = useAtomValue(savedGameIdAtom);
+  const [isInProgress, setIsInProgress] = useAtom(isGameInProgressAtom);
+  const activeMode = useAtomValue(activeGameModeAtom);
+  const [coachActive, setCoachActive] = useAtom(activeCoachAtom);
+  const [end, setEnd] = useAtom(gameEndAtom);
+  const botThinking = useAtomValue(botThinkingAtom);
+  const [botError, setBotError] = useAtom(botErrorAtom);
+  const bumpBotRetry = useSetAtom(botRetryTickAtom);
+  const [queuedSource, setQueuedSource] = useAtom(queuedStartSourceAtom);
+  const setStartingPosition = useSetAtom(startingPositionAtom);
+  const botEngineName = useAtomValue(enginePlayNameAtom);
+  const [savedStrength, setSavedStrength] = useAtom(botStrengthAtom);
+  const challengeId = useAtomValue(challengeIdAtom);
+  const challenge = challengeId ? getEndgame(challengeId) : undefined;
+  const strength = challenge ? CHALLENGE_STRENGTH : savedStrength;
+  const shownStrength = effectiveStrength(botEngineName, strength);
+  const setFlipped = useSetAtom(boardFlippedAtom);
+  const setHintArrows = useSetAtom(hintArrowsAtom);
+  const positionKey = useAtomValue(hintPositionKeyAtom);
+  const publishHintArrows = useCallback(
+    (arrows: BoardArrow[]) => setHintArrows({ positionKey, arrows }),
+    [setHintArrows, positionKey]
+  );
+  const analysisEngineName = useFeatureEngineName("advice");
+  const { depth: adviceDepth, multiPv: adviceMultiPv } = useEffectiveAdvice();
+  const { depth: botDrawEvalDepth } = useEffectiveBotDrawEvalDepth();
+  const { goToMove, undoMove } = useChessActions(gameAtom);
+
+  const [hintsOpen, setHintsOpen] = useState(false);
+  const fen = game.fen();
+  const [hintSideChoice, setHintSideChoice] = useState<MoveSideChoice>({
+    side: "mover",
+    fen,
+    positionKey,
+  });
+  const currentHintChoice = resetMoveSideChoice(
+    hintSideChoice,
+    fen,
+    positionKey
+  );
+  const hintSide = effectiveMoveSide(currentHintChoice, fen, positionKey);
+  if (currentHintChoice !== hintSideChoice) {
+    setHintSideChoice(currentHintChoice);
+  }
+  const [confirmResign, setConfirmResign] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  const hintEngine = useEngineState(
+    hintsOpen && activeMode === "casual" ? analysisEngineName : undefined,
+    engineFeatureLabel("advice")
+  );
+
+  const isCasual = activeMode === "casual";
+  const history = game.history();
+  const livePly = history.length;
+  const reviewing = reviewPly !== null && reviewPly < livePly;
+  const shownPly = reviewing ? reviewPly : livePly;
+  const selectPly = (ply: number) => {
+    const next = Math.max(0, Math.min(livePly, ply));
+    setReviewPly(next < livePly ? next : null);
+  };
+  const flip = () => setFlipped((value) => !value);
+  const info = useMemo(() => getGameResult(game, end), [game, end]);
+  const isPlayerTurn = game.turn() === playerColor;
+  const firstMove = game.history({ verbose: true })[0];
+  const startsWithBlack = firstMove?.color === "b";
+  const firstMoveNumber = Number(firstMove?.before.split(" ")[5]) || 1;
+
+  const strengthLabel =
+    shownStrength?.mode === "elo"
+      ? `${shownStrength.elo}`
+      : shownStrength?.mode === "depth"
+        ? `depth ${shownStrength.depth}`
+        : shownStrength?.mode === "max"
+          ? "Full"
+          : "Joke";
+
+  const canChangeStrength =
+    isInProgress && isCasual && !challenge && !!shownStrength;
+
+  const undoDisabledReason = !isCasual
+    ? "Takebacks are not allowed in formal games"
+    : !isInProgress
+      ? "The game is over"
+      : history.length < (isPlayerTurn ? 2 : 1)
+        ? "Nothing to take back yet"
+        : "";
+
+  const handleUndo = () => {
+    if (undoDisabledReason || inCascade || reviewing) return;
+    setReviewPly(null);
+    if (isPlayerTurn) goToMove(history.length - 2, game);
+    else undoMove();
+  };
+
+  const handleResign = () => {
+    setConfirmResign(false);
+    setEnd({ type: "resign", loser: playerColor });
+    setIsInProgress(false);
+  };
+
+  const handleOfferDraw = async () => {
+    setOptionsAnchor(null);
+    const engine = botEngine.engine;
+    if (!engine || !isPlayerTurn || offeringDraw || reviewing || inCascade)
+      return;
+
+    if (getEngineModel(botEngineName).playsOwnMoves) {
+      if (botEngineName === EngineName.Drawfish) {
+        setEnd({ type: "draw-agreed" });
+        setIsInProgress(false);
+        setNotice("Drawfish accepted your draw offer. Of course it did.");
+      } else {
+        setNotice(
+          `${engineLabel(botEngineName).small} plays on, whatever happens.`
+        );
+      }
+      return;
+    }
+
+    setOfferingDraw(true);
+    const stillCurrent = () =>
+      store.get(gameIdAtom) === gameId &&
+      store.get(gameAtom) === game &&
+      store.get(isGameInProgressAtom) &&
+      store.get(enginePlayNameAtom) === botEngineName;
+    try {
+      const result = await engine.evaluatePositionWithUpdate({
+        fen: game.fen(),
+        depth: botDrawEvalDepth,
+        multiPv: 2,
+        useCloudEval: false,
+      });
+      if (!stillCurrent()) return;
+      const playerScore = scoreFromLine(result.lines[0], game.turn());
+      const botScore = -playerScore;
+      if (botScore <= 30 && history.length >= 16) {
+        setEnd({ type: "draw-agreed" });
+        setIsInProgress(false);
+        setNotice(
+          `${engineLabel(botEngineName).small} accepted your draw offer.`
+        );
+      } else {
+        setNotice(
+          history.length < 16
+            ? `${engineLabel(botEngineName).small} declined: too early for a draw.`
+            : `${engineLabel(botEngineName).small} declined the draw offer.`
+        );
+      }
+    } catch (error) {
+      if (stillCurrent()) setNotice("The draw offer could not be evaluated.");
+      console.error(error);
+    } finally {
+      setOfferingDraw(false);
+    }
+  };
+
+  const toggleHints = () => {
+    if (hintsOpen) setHintArrows([]);
+    setHintsOpen(!hintsOpen);
+  };
+
+  const toggleCoach = () => {
+    if (!coachActive && hintsOpen) toggleHints();
+    setCoachActive(!coachActive);
+  };
+
+  const confirmCasualExit = (action: "restart" | "discard") => {
+    setOptionsAnchor(null);
+    setCasualExit(action);
+    setCasualExitOpen(true);
+  };
+
+  const handleCasualExit = () => {
+    if (casualExit === "restart") {
+      const error = restartGame();
+      if (error) setNotice(error);
+    } else {
+      backToSetup();
+    }
+    setCasualExitOpen(false);
+  };
+
+  const outcome = info.over ? getOutcomeFor(info, playerColor) : "drawn";
+  const moveAnnotations = useMemo(
+    () =>
+      coach.moves.length > 0
+        ? coach.moves.map((entry) => ({
+            classification: entry.after?.moveClassification,
+            evaluation: entry.after?.lines[0],
+            status:
+              coach.error && !entry.after?.moveClassification
+                ? ("error" as const)
+                : undefined,
+          }))
+        : undefined,
+    [coach.moves, coach.error]
+  );
+
+  return {
+    reserveHeight: overlay.coachEnabled ? 220 : 176,
+    contextBar: (
+      <VerticalContextStrip
+        left={
+          <>
+            <Typography variant="subtitle2" fontWeight={700} noWrap>
+              vs {engineLabel(botEngineName).small}
+            </Typography>
+            <InspectorPill
+              label={strengthLabel}
+              onClick={
+                canChangeStrength ? () => setStrengthOpen(true) : undefined
+              }
+              tooltip={canChangeStrength ? "Change bot strength" : undefined}
+            />
+            <InspectorPill
+              tone={isCasual ? "neutral" : "warning"}
+              icon={!isCasual ? "mdi:lock-outline" : undefined}
+              label={isCasual ? "Casual" : "Formal"}
+            />
+          </>
+        }
+        right={
+          <StatusBadge
+            over={info.over}
+            isPlayerTurn={isPlayerTurn}
+            botThinking={botThinking}
+            inCheck={game.inCheck()}
+            inProgress={isInProgress}
+          />
+        }
+      />
+    ),
+    liveStrip: (
+      <Stack spacing={0.75} sx={{ flexShrink: 0 }}>
+        {!isInProgress && info.over && (
+          <Box
+            sx={{
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 1.25,
+              overflow: "hidden",
+            }}
+          >
+            <ResultCard
+              reason={info.reason}
+              outcome={outcome}
+              result={info.result}
+              opponent={engineLabel(botEngineName).small}
+            />
+          </Box>
+        )}
+
+        {isInProgress && botError && (
+          <Alert
+            severity="error"
+            sx={{ py: 0.25 }}
+            action={
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => {
+                  setBotError(null);
+                  bumpBotRetry((v) => v + 1);
+                }}
+              >
+                Retry
+              </Button>
+            }
+          >
+            {botError}
+          </Alert>
+        )}
+
+        {/* Live Coach Stage mounts directly under the board when enabled */}
+        <Box
+          ref={coachSlotRef}
+          sx={{ flexShrink: 0, "&:empty": { display: "none" } }}
+        />
+
+        {/* Compact horizontal move ticker when coach is off and game is active */}
+        {isInProgress && !overlay.coachEnabled && (
+          <VerticalLiveStrip minHeight={38} sx={{ px: 1, py: 0.55 }}>
+            {history.length === 0 ? (
+              <Typography variant="caption" color="text.secondary">
+                Play a move on the board to begin.
+              </Typography>
+            ) : (
+              <Stack
+                direction="row"
+                alignItems="center"
+                gap={0.5}
+                sx={{
+                  overflowX: "auto",
+                  scrollbarWidth: "none",
+                  "&::-webkit-scrollbar": { display: "none" },
+                }}
+              >
+                {history.map((san, idx) => {
+                  const ply = idx + 1;
+                  const active = shownPly === ply;
+                  const isWhite = (idx + (startsWithBlack ? 1 : 0)) % 2 === 0;
+                  const moveNum =
+                    firstMoveNumber +
+                    Math.floor((idx + (startsWithBlack ? 1 : 0)) / 2);
+                  return (
+                    <ButtonBase
+                      key={ply}
+                      onClick={() => !inCascade && selectPly(ply)}
+                      sx={(theme) => ({
+                        px: 0.7,
+                        py: 0.25,
+                        borderRadius: 0.75,
+                        flexShrink: 0,
+                        fontSize: "0.78rem",
+                        fontWeight: active ? 700 : 500,
+                        fontVariantNumeric: "tabular-nums",
+                        bgcolor: active
+                          ? alpha(theme.palette.primary.main, 0.2)
+                          : "transparent",
+                        color: active ? "primary.main" : "text.primary",
+                      })}
+                    >
+                      {(isWhite || idx === 0) && (
+                        <Box
+                          component="span"
+                          sx={{ color: "text.secondary", mr: 0.35 }}
+                        >
+                          {moveNum}
+                          {isWhite ? "." : "…"}
+                        </Box>
+                      )}
+                      {san}
+                    </ButtonBase>
+                  );
+                })}
+              </Stack>
+            )}
+          </VerticalLiveStrip>
+        )}
+      </Stack>
+    ),
+    actionBar: (
+      <>
+        <WorkspaceActionBar
+          left={
+            isInProgress ? (
+              <>
+                <ToolbarButton
+                  tooltip="Previous move"
+                  icon="mdi:chevron-left"
+                  iconHeight={22}
+                  disabled={!shownPly || inCascade}
+                  onClick={() => selectPly(shownPly - 1)}
+                />
+                <ToolbarButton
+                  tooltip="Next move"
+                  icon="mdi:chevron-right"
+                  iconHeight={22}
+                  disabled={!reviewing || inCascade}
+                  onClick={() => selectPly(shownPly + 1)}
+                />
+                {isCasual ? (
+                  <>
+                    <DeckButton
+                      icon="mdi:undo-variant"
+                      disabled={!!undoDisabledReason || reviewing || inCascade}
+                      onClick={handleUndo}
+                    >
+                      Undo
+                    </DeckButton>
+                    <DeckButton
+                      active={!coachActive && hintsOpen}
+                      icon="mdi:lightbulb-on-outline"
+                      disabled={
+                        coachActive
+                          ? !interactive.canRequestHint
+                          : reviewing || inCascade
+                      }
+                      onClick={() => {
+                        if (coachActive) void interactive.requestHint();
+                        else toggleHints();
+                      }}
+                    >
+                      Hint
+                    </DeckButton>
+                  </>
+                ) : (
+                  <ToolbarButton
+                    tooltip="Flip board"
+                    icon="mdi:swap-vertical"
+                    iconHeight={20}
+                    onClick={flip}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <ToolbarButton
+                  tooltip="First position"
+                  icon="mdi:skip-previous"
+                  iconHeight={20}
+                  disabled={!shownPly || inCascade}
+                  onClick={() => selectPly(0)}
+                />
+                <ToolbarButton
+                  tooltip="Previous move"
+                  icon="mdi:chevron-left"
+                  iconHeight={22}
+                  disabled={!shownPly || inCascade}
+                  onClick={() => selectPly(shownPly - 1)}
+                />
+                <ToolbarButton
+                  tooltip="Next move"
+                  icon="mdi:chevron-right"
+                  iconHeight={22}
+                  disabled={!reviewing || inCascade}
+                  onClick={() => selectPly(shownPly + 1)}
+                />
+                <ToolbarButton
+                  tooltip="Final position"
+                  icon="mdi:skip-next"
+                  iconHeight={20}
+                  active={reviewing ? true : undefined}
+                  disabled={!reviewing || inCascade}
+                  onClick={() => selectPly(livePly)}
+                />
+              </>
+            )
+          }
+          right={
+            isInProgress ? (
+              <>
+                {!isCasual && (
+                  <>
+                    <DeckButton
+                      subtle
+                      icon="mdi:handshake-outline"
+                      disabled={
+                        !isPlayerTurn ||
+                        !botEngine.engine ||
+                        offeringDraw ||
+                        reviewing ||
+                        inCascade
+                      }
+                      onClick={() => void handleOfferDraw()}
+                    >
+                      Draw
+                    </DeckButton>
+                    <DeckButton
+                      subtle
+                      danger
+                      icon="mdi:flag-outline"
+                      onClick={() => setConfirmResign(true)}
+                    >
+                      Resign
+                    </DeckButton>
+                  </>
+                )}
+                <DeckButton
+                  active={!!optionsAnchor}
+                  icon="mdi:tune-variant"
+                  onClick={(event) => setOptionsAnchor(event.currentTarget)}
+                >
+                  Options
+                </DeckButton>
+              </>
+            ) : (
+              <>
+                <DeckButton
+                  active
+                  icon="mdi:chart-line"
+                  disabled={savedGameId === null}
+                  onClick={() =>
+                    void router.push({
+                      pathname: "/analysis",
+                      query: { gameId: savedGameId },
+                    })
+                  }
+                >
+                  Analyze
+                </DeckButton>
+                <ToolbarButton
+                  tooltip={challengeId ? "Try again" : "Rematch"}
+                  icon="mdi:sync"
+                  iconHeight={20}
+                  onClick={() =>
+                    challengeId
+                      ? startChallenge(challengeId)
+                      : startGame({ playerColor: opposite(playerColor) })
+                  }
+                />
+              </>
+            )
+          }
+        />
+
+        <InspectorPopover
+          title="Game options"
+          open={!!optionsAnchor}
+          anchorEl={optionsAnchor}
+          onClose={() => {
+            setOptionsAnchor(null);
+            overlay.engine.setFocus(null);
+          }}
+          width={316}
+        >
+          <Stack spacing={1.25}>
+            <Stack direction="row" gap={0.75} flexWrap="wrap">
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Icon icon="mdi:swap-vertical" height={16} />}
+                onClick={() => {
+                  flip();
+                  setOptionsAnchor(null);
+                }}
+              >
+                Flip board
+              </Button>
+              {isInProgress && (
+                <>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={
+                      <Icon icon="mdi:handshake-outline" height={16} />
+                    }
+                    disabled={
+                      !isPlayerTurn ||
+                      !botEngine.engine ||
+                      offeringDraw ||
+                      reviewing ||
+                      inCascade
+                    }
+                    onClick={() => void handleOfferDraw()}
+                  >
+                    Offer draw
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    startIcon={<Icon icon="mdi:flag-outline" height={16} />}
+                    onClick={() => {
+                      setOptionsAnchor(null);
+                      setConfirmResign(true);
+                    }}
+                  >
+                    Resign
+                  </Button>
+                </>
+              )}
+            </Stack>
+
+            {isInProgress && isCasual && (
+              <>
+                <Divider />
+                <Stack spacing={0.25}>
+                  <PopoverSectionLabel>Assistance</PopoverSectionLabel>
+                  <PopoverSwitchRow
+                    label="Interactive coach"
+                    checked={coachActive}
+                    onChange={toggleCoach}
+                  />
+                  <PopoverSwitchRow
+                    label="Evaluation bar"
+                    checked={evalBar}
+                    onChange={setEvalBar}
+                  />
+                  {coachActive && (
+                    <PopoverSwitchRow
+                      label="Engine arrows with coach"
+                      checked={arrowsWithCoach}
+                      onChange={setArrowsWithCoach}
+                    />
+                  )}
+                </Stack>
+                {canChangeStrength && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Icon icon="mdi:speedometer" height={16} />}
+                    onClick={() => {
+                      setOptionsAnchor(null);
+                      setStrengthOpen(true);
+                    }}
+                  >
+                    Bot strength ({strengthLabel})
+                  </Button>
+                )}
+              </>
+            )}
+
+            <Divider />
+            <Stack spacing={0.75}>
+              <PopoverSectionLabel>Board overlays</PopoverSectionLabel>
+              <ArrowOverlayControls
+                prefs={overlay.engine.prefs}
+                capabilities={overlay.capabilities}
+                onChange={overlay.engine.update}
+                arrows={overlay.engine.arrows}
+                nameOf={overlay.nameOf}
+                turn={overlay.turn}
+                onFocus={overlay.engine.setFocus}
+              />
+            </Stack>
+
+            {isInProgress && isCasual && (
+              <>
+                <Divider />
+                <Stack direction="row" gap={0.75}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    fullWidth
+                    startIcon={<Icon icon="mdi:restart" height={16} />}
+                    onClick={() => confirmCasualExit("restart")}
+                  >
+                    Restart
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    fullWidth
+                    startIcon={<Icon icon="mdi:exit-to-app" height={16} />}
+                    onClick={() => confirmCasualExit("discard")}
+                  >
+                    End practice
+                  </Button>
+                </Stack>
+              </>
+            )}
+          </Stack>
+        </InspectorPopover>
+
+        <Snackbar
+          open={!!notice}
+          autoHideDuration={4000}
+          onClose={() => setNotice("")}
+          message={notice}
+        />
+
+        <Dialog
+          open={strengthOpen}
+          onClose={() => setStrengthOpen(false)}
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle>Bot strength</DialogTitle>
+          <DialogContent dividers>
+            <StrengthControl
+              value={savedStrength}
+              onChange={setSavedStrength}
+              engineName={botEngineName}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button variant="contained" onClick={() => setStrengthOpen(false)}>
+              Done
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={casualExitOpen} onClose={() => setCasualExitOpen(false)}>
+          <DialogTitle>
+            {casualExit === "restart"
+              ? "Restart this game?"
+              : "End this practice game?"}
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Your current moves will be discarded. This practice game won’t
+              count as a loss.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCasualExitOpen(false)}>
+              Keep playing
+            </Button>
+            <Button variant="contained" onClick={handleCasualExit}>
+              {casualExit === "restart" ? "Restart game" : "End practice"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={confirmResign} onClose={() => setConfirmResign(false)}>
+          <DialogTitle>Resign this game?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              The game will end and count as a loss.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirmResign(false)}>
+              Keep playing
+            </Button>
+            <Button color="error" variant="contained" onClick={handleResign}>
+              Resign
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </>
+    ),
+    sheet: (
+      <Stack spacing={0}>
+        {queuedSource && (
+          <Box sx={{ p: 1.25, borderBottom: 1, borderColor: "divider" }}>
+            <Alert
+              severity="info"
+              sx={{ py: 0.15 }}
+              action={
+                <Button
+                  size="small"
+                  color="inherit"
+                  onClick={() => {
+                    setQueuedSource(null);
+                    setStartingPosition("");
+                  }}
+                >
+                  Clear
+                </Button>
+              }
+            >
+              Next game will inherit the board from {queuedSource}.
+            </Alert>
+          </Box>
+        )}
+
+        {challenge && <ChallengeCard endgame={challenge} />}
+
+        {isInProgress && isCasual && hintsOpen && (
+          <Box sx={{ p: 1.25, borderBottom: 1, borderColor: "divider" }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ mb: 0.75 }}
+            >
+              <Typography
+                variant="caption"
+                fontWeight={700}
+                color="text.secondary"
+              >
+                TOP MOVES
+              </Typography>
+              <IconButton
+                size="small"
+                aria-label="Hide hints"
+                onClick={toggleHints}
+                sx={{ p: 0.25 }}
+              >
+                <Icon icon="mdi:close" height={16} />
+              </IconButton>
+            </Stack>
+            <TopMovesPanel
+              fen={fen}
+              positionKey={positionKey}
+              engine={hintEngine.engine}
+              engineState={hintEngine}
+              side={hintSide}
+              depth={adviceDepth}
+              count={adviceMultiPv}
+              onSideChange={(side) => {
+                setHintArrows([]);
+                setHintSideChoice({ side, fen, positionKey });
+              }}
+              onArrows={publishHintArrows}
+            />
+          </Box>
+        )}
+
+        <Box sx={{ px: 1.25, py: 0.75 }}>
+          <MovesList
+            moves={history}
+            startsWithBlack={startsWithBlack}
+            firstMoveNumber={firstMoveNumber}
+            currentPly={shownPly}
+            onSelect={inCascade ? undefined : selectPly}
+            maxHeight="none"
+            emptyText={
+              isInProgress
+                ? "Play a move on the board to begin."
+                : "No moves played."
+            }
+            annotations={moveAnnotations}
+          />
+        </Box>
+      </Stack>
+    ),
+  };
 }

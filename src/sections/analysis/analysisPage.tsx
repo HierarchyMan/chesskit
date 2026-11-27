@@ -3,16 +3,29 @@ import PanelHeader from "@/sections/analysis/panelHeader";
 import LoadGame from "@/sections/analysis/panelHeader/loadGame";
 import AnalyzeButton from "@/sections/analysis/panelHeader/analyzeButton";
 import BoardWorkspace from "@/components/boardWorkspace";
+import {
+  VerticalContextStrip,
+  VerticalLiveStrip,
+  WorkspaceActionBar,
+} from "@/components/inspector/workspaceActionBar";
 import PanelToolBar from "@/sections/analysis/panelToolbar";
+import BoardNavigation from "@/sections/analysis/panelToolbar/boardNavigation";
+import MoreMenu from "@/sections/analysis/panelToolbar/moreMenu";
 import AnalysisOverlayPanel from "@/sections/analysis/overlayPanel";
 import { useAnalysisOverlay } from "@/sections/analysis/hooks/useAnalysisOverlay";
 import AnalysisTab from "@/sections/analysis/panelBody/analysisTab";
 import EngineLines from "@/sections/analysis/panelBody/analysisTab/engineLines";
+import LineEvaluation from "@/sections/analysis/panelBody/analysisTab/engineLines/lineEvaluation";
+import MoveInfo from "@/sections/analysis/panelBody/analysisTab/moveInfo";
+import VisualizeContinuation from "@/sections/analysis/panelBody/analysisTab/visualizeContinuation";
 import ClassificationTab from "@/sections/analysis/panelBody/classificationTab";
 import {
   analysisInitialTabAtom,
   arrangeModeAtom,
+  boardAtom,
+  currentPositionAtom,
 } from "@/sections/analysis/states";
+import { positionFor } from "@/lib/currentPosition";
 import { arrangeHistoryAtom } from "./sessionAtoms";
 import {
   Box,
@@ -34,7 +47,7 @@ import { Icon } from "@iconify/react";
 import { PageTitle } from "@/components/pageTitle";
 import { AnalysisEngineProvider } from "./engineContext";
 import ArrangeBoard from "./arrange/arrangeBoard";
-import ArrangePanel from "./arrange/arrangePanel";
+import ArrangePanel, { useArrangeVerticalSlots } from "./arrange/arrangePanel";
 import ModeSwitch from "./arrange/modeSwitch";
 import { useArrangeMode } from "./arrange/useArrangeMode";
 import { useAnalysisSources } from "./hooks/useAnalysisSources";
@@ -89,6 +102,14 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
     useArrangeMode();
   // One composition for the page: the board draws it and the overlay lists it.
   const overlay = useAnalysisOverlay();
+  const arrangeVertical = useArrangeVerticalSlots();
+  const board = useAtomValue(boardAtom);
+  const currentPos = positionFor(
+    useAtomValue(currentPositionAtom),
+    board.fen()
+  );
+  const topEngineLine = currentPos?.eval?.lines?.[0];
+  const threatsOn = !!(overlay.prefs.enabled && overlay.prefs.threats);
 
   useEffect(() => {
     if (!initialTab) return;
@@ -131,12 +152,153 @@ function AnalysisPageBody({ title, startInArrangeMode = false }: Props) {
       </Stack>
     );
 
+  const analysisVertical = {
+    contextBar: (
+      <VerticalContextStrip
+        left={<SessionPanel />}
+        right={
+          <>
+            <LoadGame />
+            <AnalyzeButton />
+            <AnalysisOverlayPanel overlay={overlay} />
+            <ModeSwitch />
+          </>
+        }
+      />
+    ),
+    liveStrip: (
+      <Stack spacing={0.5} sx={{ flexShrink: 0 }}>
+        <PanelHeader />
+        <VerticalLiveStrip minHeight={64} sx={{ px: 1, py: 0.65 }}>
+          <Stack spacing={0.5}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              gap={0.5}
+              sx={{ minWidth: 0 }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                {topEngineLine ? (
+                  <LineEvaluation
+                    line={topEngineLine}
+                    action={<VisualizeContinuation compact />}
+                  />
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    {board.isGameOver()
+                      ? "Game over"
+                      : "Engine evaluating position…"}
+                  </Typography>
+                )}
+              </Box>
+              {!board.isGameOver() && (
+                <Button
+                  size="small"
+                  variant={threatsOn ? "contained" : "text"}
+                  color={threatsOn ? "warning" : "inherit"}
+                  onClick={() =>
+                    overlay.update({ enabled: true, threats: !threatsOn })
+                  }
+                  aria-label="Toggle opponent threats"
+                  sx={{
+                    minWidth: 32,
+                    minHeight: 30,
+                    px: 0.75,
+                    flexShrink: 0,
+                    bgcolor: threatsOn ? undefined : "action.hover",
+                  }}
+                >
+                  <Icon icon="mdi:alert-decagram-outline" height={16} />
+                </Button>
+              )}
+            </Stack>
+            <MoveInfo />
+          </Stack>
+        </VerticalLiveStrip>
+      </Stack>
+    ),
+    actionBar: (
+      <WorkspaceActionBar>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <BoardNavigation />
+        </Box>
+        <MoreMenu />
+      </WorkspaceActionBar>
+    ),
+    sheet: (
+      <>
+        <SessionBanners />
+        <EngineLines overlay={overlay} />
+        <Tabs
+          value={tab}
+          onChange={(_, value: number) => {
+            setVisited((previous) => new Set([...previous, value]));
+            setTab(value);
+          }}
+          aria-label="Analysis views"
+          variant="fullWidth"
+          sx={{
+            minHeight: 38,
+            flexShrink: 0,
+            borderBottom: 1,
+            borderColor: "divider",
+            "& .MuiTab-root": {
+              minHeight: 38,
+              py: 0.5,
+              textTransform: "none",
+              fontSize: "0.84rem",
+            },
+          }}
+        >
+          <Tab
+            label="Moves"
+            id="tab0-v"
+            aria-controls="tabContent0-v"
+            icon={<Icon icon="mdi:format-list-bulleted" height={16} />}
+            iconPosition="start"
+          />
+          <Tab
+            label="Review"
+            id="tab1-v"
+            aria-controls="tabContent1-v"
+            icon={<Icon icon="mdi:chart-line" height={16} />}
+            iconPosition="start"
+          />
+        </Tabs>
+
+        <Box sx={{ p: 1.25 }}>
+          <Activity mode={tab === 0 ? "visible" : "hidden"}>
+            {visited.has(0) && <AnalysisTab hidden={tab !== 0} />}
+          </Activity>
+          <Activity mode={tab === 1 ? "visible" : "hidden"}>
+            {visited.has(1) && <ClassificationTab hidden={tab !== 1} />}
+          </Activity>
+        </Box>
+
+        <Box
+          sx={{
+            px: 1,
+            py: 0.5,
+            flexShrink: 0,
+            borderTop: 1,
+            borderColor: "divider",
+            userSelect: "none",
+          }}
+        >
+          <PanelToolBar />
+        </Box>
+      </>
+    ),
+  };
+
   return (
     <>
       <PageTitle title={title} />
       <BoardWorkspace
         inspectorMinWidth={400}
         inspectorLabel="Analysis inspector"
+        vertical={arrange ? arrangeVertical : analysisVertical}
         board={arrange ? <ArrangeBoard /> : <Board overlay={overlay} />}
         inspector={
           <>

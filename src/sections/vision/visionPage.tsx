@@ -13,7 +13,15 @@ import {
   InspectorPill,
   InspectorShell,
 } from "@/components/inspector/inspectorShell";
-import BoardWorkspace, { SquareBoardStage } from "@/components/boardWorkspace";
+import {
+  VerticalContextStrip,
+  VerticalLiveStrip,
+  WorkspaceActionBar,
+} from "@/components/inspector/workspaceActionBar";
+import BoardWorkspace, {
+  SquareBoardStage,
+  type VerticalWorkspaceSlots,
+} from "@/components/boardWorkspace";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import ArrowLayer from "@/components/board/arrowLayer";
 import { BoardArrow } from "@/lib/arrows/types";
@@ -191,10 +199,488 @@ export default function VisionPage() {
     trainer.mode === "find" && trainer.phase === "running" && !!trainer.target;
   const latestFlash = trainer.flashes[0];
 
+  const optionsPopover = (
+    <InspectorPopover
+      title="Vision options"
+      open={!!optionsAnchor}
+      anchorEl={optionsAnchor}
+      onClose={() => setOptionsAnchor(null)}
+      width={316}
+    >
+      <Stack spacing={1.5}>
+        <Box>
+          <PopoverSectionLabel>Board perspective</PopoverSectionLabel>
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
+            size="small"
+            value={trainer.orientationChoice}
+            onChange={(_, value: OrientationChoice | null) =>
+              value && trainer.setOrientationChoice(value)
+            }
+            sx={{
+              mt: 0.6,
+              "& .MuiToggleButton-root": { py: 0.45, fontSize: "0.75rem" },
+            }}
+          >
+            <ToggleButton value="white">White</ToggleButton>
+            <ToggleButton value="random">Random</ToggleButton>
+            <ToggleButton value="black">Black</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
+        {trainer.mode === "knight" && (
+          <Box>
+            <PopoverSectionLabel>Route length</PopoverSectionLabel>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={trainer.difficulty}
+              onChange={(_, value: Difficulty | null) =>
+                value && trainer.setDifficulty(value)
+              }
+              sx={{
+                mt: 0.6,
+                "& .MuiToggleButton-root": {
+                  py: 0.45,
+                  fontSize: "0.74rem",
+                },
+              }}
+            >
+              {(Object.keys(DIFFICULTY_RANGE) as Difficulty[]).map((level) => (
+                <ToggleButton key={level} value={level}>
+                  {DIFFICULTY_LABELS[level]} (
+                  {DIFFICULTY_RANGE[level].join("–")})
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
+        )}
+
+        {labelsAllowed && (
+          <PopoverSwitchRow
+            label="Show square labels"
+            checked={trainer.showLabels}
+            onChange={trainer.setShowLabels}
+          />
+        )}
+
+        <Divider />
+
+        <Typography variant="caption" color="text.secondary">
+          {MODES.find(({ id }) => id === trainer.mode)?.text}
+        </Typography>
+      </Stack>
+    </InspectorPopover>
+  );
+
+  const verticalSlots: VerticalWorkspaceSlots = {
+    hideBoard: isBlindfoldColor,
+    reserveHeight:
+      trainer.mode === "name" && trainer.phase === "running" ? 245 : 176,
+    contextBar: (
+      <VerticalContextStrip
+        left={
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={trainer.mode}
+            onChange={(_, value: VisionMode | null) =>
+              value && trainer.setMode(value)
+            }
+            sx={{
+              "& .MuiToggleButton-root": {
+                py: 0.25,
+                px: 0.75,
+                minHeight: 28,
+                fontSize: "0.73rem",
+                whiteSpace: "nowrap",
+              },
+            }}
+          >
+            {MODES.map(({ id, label }) => (
+              <ToggleButton key={id} value={id}>
+                {label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        }
+        right={
+          trainer.mode === "knight" ? (
+            <InspectorPill
+              icon="mdi:chess-knight"
+              label={`${trainer.knightSolved}`}
+            />
+          ) : (
+            <InspectorPill
+              icon="mdi:trophy-outline"
+              label={`Best ${trainer.bestScore}`}
+            />
+          )
+        }
+      />
+    ),
+    liveStrip: (
+      <VerticalLiveStrip minHeight={72} sx={{ px: 1.15, py: 0.9 }}>
+        {trainer.mode === "knight" ? (
+          <KnightPanel trainer={trainer} />
+        ) : trainer.phase === "idle" ? (
+          <Stack spacing={0.5}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              30-second sprint
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {MODES.find(({ id }) => id === trainer.mode)?.text}
+            </Typography>
+          </Stack>
+        ) : trainer.phase === "done" ? (
+          <TimedPanel trainer={trainer} />
+        ) : trainer.mode === "colour" ? (
+          <Stack spacing={1.25}>
+            <LinearProgress
+              variant="determinate"
+              value={(trainer.msLeft / ROUND_MS) * 100}
+              sx={{ height: 7, borderRadius: 4 }}
+            />
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {(trainer.msLeft / 1000).toFixed(1)}s left
+              </Typography>
+              <Stack direction="row" spacing={1.5}>
+                <Typography
+                  variant="body2"
+                  color="success.main"
+                  sx={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  Hits <b>{trainer.score}</b>
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color={trainer.misses > 0 ? "error.main" : "text.secondary"}
+                  sx={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  Misses <b>{trainer.misses}</b>
+                </Typography>
+              </Stack>
+            </Stack>
+            <Box
+              sx={{
+                py: 3,
+                borderRadius: 1.5,
+                bgcolor: "rgba(16, 18, 24, 0.92)",
+                textAlign: "center",
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "rgba(255,255,255,0.6)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  fontWeight: 600,
+                }}
+              >
+                Light or dark square?
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: "4rem",
+                  lineHeight: 1.05,
+                  fontWeight: 800,
+                  color: "#fff",
+                  my: 0.75,
+                }}
+              >
+                {trainer.target}
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  display: "block",
+                  minHeight: 18,
+                  color: latestFlash
+                    ? latestFlash.correct
+                      ? "success.light"
+                      : "error.light"
+                    : "rgba(255,255,255,0.55)",
+                  fontWeight: latestFlash ? 600 : 400,
+                }}
+              >
+                {latestFlash
+                  ? latestFlash.correct
+                    ? `${latestFlash.square} — Correct`
+                    : `${latestFlash.square} — Missed`
+                  : "Tap Light or Dark below"}
+              </Typography>
+            </Box>
+            <Stack direction="row" gap={1.25}>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{
+                  minHeight: 52,
+                  backgroundColor: "#f0d9b5",
+                  color: "#1a1a1a",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  "&:hover": { backgroundColor: "#e6c999" },
+                }}
+                onClick={() => trainer.answerColour(true)}
+              >
+                Light
+              </Button>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{
+                  minHeight: 52,
+                  backgroundColor: "#7c583c",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  "&:hover": { backgroundColor: "#65462f" },
+                }}
+                onClick={() => trainer.answerColour(false)}
+              >
+                Dark
+              </Button>
+            </Stack>
+          </Stack>
+        ) : trainer.mode === "name" ? (
+          <Stack spacing={0.85}>
+            <LinearProgress
+              variant="determinate"
+              value={(trainer.msLeft / ROUND_MS) * 100}
+              sx={{ height: 6, borderRadius: 4 }}
+            />
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Typography
+                variant="caption"
+                fontWeight={700}
+                sx={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {(trainer.msLeft / 1000).toFixed(1)}s ·{" "}
+                <Box
+                  component="span"
+                  sx={{
+                    color: trainer.typed ? "primary.main" : "text.secondary",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  {trainer.typed ? `${trainer.typed}–` : "Pick file → rank"}
+                </Box>
+              </Typography>
+              <Stack direction="row" spacing={1.25}>
+                <Typography
+                  variant="caption"
+                  color="success.main"
+                  sx={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  Hits <b>{trainer.score}</b>
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color={trainer.misses > 0 ? "error.main" : "text.secondary"}
+                  sx={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  Misses <b>{trainer.misses}</b>
+                </Typography>
+              </Stack>
+            </Stack>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(8, minmax(0, 1fr))",
+                gap: 0.45,
+              }}
+            >
+              {FILES.map((file) => (
+                <Button
+                  key={file}
+                  size="small"
+                  variant={trainer.typed === file ? "contained" : "outlined"}
+                  sx={{ minWidth: 0, px: 0, minHeight: 40, fontWeight: 700 }}
+                  onClick={() => trainer.typeKey(file)}
+                >
+                  {file}
+                </Button>
+              ))}
+            </Box>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(8, minmax(0, 1fr))",
+                gap: 0.45,
+              }}
+            >
+              {RANKS.map((rank) => (
+                <Button
+                  key={rank}
+                  size="small"
+                  variant="outlined"
+                  disabled={!trainer.typed}
+                  sx={{ minWidth: 0, px: 0, minHeight: 40, fontWeight: 700 }}
+                  onClick={() => trainer.typeKey(rank)}
+                >
+                  {rank}
+                </Button>
+              ))}
+            </Box>
+          </Stack>
+        ) : (
+          <Stack spacing={0.75}>
+            <LinearProgress
+              variant="determinate"
+              value={(trainer.msLeft / ROUND_MS) * 100}
+              sx={{ height: 6, borderRadius: 4 }}
+            />
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {(trainer.msLeft / 1000).toFixed(1)}s left
+              </Typography>
+              <Stack direction="row" spacing={1.5}>
+                <Typography
+                  variant="body2"
+                  color="success.main"
+                  sx={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  Hits <b>{trainer.score}</b>
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color={trainer.misses > 0 ? "error.main" : "text.secondary"}
+                  sx={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  Misses <b>{trainer.misses}</b>
+                </Typography>
+              </Stack>
+            </Stack>
+          </Stack>
+        )}
+      </VerticalLiveStrip>
+    ),
+    actionBar: (
+      <>
+        <WorkspaceActionBar
+          left={
+            trainer.phase !== "running" ? (
+              <DeckButton active icon="mdi:play" onClick={trainer.start}>
+                {trainer.phase === "done"
+                  ? "Play again"
+                  : trainer.mode === "knight"
+                    ? "Start"
+                    : "Start round"}
+              </DeckButton>
+            ) : trainer.mode === "knight" ? (
+              trainer.knightResult ? (
+                <>
+                  <DeckButton
+                    active
+                    icon="mdi:skip-next"
+                    onClick={trainer.start}
+                  >
+                    Next route
+                  </DeckButton>
+                  {(trainer.knightResult.used !== trainer.knightResult.best ||
+                    trainer.knightResult.usedHint) && (
+                    <DeckButton
+                      icon="mdi:refresh"
+                      onClick={trainer.retryKnightRoute}
+                    >
+                      Retry
+                    </DeckButton>
+                  )}
+                </>
+              ) : (
+                <>
+                  <DeckButton
+                    icon="mdi:undo-variant"
+                    disabled={trainer.path.length < 2}
+                    onClick={trainer.undoKnight}
+                  >
+                    Undo
+                  </DeckButton>
+                  <DeckButton
+                    active={trainer.showSolution}
+                    icon="mdi:eye-outline"
+                    onClick={() =>
+                      trainer.setShowSolution(!trainer.showSolution)
+                    }
+                  >
+                    {trainer.showSolution ? "Hide" : "Route"}
+                  </DeckButton>
+                </>
+              )
+            ) : (
+              <DeckButton icon="mdi:refresh" onClick={trainer.start}>
+                Restart
+              </DeckButton>
+            )
+          }
+          right={
+            <>
+              {trainer.phase === "running" && trainer.mode !== "knight" && (
+                <DeckButton
+                  subtle
+                  danger
+                  icon="mdi:stop"
+                  onClick={trainer.stop}
+                >
+                  Stop
+                </DeckButton>
+              )}
+              {trainer.phase === "running" &&
+                trainer.mode === "knight" &&
+                !trainer.knightResult && (
+                  <DeckButton
+                    subtle
+                    icon="mdi:skip-next"
+                    onClick={trainer.start}
+                  >
+                    Skip
+                  </DeckButton>
+                )}
+              <DeckButton
+                active={!!optionsAnchor}
+                icon="mdi:tune-variant"
+                onClick={(event) => setOptionsAnchor(event.currentTarget)}
+              >
+                Options
+              </DeckButton>
+            </>
+          }
+        />
+        {optionsPopover}
+      </>
+    ),
+  };
+
   return (
     <BoardWorkspace
       inspectorMinWidth={SIDE_PANEL_WIDTH}
       inspectorLabel="Vision trainer controls"
+      vertical={verticalSlots}
       board={
         <SquareBoardStage>
           {(boardSize) => (

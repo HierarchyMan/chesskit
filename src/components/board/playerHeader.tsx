@@ -1,3 +1,4 @@
+import { useWorkspaceLayout } from "@/components/boardWorkspace";
 import { Color } from "@/types/enums";
 import { Player } from "@/types/game";
 import { Avatar, Box, Grid2 as Grid, Stack, Typography } from "@mui/material";
@@ -36,6 +37,7 @@ export default function PlayerHeader({
   previewFen,
   clockMsAtom = NO_CLOCK_ATOM,
 }: Props) {
+  const { isCompactPhone } = useWorkspaceLayout();
   const game = useAtomValue(gameAtom);
   const liveClockMs = useAtomValue(clockMsAtom);
 
@@ -71,12 +73,12 @@ export default function PlayerHeader({
       justifyContent="space-between"
       alignItems="center"
       size={12}
-      gap={1}
+      gap={isCompactPhone ? 0.75 : 1}
       sx={{
-        height: 44,
-        minHeight: 44,
-        maxHeight: 44,
-        py: 0.25,
+        height: isCompactPhone ? 32 : 44,
+        minHeight: isCompactPhone ? 32 : 44,
+        maxHeight: isCompactPhone ? 32 : 44,
+        py: isCompactPhone ? 0 : 0.25,
         flexShrink: 0,
         minWidth: 0,
         overflow: "hidden",
@@ -87,7 +89,7 @@ export default function PlayerHeader({
       <Stack
         direction="row"
         alignItems="center"
-        spacing={1}
+        spacing={isCompactPhone ? 0.75 : 1}
         sx={{ minWidth: 0, overflow: "hidden" }}
       >
         <Avatar
@@ -95,9 +97,9 @@ export default function PlayerHeader({
           alt={displayName}
           variant="circular"
           sx={(theme) => ({
-            width: 34,
-            height: 34,
-            fontSize: "0.9rem",
+            width: isCompactPhone ? 24 : 34,
+            height: isCompactPhone ? 24 : 34,
+            fontSize: isCompactPhone ? "0.75rem" : "0.9rem",
             fontWeight: 700,
             flexShrink: 0,
             backgroundColor: color === Color.White ? "#f3f4f6" : "#26262c",
@@ -115,8 +117,13 @@ export default function PlayerHeader({
           {initial}
         </Avatar>
 
-        <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-          <Stack direction="row" alignItems="center" spacing={0.6} minWidth={0}>
+        <Stack
+          direction={isCompactPhone ? "row" : "column"}
+          alignItems={isCompactPhone ? "center" : undefined}
+          spacing={isCompactPhone ? 0.75 : 0.25}
+          sx={{ minWidth: 0, overflow: "hidden" }}
+        >
+          <Stack direction="row" alignItems="center" spacing={0.5} minWidth={0}>
             {player.title && (
               <Box
                 component="span"
@@ -141,7 +148,7 @@ export default function PlayerHeader({
             )}
 
             <Typography
-              fontSize="0.88rem"
+              fontSize={isCompactPhone ? "0.82rem" : "0.88rem"}
               fontWeight={isActiveTurn ? 700 : 500}
               lineHeight={1.25}
               noWrap
@@ -154,7 +161,7 @@ export default function PlayerHeader({
                 component="span"
                 color="text.secondary"
                 sx={{
-                  fontSize: "0.8rem",
+                  fontSize: isCompactPhone ? "0.74rem" : "0.8rem",
                   fontWeight: 500,
                   lineHeight: 1.25,
                   fontVariantNumeric: "tabular-nums",
@@ -213,9 +220,9 @@ export default function PlayerHeader({
             return {
               backgroundColor: bg,
               color: fg,
-              height: 32,
-              minWidth: 74,
-              px: 1.25,
+              height: isCompactPhone ? 26 : 32,
+              minWidth: isCompactPhone ? 62 : 74,
+              px: isCompactPhone ? 0.9 : 1.25,
               borderRadius: 1,
               border: "1.5px solid",
               borderColor,
@@ -228,7 +235,7 @@ export default function PlayerHeader({
               alignItems: "center",
               justifyContent: "flex-end",
               flexShrink: 0,
-              fontSize: "0.92rem",
+              fontSize: isCompactPhone ? "0.82rem" : "0.92rem",
               fontWeight: 700,
               lineHeight: 1,
               fontVariantNumeric: "tabular-nums",

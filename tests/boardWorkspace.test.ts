@@ -67,17 +67,21 @@ describe("board workspace fit", () => {
       { width: 948, height: 1026 },
       { width: 1024, height: 1366 },
     ]) {
+      const width = viewport.width - 72;
+      const height = viewport.height - 64;
       const fit = fitBoardWorkspace({
-        width: viewport.width - 72,
-        height: viewport.height - 64,
+        width,
+        height,
         portrait: viewport.height > viewport.width,
         inspectorMinWidth: 380,
         chromeHeight: 156,
         gutterWidth: 48,
       });
       assert.equal(fit.sideBySide, false);
-      assert.equal(fit.boardWidth, viewport.width - 72);
-      assert.equal(fit.inspectorWidth, fit.boardWidth);
+      assert.ok(fit.boardWidth <= width);
+      assert.equal(fit.inspectorWidth, width);
+      // Board + chrome + vertical reserve fit inside the portrait viewport.
+      assert.ok(fit.boardWidth - 48 + 156 + 176 <= height);
     }
   });
   it("uses viewport orientation rather than the shape left by navigation and chrome", () => {
@@ -88,11 +92,30 @@ describe("board workspace fit", () => {
       chromeHeight: 156,
       gutterWidth: 48,
     };
-    assert.equal(fitBoardWorkspace({ ...bounds, portrait: false }).sideBySide, true);
-    assert.equal(fitBoardWorkspace({ ...bounds, portrait: true }).sideBySide, false);
+    assert.equal(
+      fitBoardWorkspace({ ...bounds, portrait: false }).sideBySide,
+      true
+    );
+    assert.equal(
+      fitBoardWorkspace({ ...bounds, portrait: true }).sideBySide,
+      false
+    );
   });
-  it("lets stacked boards use their width and scroll past the viewport height", () => {
-    const fit = fitBoardWorkspace({
+  it("keeps full board width on modern phones while capping wide portrait boards so controls stay above the fold", () => {
+    // Modern phone (390x710 usable): board stays full width (374px).
+    const phone = fitBoardWorkspace({
+      width: 374,
+      height: 656,
+      portrait: true,
+      inspectorMinWidth: 380,
+      chromeHeight: 74,
+      gutterWidth: 24,
+    });
+    assert.equal(phone.sideBySide, false);
+    assert.equal(phone.boardWidth, 374);
+
+    // Wide portrait (900x800): board caps so chrome + reserve remain visible.
+    const widePortrait = fitBoardWorkspace({
       width: 900,
       height: 800,
       portrait: true,
@@ -100,7 +123,21 @@ describe("board workspace fit", () => {
       chromeHeight: 156,
       gutterWidth: 48,
     });
-    assert.equal(fit.boardWidth, 900);
-    assert.ok(fit.boardWidth - 48 + 156 > 800);
+    assert.equal(widePortrait.sideBySide, false);
+    assert.equal(widePortrait.boardWidth, 800 - 156 - 176 + 48);
+    assert.ok(widePortrait.boardWidth < 900);
+  });
+  it("never crushes stacked boards below the playable 220px touch floor on very short viewports", () => {
+    const compact = fitBoardWorkspace({
+      width: 359,
+      height: 440,
+      portrait: true,
+      inspectorMinWidth: 380,
+      chromeHeight: 74,
+      gutterWidth: 24,
+      verticalReserveHeight: 240,
+    });
+    assert.equal(compact.sideBySide, false);
+    assert.equal(compact.boardWidth, 220 + 24);
   });
 });

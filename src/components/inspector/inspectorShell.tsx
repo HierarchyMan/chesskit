@@ -1,4 +1,7 @@
-import { useWorkspacePageFlow } from "@/components/boardWorkspace";
+import {
+  useWorkspaceLayout,
+  useWorkspacePageFlow,
+} from "@/components/boardWorkspace";
 import { Icon } from "@iconify/react";
 import {
   Box,
@@ -252,18 +255,21 @@ export function DeckButton({
   danger?: boolean;
   icon?: string;
 }) {
+  const { sideBySide } = useWorkspaceLayout();
   return (
     <Button
       size="small"
       variant="text"
-      startIcon={icon ? <Icon icon={icon} height={15} /> : undefined}
+      startIcon={
+        icon ? <Icon icon={icon} height={sideBySide ? 15 : 17} /> : undefined
+      }
       sx={[
         (theme) => ({
-          minHeight: 30,
+          minHeight: sideBySide ? 30 : 38,
           minWidth: 0,
-          px: subtle ? 0.65 : 0.8,
+          px: sideBySide ? (subtle ? 0.65 : 0.8) : subtle ? 0.85 : 1.05,
           borderRadius: 1,
-          fontSize: "0.75rem",
+          fontSize: sideBySide ? "0.75rem" : "0.78rem",
           fontWeight: subtle ? 500 : 600,
           textTransform: "none",
           whiteSpace: "nowrap",

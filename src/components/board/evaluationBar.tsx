@@ -1,3 +1,4 @@
+import { useWorkspaceLayout } from "@/components/boardWorkspace";
 import { Box, Typography } from "@mui/material";
 import { PrimitiveAtom, atom, useAtomValue } from "jotai";
 import { useEffect, useState } from "react";
@@ -29,6 +30,7 @@ export default function EvaluationBar({
   currentPositionAtom = noPositionAtom,
   fen,
 }: Props) {
+  const { isCompactPhone } = useWorkspaceLayout();
   const [lastEval, setLastEval] = useState<typeof EMPTY_BAR | null>(null);
   const position = positionFor(useAtomValue(currentPositionAtom), fen);
   const motion = useMotionScale();
@@ -84,7 +86,7 @@ export default function EvaluationBar({
 
   return (
     <Box
-      width={{ xs: "1.6rem", sm: "2rem" }}
+      width={isCompactPhone ? "20px" : { xs: "1.6rem", sm: "2rem" }}
       height={height}
       sx={{
         position: "relative",

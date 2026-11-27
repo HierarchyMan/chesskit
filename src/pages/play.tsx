@@ -5,8 +5,10 @@ import { useEngineState } from "@/hooks/useEngine";
 import { useHandoff } from "@/hooks/useHandoff";
 import { Handoff } from "@/lib/handoff";
 import Board from "@/sections/play/board";
-import GamePanel from "@/sections/play/gamePanel";
-import NewGamePanel from "@/sections/play/newGamePanel";
+import GamePanel, { usePlayVerticalSlots } from "@/sections/play/gamePanel";
+import NewGamePanel, {
+  useNewGameVerticalSlots,
+} from "@/sections/play/newGamePanel";
 import {
   enginePlayNameAtom,
   gameAtom,
@@ -96,12 +98,28 @@ export default function Play() {
     setPendingHandoff(null);
   };
 
+  const newGameVertical = useNewGameVerticalSlots(botEngine);
+  const activeGameVertical = usePlayVerticalSlots({
+    botEngine,
+    overlay,
+    coach: overlay.coach,
+    interactive: overlay.interactiveCoach,
+    coachSlotRef: setCoachSlot,
+  });
+
   return (
     <>
       <PageTitle title="Chesskit Play" />
       <BoardWorkspace
         inspectorMinWidth={400}
         inspectorLabel="Play controls"
+        vertical={
+          !recoveryReady
+            ? undefined
+            : hasGame
+              ? activeGameVertical
+              : newGameVertical
+        }
         board={
           <Board
             engine={botEngine.engine}

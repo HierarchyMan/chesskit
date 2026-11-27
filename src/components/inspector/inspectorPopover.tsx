@@ -1,6 +1,8 @@
+import { useWorkspaceLayout } from "@/components/boardWorkspace";
 import { Icon } from "@iconify/react";
 import {
   Box,
+  Drawer,
   FormControlLabel,
   IconButton,
   Popover,
@@ -19,18 +21,102 @@ interface InspectorPopoverProps
   children: ReactNode;
 }
 
-/** Shared popover surface for Options & Overlays across Play, Arena, Analysis, Puzzles, Vision. */
+/**
+ * Shared popover surface for Options & Overlays across Play, Arena, Analysis, Puzzles, Vision.
+ * Renders as a bottom sheet Drawer on compact vertical phones while staying a Popover on desktop.
+ */
 export function InspectorPopover({
   title,
   onClose,
   width = 316,
   anchorOrigin = { vertical: "top", horizontal: "left" },
   transformOrigin = { vertical: "bottom", horizontal: "left" },
+  open,
   children,
   ...rest
 }: InspectorPopoverProps) {
+  const { isCompactPhone } = useWorkspaceLayout();
+
+  const header = title && (
+    <Stack
+      direction="row"
+      alignItems="center"
+      justifyContent="space-between"
+      sx={{
+        px: 1.5,
+        py: 1,
+        flexShrink: 0,
+        borderBottom: 1,
+        borderColor: "divider",
+      }}
+    >
+      <Typography variant="subtitle2" fontWeight={700}>
+        {title}
+      </Typography>
+      <IconButton
+        size="small"
+        aria-label={`Close ${title.toLowerCase()}`}
+        onClick={onClose}
+        sx={{ p: isCompactPhone ? 0.75 : 0.35 }}
+      >
+        <Icon icon="mdi:close" height={18} />
+      </IconButton>
+    </Stack>
+  );
+
+  if (isCompactPhone) {
+    return (
+      <Drawer
+        anchor="bottom"
+        open={open}
+        onClose={onClose}
+        slotProps={{
+          paper: {
+            sx: {
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              borderTop: 1,
+              borderColor: "divider",
+              maxHeight: "78dvh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              pb: "env(safe-area-inset-bottom, 0px)",
+            },
+          },
+        }}
+      >
+        <Box
+          aria-hidden
+          sx={{
+            width: 36,
+            height: 4,
+            borderRadius: 999,
+            bgcolor: "divider",
+            mx: "auto",
+            mt: 1,
+            mb: 0.25,
+            flexShrink: 0,
+          }}
+        />
+        {header}
+        <Box
+          sx={{
+            px: 1.75,
+            py: 1.5,
+            overflowY: "auto",
+            minHeight: 0,
+          }}
+        >
+          {children}
+        </Box>
+      </Drawer>
+    );
+  }
+
   return (
     <Popover
+      open={open}
       onClose={onClose}
       marginThreshold={12}
       anchorOrigin={anchorOrigin}
@@ -52,32 +138,7 @@ export function InspectorPopover({
       }}
       {...rest}
     >
-      {title && (
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{
-            px: 1.5,
-            py: 1,
-            flexShrink: 0,
-            borderBottom: 1,
-            borderColor: "divider",
-          }}
-        >
-          <Typography variant="subtitle2" fontWeight={700}>
-            {title}
-          </Typography>
-          <IconButton
-            size="small"
-            aria-label={`Close ${title.toLowerCase()}`}
-            onClick={onClose}
-            sx={{ p: 0.35 }}
-          >
-            <Icon icon="mdi:close" height={17} />
-          </IconButton>
-        </Stack>
-      )}
+      {header}
       <Box
         sx={{
           px: 1.5,
@@ -106,6 +167,7 @@ export function PopoverSwitchRow({
   disabled?: boolean;
   onChange: (value: boolean) => void;
 }) {
+  const { isCompactPhone } = useWorkspaceLayout();
   return (
     <Box>
       <FormControlLabel
@@ -122,7 +184,7 @@ export function PopoverSwitchRow({
         sx={{
           m: 0,
           width: "100%",
-          minHeight: 34,
+          minHeight: isCompactPhone ? 42 : 34,
           justifyContent: "space-between",
           gap: 2,
         }}

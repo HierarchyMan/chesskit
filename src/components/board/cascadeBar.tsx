@@ -1,3 +1,4 @@
+import { useWorkspaceLayout } from "@/components/boardWorkspace";
 import { Icon } from "@iconify/react";
 import {
   Box,
@@ -70,11 +71,12 @@ export default function CascadeBar({
     cascade.active
   );
 
+  const { sideBySide } = useWorkspaceLayout();
   if (!cascade.active) return null;
 
   const transportButtonSx = {
-    width: 28,
-    height: 28,
+    width: sideBySide ? 28 : 38,
+    height: sideBySide ? 28 : 38,
     borderRadius: 1,
     p: 0,
   };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useWorkspaceLayout } from "@/components/boardWorkspace";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
 import {
@@ -83,6 +84,7 @@ export default function CoachStage({
   onCascadeExit,
   onCascadeTryAgain,
 }: Props) {
+  const { isCompactPhone } = useWorkspaceLayout();
   const game = useAtomValue(gameAtom);
   const isInProgress = useAtomValue(isGameInProgressAtom);
   const reviewing = useAtomValue(reviewPlyAtom) !== null;
@@ -275,24 +277,28 @@ export default function CoachStage({
       data-coach-stage
       sx={(theme) => ({
         width: "100%",
-        height: { xs: 196, sm: 216 },
-        "@media (max-height: 680px)": { height: 176 },
-        "@media (max-height: 550px)": { height: 152 },
+        height: isCompactPhone ? 136 : { xs: 196, sm: 216 },
+        "@media (max-height: 680px)": { height: isCompactPhone ? 124 : 176 },
+        "@media (max-height: 550px)": { height: isCompactPhone ? 114 : 152 },
         flexShrink: 0,
         boxSizing: "border-box",
         overflow: "hidden",
         display: "flex",
+        border: isCompactPhone ? "1px solid" : undefined,
+        borderRadius: isCompactPhone ? 1.25 : 0,
         borderBottom: "1px solid",
         borderColor: cascade.active
           ? alpha("#f5b82e", 0.55)
           : theme.palette.divider,
         bgcolor: cascade.active
           ? alpha("#f5b82e", theme.palette.mode === "dark" ? 0.08 : 0.09)
-          : theme.palette.mode === "dark"
-            ? alpha(theme.palette.common.white, 0.022)
-            : alpha(theme.palette.primary.main, 0.025),
-        px: 1.5,
-        py: 1,
+          : isCompactPhone
+            ? theme.palette.background.paper
+            : theme.palette.mode === "dark"
+              ? alpha(theme.palette.common.white, 0.022)
+              : alpha(theme.palette.primary.main, 0.025),
+        px: isCompactPhone ? 1.1 : 1.5,
+        py: isCompactPhone ? 0.75 : 1,
         transition: "border-color 200ms ease, background-color 200ms ease",
       })}
     >

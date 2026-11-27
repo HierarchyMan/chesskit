@@ -89,7 +89,12 @@ function LayoutBody({ children }: PropsWithChildren) {
             component="main"
             sx={
               workspace
-                ? { p: 1.5, minWidth: 0 }
+                ? {
+                    px: { xs: 1, sm: 1.5 },
+                    pt: { xs: 0.75, sm: 1.5 },
+                    pb: { xs: 0, sm: 1.5 },
+                    minWidth: 0,
+                  }
                 : {
                     px: { xs: 1.5, sm: 3 },
                     py: { xs: 1.5, sm: 2.5 },

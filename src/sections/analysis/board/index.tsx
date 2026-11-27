@@ -11,6 +11,7 @@ import {
 } from "../states";
 import { Color } from "@/types/enums";
 import Board from "@/components/board";
+import { useWorkspaceLayout } from "@/components/boardWorkspace";
 import CascadeBar from "@/components/board/cascadeBar";
 import { usePlayersData } from "@/hooks/usePlayersData";
 import { AnalysisOverlay } from "../hooks/useAnalysisOverlay";
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export default function BoardContainer({ overlay }: Props) {
+  const { sideBySide } = useWorkspaceLayout();
   const sessionId = useAtomValue(analysisSessionAtom)?.id;
   const navigate = useAnalysisNavigation();
   const boardOrientation = useAtomValue(boardOrientationAtom);
@@ -100,9 +102,9 @@ export default function BoardContainer({ overlay }: Props) {
             onExit={cascade.stop}
             showCaption={false}
           />
-        ) : (
+        ) : sideBySide ? (
           <BoardNavigation />
-        )
+        ) : undefined
       }
     />
   );

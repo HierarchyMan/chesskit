@@ -1,5 +1,5 @@
 import { Box, Grid2 as Grid } from "@mui/material";
-import { useBoardStage } from "@/components/boardWorkspace";
+import { useBoardStage, useWorkspaceLayout } from "@/components/boardWorkspace";
 import Chessboard from "./motionChessboard";
 import { Atom, PrimitiveAtom, atom, useAtomValue, useSetAtom } from "jotai";
 import {
@@ -105,6 +105,8 @@ export interface Props {
   threatMarks?: boolean;
   /** Called with +1 or -1 as the wheel turns over the board, to step through moves. */
   onWheelStep?: (direction: 1 | -1) => void;
+  /** Hide generic placeholder player bars in stacked/vertical mode (e.g. Openings, Puzzles). */
+  hidePlayersInVertical?: boolean;
 }
 
 /** The board's width in pixels, measured as it changes. */
@@ -152,15 +154,23 @@ export default function Board({
   premoves = false,
   threatMarks = false,
   onWheelStep,
+  hidePlayersInVertical = false,
 }: Props) {
   const stage = useBoardStage();
+  const { sideBySide, isCompactPhone } = useWorkspaceLayout();
   const boardSize = stage?.width ?? suppliedBoardSize;
   const rootRef = useRef<HTMLDivElement>(null);
   const stackRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const [barTop, setBarTop] = useState(0);
   const reportChrome = stage?.reportChrome;
-  const hasEvalGutter = showEvaluationBar || reserveEvaluationBar;
+  // On horizontal desktop, keep the eval gutter stably reserved when requested.
+  // On vertical/stacked screens, only allocate the gutter when the bar is actually on
+  // so Formal Play, Setup, and eval-off modes get full centered board width.
+  const hasEvalGutter = sideBySide
+    ? showEvaluationBar || reserveEvaluationBar
+    : showEvaluationBar;
+  const showPlayers = sideBySide || !hidePlayersInVertical;
   useLayoutEffect(() => {
     if (!stackRef.current || !boardRef.current) return;
     const measure = () => {
@@ -638,7 +648,7 @@ export default function Board({
       {hasEvalGutter && (
         <Box
           sx={{
-            width: { xs: "1.6rem", sm: "2rem" },
+            width: isCompactPhone ? "20px" : { xs: "1.6rem", sm: "2rem" },
             flexShrink: 0,
             alignSelf: "stretch",
             position: "relative",
@@ -671,27 +681,37 @@ export default function Board({
       <Grid
         ref={stackRef}
         container
-        rowGap={0.75}
+        rowGap={isCompactPhone ? 0.5 : 0.75}
         justifyContent="center"
         alignItems="center"
-        paddingLeft={{
-          xs: hasEvalGutter ? 0.75 : 0,
-          sm: hasEvalGutter ? 1.25 : 0,
-        }}
+        paddingLeft={
+          isCompactPhone
+            ? hasEvalGutter
+              ? 0.5
+              : 0
+            : {
+                xs: hasEvalGutter ? 0.75 : 0,
+                sm: hasEvalGutter ? 1.25 : 0,
+              }
+        }
         size="grow"
         sx={{ minWidth: 0, flexWrap: "nowrap", flexDirection: "column" }}
       >
         {header}
 
-        <PlayerHeader
-          previewFen={previewFen}
-          color={boardOrientation === Color.White ? Color.Black : Color.White}
-          gameAtom={gameAtom}
-          player={boardOrientation === Color.White ? blackPlayer : whitePlayer}
-          clockMsAtom={
-            boardOrientation === Color.White ? blackClockAtom : whiteClockAtom
-          }
-        />
+        {showPlayers && (
+          <PlayerHeader
+            previewFen={previewFen}
+            color={boardOrientation === Color.White ? Color.Black : Color.White}
+            gameAtom={gameAtom}
+            player={
+              boardOrientation === Color.White ? blackPlayer : whitePlayer
+            }
+            clockMsAtom={
+              boardOrientation === Color.White ? blackClockAtom : whiteClockAtom
+            }
+          />
+        )}
 
         <Grid
           container
@@ -792,15 +812,19 @@ export default function Board({
           <DrawBadges result={drawResult} orientation={orientation} />
         </Grid>
 
-        <PlayerHeader
-          previewFen={previewFen}
-          color={boardOrientation}
-          gameAtom={gameAtom}
-          player={boardOrientation === Color.White ? whitePlayer : blackPlayer}
-          clockMsAtom={
-            boardOrientation === Color.White ? whiteClockAtom : blackClockAtom
-          }
-        />
+        {showPlayers && (
+          <PlayerHeader
+            previewFen={previewFen}
+            color={boardOrientation}
+            gameAtom={gameAtom}
+            player={
+              boardOrientation === Color.White ? whitePlayer : blackPlayer
+            }
+            clockMsAtom={
+              boardOrientation === Color.White ? whiteClockAtom : blackClockAtom
+            }
+          />
+        )}
 
         {footer}
       </Grid>

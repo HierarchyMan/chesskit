@@ -6,7 +6,14 @@ export interface WorkspaceBounds {
   gutterWidth: number;
   /** Viewport orientation, independent of navigation and header space. */
   portrait?: boolean;
+  /**
+   * Minimum vertical pixels reserved for above-the-fold context, live feedback,
+   * and the primary action bar in stacked/vertical mode.
+   */
+  verticalReserveHeight?: number;
 }
+
+export const DEFAULT_VERTICAL_RESERVE_HEIGHT = 176;
 
 /** Fit the square and its real chrome; inspector contents never enter this calculation. */
 export function fitBoardWorkspace({
@@ -16,6 +23,7 @@ export function fitBoardWorkspace({
   chromeHeight,
   gutterWidth,
   portrait = height > width,
+  verticalReserveHeight = DEFAULT_VERTICAL_RESERVE_HEIGHT,
 }: WorkspaceBounds) {
   const gap = 20;
   const usableSquare = 300;
@@ -24,12 +32,16 @@ export function fitBoardWorkspace({
     width >= inspectorMinWidth + gap + gutterWidth + usableSquare &&
     height >= chromeHeight + 160;
   const stageWidth = sideBySide ? width - inspectorMinWidth - gap : width;
+  const maxVerticalSquare = Math.max(
+    220,
+    Math.floor(height - chromeHeight - verticalReserveHeight)
+  );
   const square = Math.max(
     160,
     Math.floor(
       Math.min(
         Math.max(0, stageWidth - gutterWidth),
-        sideBySide ? Math.max(160, height - chromeHeight) : Infinity
+        sideBySide ? Math.max(160, height - chromeHeight) : maxVerticalSquare
       )
     )
   );

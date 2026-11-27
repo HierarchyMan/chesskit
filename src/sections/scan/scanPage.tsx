@@ -98,6 +98,21 @@ export default function ScanPage() {
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const previewWrapRef = useRef<HTMLDivElement>(null);
+  const [previewSize, setPreviewSize] = useState(320);
+
+  useEffect(() => {
+    const el = previewWrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const width = Math.floor(el.clientWidth);
+      if (width > 0) setPreviewSize(Math.min(320, width));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loaded, grid]);
   const processor = useRef<ScanProcessor | null>(null);
   const generation = useRef(0);
   const getProcessor = useCallback(() => {
@@ -466,12 +481,17 @@ export default function ScanPage() {
               borderRadius: 1.5,
             }}
           >
-            <Stack spacing={1.5} alignItems="center">
+            <Stack
+              spacing={1.5}
+              alignItems="center"
+              ref={previewWrapRef}
+              width="100%"
+            >
               {outcome ? (
                 <>
                   <MiniBoard
                     fen={fen}
-                    size={320}
+                    size={previewSize}
                     orientation={effectiveOrientation}
                     showCoordinates={true}
                     animationDuration={0}

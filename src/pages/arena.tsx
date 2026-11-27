@@ -10,7 +10,9 @@ import { PageTitle } from "@/components/pageTitle";
 import BoardWorkspace from "@/components/boardWorkspace";
 import { useHandoff } from "@/hooks/useHandoff";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
-import ArenaSidePanel from "@/sections/arena/sidePanel";
+import ArenaSidePanel, {
+  useArenaVerticalSlots,
+} from "@/sections/arena/sidePanel";
 import {
   arenaAnalysisOptionAtoms,
   arenaArrowPrefsAtom,
@@ -136,12 +138,34 @@ export default function Arena() {
     arena.started
   );
 
+  const storyControls = <StoryControls story={story} />;
+  const overlayControls = arena.started ? (
+    <ArrowOverlayControls
+      prefs={engine.prefs}
+      capabilities={ARROW_CAPABILITIES.arena}
+      onChange={engine.update}
+      arrows={engine.arrows}
+      nameOf={colorNamer}
+      turn={displayedFen.split(" ")[1] === "b" ? "b" : "w"}
+      onFocus={engine.setFocus}
+    />
+  ) : undefined;
+
+  const arenaVertical = useArenaVerticalSlots({
+    arena,
+    story,
+    storyControls,
+    onArrows: setArrows,
+    overlayControls,
+  });
+
   return (
     <>
       <PageTitle title="Chesskit Engine Arena" />
       <BoardWorkspace
         inspectorMinWidth={400}
         inspectorLabel="Arena controls"
+        vertical={arenaVertical}
         board={
           <Board
             id="ArenaBoard"

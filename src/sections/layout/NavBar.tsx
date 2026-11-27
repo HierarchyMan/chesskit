@@ -70,7 +70,15 @@ export default function NavBar({
         userSelect: "none",
       }}
     >
-      <Toolbar variant="dense" sx={{ minHeight: 56, height: 56, gap: 0.75 }}>
+      <Toolbar
+        variant="dense"
+        sx={{
+          minHeight: { xs: 48, sm: 56 },
+          height: { xs: 48, sm: 56 },
+          px: { xs: 1, sm: 2 },
+          gap: { xs: 0.45, sm: 0.75 },
+        }}
+      >
         {!isDesktop && (
           <>
             <IconButton
@@ -107,7 +115,7 @@ export default function NavBar({
             minWidth: 0,
           }}
         >
-          {current && (
+          {current && isSmOrGreater && (
             <Box
               sx={{
                 display: "flex",

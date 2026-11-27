@@ -1,3 +1,4 @@
+import { useWorkspaceLayout } from "@/components/boardWorkspace";
 import { IconButton, Tooltip } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Icon } from "@iconify/react";
@@ -23,6 +24,8 @@ export const ToolbarButton = ({
   active,
   danger = false,
 }: Props) => {
+  const { sideBySide } = useWorkspaceLayout();
+  const touchSize = sideBySide ? 36 : 40;
   return (
     <Tooltip title={tooltip} disableInteractive>
       <span>
@@ -35,8 +38,8 @@ export const ToolbarButton = ({
           sx={(theme) => ({
             padding: "6px",
             borderRadius: 1,
-            width: 36,
-            height: 36,
+            width: touchSize,
+            height: touchSize,
             flexShrink: 0,
             userSelect: "none",
             color: danger

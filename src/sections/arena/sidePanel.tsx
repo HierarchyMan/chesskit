@@ -1,4 +1,5 @@
 import EngineStatusChip from "@/components/engineStatusChip";
+import type { VerticalWorkspaceSlots } from "@/components/boardWorkspace";
 import { EngineField } from "@/components/enginePicker";
 import {
   InspectorPopover,
@@ -13,6 +14,11 @@ import {
   InspectorPill,
   InspectorShell,
 } from "@/components/inspector/inspectorShell";
+import {
+  VerticalContextStrip,
+  VerticalLiveStrip,
+  WorkspaceActionBar,
+} from "@/components/inspector/workspaceActionBar";
 import MovesList from "@/components/movesList";
 import PrettyMoveSan from "@/components/prettyMoveSan";
 import StrengthControl from "@/components/strengthControl";
@@ -1202,4 +1208,706 @@ function ResultCard({ arena }: { arena: Arena }) {
       </Stack>
     </Box>
   );
+}
+
+/**
+ * Vertical workspace slots for Engine Arena (both Match Setup and Active Match).
+ */
+export function useArenaVerticalSlots({
+  arena,
+  onArrows,
+  overlayControls,
+  story,
+  storyControls,
+}: {
+  arena: Arena;
+  story: ReturnType<typeof useInBoardCascade>;
+  storyControls: ReactNode;
+  onArrows: (arrows: PositionArrows) => void;
+  overlayControls?: ReactNode;
+}): VerticalWorkspaceSlots {
+  const router = useRouter();
+  const [speed, setSpeed] = useAtom(arenaSpeedAtom);
+  const [variety, setVariety] = useAtom(arenaVarietyAtom);
+  const [, setFlipped] = useAtom(arenaFlippedAtom);
+  const [editingPlayers, setEditingPlayers] = useAtom(arenaEditingPlayersAtom);
+  const [queuedSource, setQueuedSource] = useAtom(arenaQueuedSourceAtom);
+  const [showFen, setShowFen] = useState(!!arena.startFen);
+  const [showBoardPreview, setShowBoardPreview] = useState(false);
+  const [tab, setTab] = useState(0);
+  const [optionsAnchor, setOptionsAnchor] = useState<HTMLElement | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"restart" | "new" | null>(
+    null
+  );
+
+  const preview = useMemo(
+    () => setupPosition(arena.startFen),
+    [arena.startFen]
+  );
+
+  useEffect(() => {
+    if (arena.startFen) setShowFen(true);
+  }, [arena.startFen]);
+
+  const anyError =
+    arena.whiteEngine.status === "error" ||
+    arena.blackEngine.status === "error";
+  const bothReady =
+    arena.whiteEngine.status === "ready" &&
+    arena.blackEngine.status === "ready";
+  const startLabel = anyError
+    ? "Engine unavailable"
+    : bothReady
+      ? "Start the match"
+      : "Loading engines…";
+
+  const canAdvance = arena.proposal.status === "ready" && !arena.isOver;
+  const hasMoves = arena.totalPlies > 0;
+  const history = arena.game.history();
+  const { analysis } = arena;
+  const activeIndex = arena.displayPly - 1;
+  const entry = activeIndex >= 0 ? analysis.moves[activeIndex] : undefined;
+  const firstMove = analysis.moves[0]?.move;
+
+  const liveCandidates = useMemo(
+    () =>
+      arena.started &&
+      arena.proposal.status === "ready" &&
+      arena.proposal.fen === arena.game.fen()
+        ? linesToTopMoves(arena.proposal.fen, arena.proposal.choice.lines, 4)
+        : [],
+    [arena.started, arena.proposal, arena.game]
+  );
+
+  const readyChoiceUci =
+    arena.proposal.status === "ready" ? arena.proposal.choice.uci : undefined;
+  const chosenCandidate = readyChoiceUci
+    ? (liveCandidates.find((c) => c.uci === readyChoiceUci) ??
+      liveCandidates[0])
+    : undefined;
+
+  const requestReset = (action: "restart" | "new") => {
+    setOptionsAnchor(null);
+    arena.setRunning(false);
+    if (!hasMoves) {
+      if (action === "restart") arena.start();
+      else arena.stop();
+      return;
+    }
+    setConfirmAction(action);
+  };
+
+  // Match setup vertical slots
+  if (!arena.started) {
+    const hasCustomFen = Boolean(arena.startFen?.trim());
+    return {
+      hideBoard: !hasCustomFen && !showBoardPreview,
+      contextBar: (
+        <VerticalContextStrip
+          left={
+            <Typography variant="subtitle2" fontWeight={700} noWrap>
+              Set up match
+            </Typography>
+          }
+          right={
+            <>
+              {!hasCustomFen && (
+                <InspectorPill
+                  icon={
+                    showBoardPreview ? "mdi:eye-off-outline" : "mdi:eye-outline"
+                  }
+                  label={showBoardPreview ? "Hide board" : "Preview"}
+                  onClick={() => setShowBoardPreview((value) => !value)}
+                />
+              )}
+              <InspectorPill
+                tone={anyError ? "error" : bothReady ? "success" : "neutral"}
+                label={
+                  anyError
+                    ? "Unavailable"
+                    : bothReady
+                      ? "Engines ready"
+                      : "Loading…"
+                }
+              />
+            </>
+          }
+        />
+      ),
+      sheet: (
+        <Stack spacing={2} sx={{ p: 1.5 }}>
+          <SideSetup
+            title="White"
+            side={arena.white}
+            onChange={arena.setWhite}
+            state={arena.whiteEngine}
+          />
+          <Divider />
+          <SideSetup
+            title="Black"
+            side={arena.black}
+            onChange={arena.setBlack}
+            state={arena.blackEngine}
+          />
+          <Stack direction="row" gap={0.75} flexWrap="wrap">
+            <Button
+              size="small"
+              variant="outlined"
+              color="inherit"
+              startIcon={<Icon icon="mdi:swap-horizontal" height={17} />}
+              onClick={arena.swapSides}
+              sx={{ borderColor: "divider" }}
+            >
+              Swap sides
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="inherit"
+              startIcon={<Icon icon="mdi:pencil-ruler" height={17} />}
+              disabled={!!preview.error}
+              onClick={() => {
+                setHandoff(
+                  { kind: "fen", fen: preview.fen, source: "Arena" },
+                  "/editor"
+                );
+                void router.push("/editor");
+              }}
+              sx={{ borderColor: "divider" }}
+            >
+              Board editor
+            </Button>
+            <Button
+              size="small"
+              variant="text"
+              color="inherit"
+              endIcon={
+                <Icon
+                  icon={showFen ? "mdi:chevron-up" : "mdi:chevron-down"}
+                  height={17}
+                />
+              }
+              onClick={() => setShowFen((open) => !open)}
+              sx={{ color: "text.secondary" }}
+            >
+              Custom FEN
+            </Button>
+          </Stack>
+          <Collapse in={showFen}>
+            <TextField
+              size="small"
+              fullWidth
+              label="Start from FEN (optional)"
+              value={arena.startFen ?? ""}
+              onChange={(event) => {
+                arena.setStartFen(event.target.value || undefined);
+              }}
+              error={!!preview.error}
+              helperText={
+                preview.error ??
+                "Leave blank for the standard starting position."
+              }
+            />
+          </Collapse>
+        </Stack>
+      ),
+      actionBar: (
+        <WorkspaceActionBar>
+          <Button
+            variant="contained"
+            size="medium"
+            fullWidth
+            disabled={!bothReady || !!preview.error}
+            startIcon={
+              <Icon
+                icon={anyError ? "mdi:alert-circle-outline" : "mdi:play"}
+                height={20}
+              />
+            }
+            onClick={() => arena.start()}
+            sx={{ minHeight: 40, borderRadius: 1, fontWeight: 700 }}
+          >
+            {startLabel}
+          </Button>
+        </WorkspaceActionBar>
+      ),
+    };
+  }
+
+  // Active match vertical slots
+  return {
+    contextBar: (
+      <VerticalContextStrip
+        left={
+          <>
+            <Typography
+              variant="subtitle2"
+              fontWeight={700}
+              noWrap
+              sx={{ fontSize: "0.82rem" }}
+            >
+              {sideLabel(arena.white)} vs {sideLabel(arena.black)}
+            </Typography>
+            <InspectorPill
+              icon="mdi:account-cog-outline"
+              label="Players"
+              onClick={() => setEditingPlayers(true)}
+            />
+          </>
+        }
+        right={
+          !arena.isOver ? (
+            <Stack direction="row" alignItems="center" gap={0.5}>
+              {arena.proposal.status === "thinking" ? (
+                <CircularProgress size={11} thickness={5} />
+              ) : (
+                <Box
+                  sx={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: "50%",
+                    border: 1.5,
+                    borderColor: "divider",
+                    bgcolor: arena.turn === "w" ? "#f2f2f2" : "#1d1d1d",
+                  }}
+                />
+              )}
+              <Typography
+                variant="caption"
+                fontWeight={600}
+                color="text.secondary"
+              >
+                {arena.turn === "w" ? "White" : "Black"}
+              </Typography>
+            </Stack>
+          ) : undefined
+        }
+      />
+    ),
+    liveStrip: arena.isOver ? (
+      <Box
+        sx={{
+          border: 1,
+          borderColor: "divider",
+          borderRadius: 1.25,
+          overflow: "hidden",
+          flexShrink: 0,
+        }}
+      >
+        <ResultCard arena={arena} />
+      </Box>
+    ) : story.projection.active ? (
+      <Box sx={{ flexShrink: 0 }}>{storyControls}</Box>
+    ) : (
+      <VerticalLiveStrip minHeight={64} sx={{ px: 1.1, py: 0.7 }}>
+        <Stack spacing={0.55}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            gap={0.75}
+          >
+            <Stack direction="row" alignItems="center" gap={0.6} minWidth={0}>
+              <Typography
+                variant="caption"
+                fontWeight={700}
+                color="text.secondary"
+                noWrap
+              >
+                {sideLabel(arena.mover)}:
+              </Typography>
+              {chosenCandidate ? (
+                <>
+                  <Typography variant="body2" fontWeight={700} component="span">
+                    <PrettyMoveSan
+                      san={chosenCandidate.san}
+                      color={arena.turn}
+                    />
+                  </Typography>
+                  <InspectorPill label={chosenCandidate.evalLabel} />
+                </>
+              ) : (
+                <Typography variant="caption" color="text.secondary">
+                  {arena.proposal.status === "error"
+                    ? arena.proposal.message
+                    : "Thinking…"}
+                </Typography>
+              )}
+            </Stack>
+
+            {chosenCandidate && (
+              <Button
+                size="small"
+                variant="contained"
+                disabled={arena.running}
+                onClick={() => arena.playCandidate(chosenCandidate.uci)}
+                sx={{ minHeight: 28, py: 0.15, px: 1.1, fontSize: "0.75rem" }}
+              >
+                Play
+              </Button>
+            )}
+          </Stack>
+
+          {liveCandidates.length > 1 && (
+            <Stack
+              direction="row"
+              alignItems="center"
+              gap={0.5}
+              sx={{
+                overflowX: "auto",
+                scrollbarWidth: "none",
+                "&::-webkit-scrollbar": { display: "none" },
+              }}
+            >
+              {liveCandidates
+                .filter((c) => c.uci !== chosenCandidate?.uci)
+                .map((candidate) => (
+                  <InspectorPill
+                    key={candidate.uci}
+                    label={`#${candidate.rank} ${candidate.san} (${candidate.evalLabel})`}
+                    onClick={() => arena.playCandidate(candidate.uci)}
+                  />
+                ))}
+            </Stack>
+          )}
+        </Stack>
+      </VerticalLiveStrip>
+    ),
+    actionBar: (
+      <>
+        <WorkspaceActionBar
+          left={
+            <>
+              <ToolbarButton
+                tooltip="Previous move"
+                icon="mdi:chevron-left"
+                iconHeight={22}
+                disabled={arena.displayPly <= 0}
+                onClick={() => arena.stepReview(-1)}
+              />
+              <ToolbarButton
+                tooltip="Next move"
+                icon="mdi:chevron-right"
+                iconHeight={22}
+                disabled={!arena.isReviewing}
+                onClick={() => arena.stepReview(1)}
+              />
+              {!arena.isOver && (
+                <>
+                  <DeckButton
+                    active={arena.running}
+                    icon={arena.running ? "mdi:pause" : "mdi:play"}
+                    onClick={() => arena.setRunning(!arena.running)}
+                  >
+                    {arena.running ? "Pause" : "Auto"}
+                  </DeckButton>
+                  <DeckButton
+                    icon="mdi:skip-next"
+                    disabled={!canAdvance || arena.running}
+                    onClick={arena.acceptProposal}
+                  >
+                    Next
+                  </DeckButton>
+                </>
+              )}
+            </>
+          }
+          right={
+            <>
+              <ToolbarButton
+                tooltip="Take back"
+                icon="mdi:undo-variant"
+                iconHeight={20}
+                disabled={!hasMoves}
+                onClick={arena.takeBack}
+              />
+              <ToolbarButton
+                tooltip="Arena options"
+                icon="mdi:tune-variant"
+                iconHeight={20}
+                active={!!optionsAnchor || undefined}
+                onClick={() => setOptionsAnchor(document.body)}
+              />
+            </>
+          }
+        />
+
+        <InspectorPopover
+          title="Arena options"
+          open={!!optionsAnchor}
+          anchorEl={optionsAnchor}
+          onClose={() => setOptionsAnchor(null)}
+          width={324}
+        >
+          <Stack spacing={1.5}>
+            <Stack direction="row" gap={0.75} flexWrap="wrap">
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Icon icon="mdi:swap-vertical" height={16} />}
+                onClick={() => {
+                  setFlipped((value) => !value);
+                  setOptionsAnchor(null);
+                }}
+              >
+                Flip board
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Icon icon="mdi:restart" height={16} />}
+                onClick={() => requestReset("restart")}
+              >
+                Restart
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<Icon icon="mdi:plus" height={16} />}
+                onClick={() => requestReset("new")}
+              >
+                New match
+              </Button>
+            </Stack>
+
+            <Box>
+              <PopoverSectionLabel>Auto-play speed</PopoverSectionLabel>
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                fullWidth
+                value={speed}
+                onChange={(_, value: number | null) =>
+                  value !== null && setSpeed(value)
+                }
+                sx={{
+                  mt: 0.6,
+                  "& .MuiToggleButton-root": {
+                    py: 0.45,
+                    fontSize: "0.75rem",
+                  },
+                }}
+              >
+                {ARENA_SPEEDS.map((option) => (
+                  <ToggleButton key={option.ms} value={option.ms}>
+                    {option.label}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Box>
+
+            <Box>
+              <Stack direction="row" justifyContent="space-between">
+                <PopoverSectionLabel>Move variety</PopoverSectionLabel>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}
+                >
+                  {Math.round(variety * 100)}%
+                </Typography>
+              </Stack>
+              <Slider
+                size="small"
+                min={0}
+                max={1}
+                step={0.05}
+                value={variety}
+                onChange={(_, value) => setVariety(value as number)}
+                aria-label="Variety"
+              />
+            </Box>
+
+            {overlayControls && (
+              <>
+                <Divider />
+                <Stack spacing={0.75}>
+                  <PopoverSectionLabel>Board overlays</PopoverSectionLabel>
+                  {overlayControls}
+                </Stack>
+              </>
+            )}
+          </Stack>
+        </InspectorPopover>
+
+        <Dialog
+          open={editingPlayers}
+          onClose={() => setEditingPlayers(false)}
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle>Arena players</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <SideSetup
+                title="White"
+                side={arena.white}
+                onChange={arena.setWhite}
+                state={arena.whiteEngine}
+              />
+              <Divider />
+              <SideSetup
+                title="Black"
+                side={arena.black}
+                onChange={arena.setBlack}
+                state={arena.blackEngine}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: "space-between", px: 2 }}>
+            <Button
+              size="small"
+              color="inherit"
+              startIcon={<Icon icon="mdi:swap-horizontal" height={17} />}
+              onClick={arena.swapSides}
+            >
+              Swap sides
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => setEditingPlayers(false)}
+            >
+              Done
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={confirmAction !== null}
+          onClose={() => setConfirmAction(null)}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>
+            {confirmAction === "restart"
+              ? "Restart match?"
+              : "Leave current match?"}
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {confirmAction === "restart"
+                ? "This clears the current moves and restarts from move 1."
+                : "This ends the current match and returns to player setup."}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirmAction(null)}>Cancel</Button>
+            <Button
+              variant="contained"
+              color="warning"
+              onClick={() => {
+                const action = confirmAction;
+                setConfirmAction(null);
+                if (action === "restart") arena.start();
+                else if (action === "new") arena.stop();
+              }}
+            >
+              {confirmAction === "restart" ? "Restart" : "New match"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </>
+    ),
+    sheet: (
+      <Stack spacing={0}>
+        {queuedSource && (
+          <Box sx={{ p: 1.25, borderBottom: 1, borderColor: "divider" }}>
+            <Alert
+              severity="info"
+              sx={{ py: 0.15 }}
+              action={
+                <Button
+                  size="small"
+                  color="inherit"
+                  onClick={() => {
+                    setQueuedSource(null);
+                    arena.setStartFen(undefined);
+                  }}
+                >
+                  Clear
+                </Button>
+              }
+            >
+              Next match will start from the board sent from {queuedSource}.
+            </Alert>
+          </Box>
+        )}
+
+        {!arena.isOver && <ProposalSection arena={arena} onArrows={onArrows} />}
+
+        <Tabs
+          value={tab}
+          onChange={(_, value: number) => setTab(value)}
+          aria-label="Arena views"
+          variant="fullWidth"
+          sx={{
+            minHeight: 38,
+            borderBottom: 1,
+            borderColor: "divider",
+            "& .MuiTab-root": {
+              minHeight: 38,
+              py: 0.5,
+              textTransform: "none",
+              fontSize: "0.82rem",
+            },
+          }}
+        >
+          <Tab
+            label="Moves"
+            icon={<Icon icon="mdi:format-list-bulleted" height={15} />}
+            iconPosition="start"
+          />
+          <Tab
+            label="Analysis"
+            icon={<Icon icon="mdi:chart-line" height={15} />}
+            iconPosition="start"
+          />
+        </Tabs>
+
+        <Box sx={{ px: 1.25, py: 0.75 }}>
+          {tab === 0 ? (
+            <Stack spacing={1}>
+              <MovesList
+                moves={history}
+                startsWithBlack={firstMove?.color === "b"}
+                firstMoveNumber={Number(firstMove?.before.split(" ")[5] ?? 1)}
+                currentPly={arena.displayPly}
+                onSelect={(ply) => arena.goToPly(ply)}
+                annotations={
+                  analysis.showAnnotations
+                    ? analysis.moves.map((move) => ({
+                        classification: move.after?.moveClassification,
+                        evaluation: move.after?.lines[0],
+                        status:
+                          analysis.error && !move.after?.moveClassification
+                            ? "error"
+                            : undefined,
+                      }))
+                    : undefined
+                }
+                maxHeight="none"
+                emptyText={
+                  arena.isOver
+                    ? "This starting position is already game over."
+                    : "No moves yet. Tap Auto or Next."
+                }
+              />
+              {analysis.showAnnotations && entry && (
+                <MoveFeedback
+                  entry={entry}
+                  onShowStory={(value) => {
+                    arena.setRunning(false);
+                    story.start(value, { exitLabel: "Back to game" });
+                  }}
+                />
+              )}
+            </Stack>
+          ) : (
+            <AnalysisCard arena={arena} />
+          )}
+        </Box>
+      </Stack>
+    ),
+  };
 }

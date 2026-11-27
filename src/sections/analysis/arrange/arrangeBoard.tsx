@@ -8,7 +8,7 @@ import {
 import { Box, Grid2 as Grid, Typography } from "@mui/material";
 import { useAtom, useAtomValue } from "jotai";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { useBoardStage } from "@/components/boardWorkspace";
+import { useBoardStage, useWorkspaceLayout } from "@/components/boardWorkspace";
 import Chessboard from "@/components/board/motionChessboard";
 import { PIECE_SLIDE_MS } from "@/lib/pieceMotion";
 import { Square } from "react-chessboard/dist/chessboard/types";
@@ -24,6 +24,7 @@ type BoardPositionObject = Record<string, PieceCode>;
 
 export default function ArrangeBoard() {
   const stage = useBoardStage();
+  const { sideBySide } = useWorkspaceLayout();
   const boardSize = stage?.width;
   const reportChrome = stage?.reportChrome;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -77,41 +78,49 @@ export default function ArrangeBoard() {
       width={boardSize}
       sx={{ maxWidth: "100%" }}
     >
-      {/* Reserve the same eval-bar gutter as AnalysisBoard so toggling Arrange never shifts the board */}
-      <Box
-        aria-hidden
-        sx={{
-          width: { xs: "1.6rem", sm: "2rem" },
-          flexShrink: 0,
-        }}
-      />
+      {/* Reserve the same eval-bar gutter as AnalysisBoard on desktop so toggling Arrange never shifts the board */}
+      {sideBySide && (
+        <Box
+          aria-hidden
+          sx={{
+            width: { xs: "1.6rem", sm: "2rem" },
+            flexShrink: 0,
+          }}
+        />
+      )}
       <Grid
         ref={stackRef}
         container
         rowGap={0.75}
         justifyContent="center"
         alignItems="center"
-        paddingLeft={{ xs: 0.75, sm: 1.25 }}
+        paddingLeft={sideBySide ? { xs: 0.75, sm: 1.25 } : 0}
         size="grow"
         sx={{ minWidth: 0, flexWrap: "nowrap", flexDirection: "column" }}
       >
-        <Box
-          sx={{
-            height: 44,
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            px: 0.5,
-          }}
-        >
-          <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            {orientation ? "Black side" : "White side"}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Board editor · drag pieces or click squares
-          </Typography>
-        </Box>
+        {sideBySide && (
+          <Box
+            sx={{
+              height: 44,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              px: 0.5,
+            }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              fontWeight={600}
+            >
+              {orientation ? "Black side" : "White side"}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Board editor · drag pieces or click squares
+            </Typography>
+          </Box>
+        )}
         <Box
           ref={boardRef}
           sx={{
@@ -149,21 +158,27 @@ export default function ArrangeBoard() {
             showBoardNotation={appearance.showBoardNotation}
           />
         </Box>
-        <Box
-          sx={{
-            height: 94,
-            width: "100%",
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            pt: 1,
-            px: 0.5,
-          }}
-        >
-          <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            {orientation ? "White side" : "Black side"}
-          </Typography>
-        </Box>
+        {sideBySide && (
+          <Box
+            sx={{
+              height: 94,
+              width: "100%",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              pt: 1,
+              px: 0.5,
+            }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              fontWeight={600}
+            >
+              {orientation ? "White side" : "Black side"}
+            </Typography>
+          </Box>
+        )}
       </Grid>
     </Grid>
   );
